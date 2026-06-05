@@ -39,6 +39,7 @@ npm-debug.log*
 # Database
 *.db
 *.sqlite
+apps/api/osaja_welfare.db
 
 # Celery
 celerybeat-schedule

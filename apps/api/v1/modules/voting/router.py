@@ -1,58 +1,70 @@
-from uuid import uuid4
+from typing import Annotated
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from v1.core.auth.dependencies import get_current_member, require_admin
+from v1.core.database import get_db
+from v1.core.models import Member
 from v1.core.schemas import ApiResponse, VoteCreate, VoteSubmit
-from v1.core.services import services
+from v1.core.services import platform_service
 
 router = APIRouter(prefix="/voting", tags=["Voting"])
 
 
 @router.post("", response_model=ApiResponse)
-async def create_vote(payload: VoteCreate):
+async def create_vote(
+    payload: VoteCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[Member, Depends(require_admin)],
+):
     options = [{**opt, "id": opt.get("id", str(uuid4()))} for opt in payload.options]
-    vote = services.create_vote({
-        **payload.model_dump(),
-        "options": options,
-        "opens_at": payload.opens_at.isoformat(),
-        "closes_at": payload.closes_at.isoformat(),
-    })
+    vote = await platform_service.create_vote(
+        db,
+        {**payload.model_dump(), "options": options},
+        created_by=admin.id,
+    )
     return ApiResponse(success=True, data=vote, message="Vote created")
 
 
 @router.patch("/{vote_id}/open", response_model=ApiResponse)
-async def open_vote(vote_id: str):
-    vote = services._votes.get(vote_id)
-    if not vote:
-        raise HTTPException(status_code=404, detail="Vote not found")
-    vote["status"] = "open"
+async def open_vote(
+    vote_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[Member, Depends(require_admin)],
+):
+    try:
+        vote = await platform_service.open_vote(db, vote_id, actor_id=admin.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return ApiResponse(success=True, data=vote, message="Vote opened")
 
 
 @router.post("/{vote_id}/submit", response_model=ApiResponse)
-async def submit_vote(vote_id: str, payload: VoteSubmit):
+async def submit_vote(
+    vote_id: UUID,
+    payload: VoteSubmit,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
     try:
-        result = services.submit_vote(vote_id, payload.member_id, payload.option_id)
+        result = await platform_service.submit_vote(
+            db, vote_id, current.id, UUID(payload.option_id), actor_id=current.id
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return ApiResponse(success=True, data=result, message="Vote submitted and locked")
 
 
 @router.get("/{vote_id}/results", response_model=ApiResponse)
-async def vote_results(vote_id: str):
+async def vote_results(
+    vote_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(get_current_member)],
+):
     try:
-        results = services.get_vote_results(vote_id)
+        data = await platform_service.get_vote_results(db, vote_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-
-    option_ids = [o["id"] for o in services._votes[vote_id].get("options", [])]
-    winner = services.vote_engine.get_winner(vote_id, option_ids)
-
-    return ApiResponse(
-        success=True,
-        data={
-            "results": results,
-            "winner_option_id": winner,
-            "total_votes": services.vote_engine.get_total_votes(vote_id),
-        },
-    )
+    return ApiResponse(success=True, data=data)

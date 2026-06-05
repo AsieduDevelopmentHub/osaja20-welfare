@@ -22,8 +22,35 @@ class MemberResponse(BaseModel):
     membership_id: str
     batch: int
     status: str
+    role: str
     email_verified: bool
     registration_date: str
+
+
+class AuthRegister(BaseModel):
+    full_name: str = Field(min_length=2, max_length=200)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    phone_number: str = Field(min_length=10, max_length=20)
+    date_of_birth: date
+    membership_id: str
+    batch: int = 2020
+
+
+class AuthLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class AuthProfileUpdate(BaseModel):
+    full_name: str | None = None
+    phone_number: str | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
 
 
 class WelfareCaseCreate(BaseModel):
@@ -40,7 +67,6 @@ class ContributionCreate(BaseModel):
     member_id: str
     amount: float = Field(gt=0)
     reference: str = ""
-    created_by: str
     verified_by: str | None = None
 
 
@@ -57,7 +83,6 @@ class VoteCreate(BaseModel):
 
 
 class VoteSubmit(BaseModel):
-    member_id: str
     option_id: str
 
 

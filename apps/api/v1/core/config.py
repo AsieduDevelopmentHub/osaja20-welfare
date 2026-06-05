@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     api_version: str = "v1"
     debug: bool = False
 
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/osaja_welfare"
+    # SQLite works out of the box for local dev (no Docker). Use PostgreSQL in production.
+    database_url: str = "sqlite+aiosqlite:///./osaja_welfare.db"
     redis_url: str = "redis://localhost:6379/0"
 
     supabase_url: str = ""

@@ -33,8 +33,10 @@ CREATE TABLE members (
   batch INTEGER NOT NULL DEFAULT 2020,
   registration_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   status member_status NOT NULL DEFAULT 'pending',
+  role user_role NOT NULL DEFAULT 'member',
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
   auth_user_id UUID,
+  password_hash VARCHAR(255),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

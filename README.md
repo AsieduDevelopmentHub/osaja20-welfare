@@ -41,11 +41,16 @@ The platform uses purpose-built algorithms for robustness:
 ## Quick Start
 
 ```bash
-pnpm install
+npx pnpm@9.15.0 install
 cd infrastructure/docker && docker compose up -d postgres redis
-cd ../../apps/api && pip install -r requirements.txt && uvicorn v1.main:app --reload
-pnpm dev:member
-pnpm dev:admin
+
+# API — uses local venv (not global pip)
+.\scripts\setup-api-venv.ps1    # Windows
+./scripts/setup-api-venv.sh     # macOS/Linux
+.\scripts\run-api.ps1
+
+npx pnpm dev:member
+npx pnpm dev:admin
 ```
 
 See [docs/setup/Installation.md](docs/setup/Installation.md) for full setup instructions.

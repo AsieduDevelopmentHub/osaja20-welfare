@@ -1,25 +1,46 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
+from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from v1.core.auth.dependencies import require_executive
+from v1.core.database import get_db
+from v1.core.models import Member
 from v1.core.schemas import ApiResponse, ContributionCreate
-from v1.core.services import services
+from v1.core.services import platform_service
 
 router = APIRouter(prefix="/contributions", tags=["Contributions"])
 
 
 @router.post("", response_model=ApiResponse)
-async def record_contribution(payload: ContributionCreate):
-    if payload.member_id not in services._members:
+async def record_contribution(
+    payload: ContributionCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    member = await platform_service.get_member(db, UUID(payload.member_id))
+    if not member:
         raise HTTPException(status_code=404, detail="Member not found")
+
     try:
-        record = services.record_contribution(payload.model_dump())
+        record = await platform_service.record_contribution(
+            db,
+            {
+                **payload.model_dump(),
+                "created_by": str(executive.id),
+            },
+            actor_id=executive.id,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return ApiResponse(success=True, data=record, message="Contribution recorded")
 
 
 @router.get("/summary", response_model=ApiResponse)
-async def contribution_summary():
-    return ApiResponse(
-        success=True,
-        data={"total_contributions": services.ledger.get_total_contributions()},
-    )
+async def contribution_summary(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    summary = await platform_service.get_contribution_summary(db)
+    return ApiResponse(success=True, data=summary)

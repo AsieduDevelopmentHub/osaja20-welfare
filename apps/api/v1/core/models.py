@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
@@ -13,9 +14,9 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from v1.core.database import Base
@@ -63,7 +64,7 @@ class VoteLifecycle(str, enum.Enum):
 class Member(Base):
     __tablename__ = "members"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -74,7 +75,7 @@ class Member(Base):
     status: Mapped[str] = mapped_column(String(20), default=MemberStatus.PENDING.value, index=True)
     role: Mapped[str] = mapped_column(String(20), default=UserRole.MEMBER.value, index=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True, nullable=True)
+    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -90,7 +91,7 @@ class Member(Base):
 class WelfareCase(Base):
     __tablename__ = "welfare_cases"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -106,7 +107,7 @@ class WelfareCase(Base):
 class Contribution(Base):
     __tablename__ = "contributions"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     type: Mapped[str] = mapped_column(String(50), default="dues")
@@ -121,7 +122,7 @@ class Contribution(Base):
 class Vote(Base):
     __tablename__ = "votes"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     vote_type: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -141,7 +142,7 @@ class Vote(Base):
 class VoteOption(Base):
     __tablename__ = "vote_options"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("votes.id", ondelete="CASCADE"), nullable=False)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
     sort_order: Mapped[int] = mapped_column(default=0)
@@ -153,7 +154,7 @@ class VoteSubmission(Base):
     __tablename__ = "vote_submissions"
     __table_args__ = (UniqueConstraint("member_id", "vote_id", name="uq_vote_submission_member_vote"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("votes.id"), nullable=False, index=True)
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
     option_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("vote_options.id"), nullable=False)
@@ -166,23 +167,23 @@ class VoteSubmission(Base):
 class VoteAuditLog(Base):
     __tablename__ = "vote_audit_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     vote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("votes.id"), nullable=False, index=True)
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False)
     action: Mapped[str] = mapped_column(String(100), nullable=False)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    entity_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
