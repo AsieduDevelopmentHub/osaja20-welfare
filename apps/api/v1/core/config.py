@@ -14,10 +14,14 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
+    supabase_jwt_secret: str = ""
 
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24
+
+    # Use local email/password auth when Supabase is not configured
+    use_local_auth: bool = True
 
     cors_origins: list[str] = [
         "http://localhost:3000",
