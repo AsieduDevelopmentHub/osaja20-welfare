@@ -1,0 +1,9 @@
+[project]
+name = "osaja-api"
+version = "0.1.0"
+description = "OSAJA'20 Welfare Platform API"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
