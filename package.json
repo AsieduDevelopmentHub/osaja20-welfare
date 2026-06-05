@@ -1,0 +1,19 @@
+{
+  "name": "osaja20-welfare",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OSAJA'20 Welfare Platform — Asuofua D/A JHS Block A Batch 2020",
+  "scripts": {
+    "dev:member": "pnpm --filter @osaja/member-app dev",
+    "dev:admin": "pnpm --filter @osaja/admin-portal dev",
+    "dev:web": "pnpm run dev:member & pnpm run dev:admin",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
