@@ -13,11 +13,21 @@
 npx pnpm@9.15.0 install
 ```
 
-## 2. Start infrastructure
+## 2. Start infrastructure (optional for local dev)
+
+The API defaults to **SQLite** — no Docker required for local development.
+
+For PostgreSQL + Redis (production-like setup):
 
 ```bash
 cd infrastructure/docker
 docker compose up -d postgres redis
+```
+
+Then set in `apps/api/.env`:
+
+```
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/osaja_welfare
 ```
 
 ## 3. Set up API virtual environment (local, not global)
