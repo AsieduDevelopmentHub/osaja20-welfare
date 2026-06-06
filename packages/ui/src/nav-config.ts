@@ -3,6 +3,7 @@ import {
   Bell,
   Cake,
   LayoutDashboard,
+  Settings,
   User,
   Vote,
   Wallet,
@@ -21,4 +22,5 @@ export const memberNavItems: NavItem[] = [
   { href: "/birthdays", label: "Birthdays", icon: Cake },
   { href: "/voting", label: "Voting", icon: Vote },
   { href: "/profile", label: "Profile", icon: User },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];

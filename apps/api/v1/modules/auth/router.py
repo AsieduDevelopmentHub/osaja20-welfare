@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from v1.core.database import get_db
 from v1.core.member_identity import validate_username
 from v1.core.models import Member, MemberStatus
 from v1.core.schemas import ApiResponse, AuthLogin, AuthProfileUpdate, AuthRegister, TokenResponse
+from v1.core.avatar_storage import delete_member_avatar_files, save_avatar
 from v1.core.serializers import member_to_dict
 from v1.core.services import platform_service
 
@@ -235,20 +236,43 @@ async def update_profile(
     current: Annotated[Member, Depends(get_current_member)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if payload.full_name is not None:
-        current.full_name = payload.full_name
-    if payload.phone_number is not None:
-        current.phone_number = payload.phone_number
+    prefs = payload.preferences.model_dump(exclude_none=True) if payload.preferences else None
+    try:
+        member = await platform_service.update_member_profile(
+            db,
+            current,
+            full_name=payload.full_name,
+            phone_number=payload.phone_number,
+            username=payload.username,
+            date_of_birth=payload.date_of_birth,
+            preferences=prefs,
+            actor_id=current.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
-    await db.flush()
-    await platform_service.log_activity(
-        db,
-        actor_id=current.id,
-        action="profile_updated",
-        entity_type="member",
-        entity_id=current.id,
-    )
-    return ApiResponse(success=True, data=member_to_dict(current), message="Profile updated")
+    return ApiResponse(success=True, data=member_to_dict(member), message="Profile updated")
+
+
+@router.post("/profile/avatar", response_model=ApiResponse)
+async def upload_avatar(
+    current: Annotated[Member, Depends(get_current_member)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...),
+):
+    avatar_url = await save_avatar(current.id, file)
+    member = await platform_service.set_member_avatar(db, current, avatar_url, actor_id=current.id)
+    return ApiResponse(success=True, data=member_to_dict(member), message="Profile photo updated")
+
+
+@router.delete("/profile/avatar", response_model=ApiResponse)
+async def remove_avatar(
+    current: Annotated[Member, Depends(get_current_member)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    delete_member_avatar_files(current.id)
+    member = await platform_service.clear_member_avatar(db, current, actor_id=current.id)
+    return ApiResponse(success=True, data=member_to_dict(member), message="Profile photo removed")
 
 
 @router.post("/logout", response_model=ApiResponse)

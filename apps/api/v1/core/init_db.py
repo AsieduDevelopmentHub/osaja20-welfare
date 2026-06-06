@@ -40,6 +40,11 @@ async def _apply_migrations(conn) -> None:
                 )
             sync_conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_members_username ON members (username)"))
 
+        if "avatar_url" not in cols:
+            sync_conn.execute(text("ALTER TABLE members ADD COLUMN avatar_url VARCHAR(500)"))
+        if "preferences" not in cols:
+            sync_conn.execute(text("ALTER TABLE members ADD COLUMN preferences JSON"))
+
         if "contributions" in insp.get_table_names():
             contrib_cols = {c["name"] for c in insp.get_columns("contributions")}
             if "period_year" not in contrib_cols:

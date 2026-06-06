@@ -2,11 +2,12 @@
 
 import { DUES } from "@osaja/config";
 import { formatCurrency } from "@osaja/utils";
-import { BellRing, ChevronRight, Mail, Phone, Receipt, Shield, User } from "lucide-react";
+import { ChevronRight, Mail, Phone, Receipt, Settings, Shield, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DuesStatusBanner } from "@/components/DuesStatusBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import { mapDuesSummary } from "@/lib/types";
@@ -14,7 +15,6 @@ import type { DuesSummary } from "@osaja/types";
 
 export default function ProfilePage() {
   const { member } = useAuth();
-  const [pushStatus, setPushStatus] = useState("");
   const [dues, setDues] = useState<DuesSummary | null>(null);
 
   useEffect(() => {
@@ -23,20 +23,6 @@ export default function ProfilePage() {
       .then((r) => setDues(mapDuesSummary(r.data as Record<string, unknown>)))
       .catch(() => {});
   }, [member]);
-
-  const enablePush = async () => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setPushStatus("Push notifications are not supported in this browser.");
-      return;
-    }
-    try {
-      await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
-      setPushStatus("Service worker registered. Add VAPID keys on the server to enable push delivery.");
-    } catch {
-      setPushStatus("Could not register for push notifications.");
-    }
-  };
 
   if (!member) return null;
 
@@ -50,21 +36,27 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Profile" description="Your membership details and notification settings." />
+      <PageHeader title="Profile" description="Your membership overview." />
 
       <div className="glass-card overflow-hidden">
         <div className="border-b border-slate-100 bg-gradient-to-br from-brand-navy/5 to-brand-gold/5 px-5 py-6 sm:px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-navy text-xl font-bold text-white">
-              {member.fullName.charAt(0).toUpperCase()}
-            </div>
-            <div>
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <ProfileAvatar member={member} size="lg" />
+            <div className="min-w-0 flex-1 text-center sm:text-left">
               <p className="text-lg font-bold text-slate-900">{member.fullName}</p>
-              <p className="text-sm text-slate-500">{member.membershipId}</p>
+              <p className="text-sm text-slate-500">@{member.username}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">{member.membershipId}</p>
               <span className="mt-2 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold capitalize text-emerald-700 ring-1 ring-emerald-200">
                 {member.status}
               </span>
             </div>
+            <Link
+              href="/settings"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-brand-navy shadow-sm transition hover:bg-slate-50"
+            >
+              <Settings className="h-4 w-4" />
+              Edit profile
+            </Link>
           </div>
         </div>
 
@@ -102,18 +94,6 @@ export default function ProfilePage() {
       </Link>
 
       {dues ? <DuesStatusBanner dues={dues} compact /> : null}
-
-      <div className="glass-card p-4 sm:p-6">
-        <h3 className="font-semibold text-slate-900">Push notifications</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Get alerts for dues reminders, votes, welfare updates, and birthdays.
-        </p>
-        <button type="button" onClick={enablePush} className="btn-primary mt-4 flex items-center gap-2">
-          <BellRing className="h-5 w-5" />
-          Enable push
-        </button>
-        {pushStatus ? <p className="mt-3 text-sm text-slate-600">{pushStatus}</p> : null}
-      </div>
     </div>
   );
 }

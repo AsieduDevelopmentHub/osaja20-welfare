@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from v1.core.config import settings
 from v1.core.database import async_session
@@ -19,6 +21,8 @@ from v1.modules.welfare.router import router as welfare_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
+    (Path(settings.uploads_dir) / "avatars").mkdir(parents=True, exist_ok=True)
     await init_database()
     async with async_session() as session:
         await warm_indexes(session)
@@ -53,6 +57,10 @@ app.include_router(dashboard_router, prefix=API_PREFIX)
 app.include_router(notifications_router, prefix=API_PREFIX)
 app.include_router(announcements_router, prefix=API_PREFIX)
 app.include_router(push_router, prefix=API_PREFIX)
+
+uploads_path = Path(settings.uploads_dir)
+if uploads_path.exists():
+    app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 
 @app.get("/health")

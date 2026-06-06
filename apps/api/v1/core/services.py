@@ -43,6 +43,7 @@ from v1.core.member_identity import (
     resolve_member_by_identifier,
     validate_username,
 )
+from v1.core.member_preferences import PREFERENCE_KEYS, merge_preferences
 from v1.core.password import hash_password, verify_password
 from v1.core.serializers import (
     contribution_to_dict,
@@ -111,6 +112,21 @@ class AlgorithmRegistry:
                 day=member.date_of_birth.day,
             )
         )
+
+    def _reindex_member(self, member: Member, *, old_full_name: str, old_username: str, old_dob) -> None:
+        mid = str(member.id)
+        self.member_index.remove(mid, old_full_name, member.email, member.membership_id, old_username)
+        self._index_member(member)
+        if old_dob != member.date_of_birth:
+            self.birthday_index.remove(mid, old_dob.month, old_dob.day)
+            self.birthday_index.insert(
+                BirthdayMember(
+                    member_id=mid,
+                    full_name=member.full_name,
+                    month=member.date_of_birth.month,
+                    day=member.date_of_birth.day,
+                )
+            )
 
 
 registry = AlgorithmRegistry()
@@ -270,6 +286,104 @@ class PlatformService:
             entity_type="member",
             entity_id=member.id,
             metadata={"role": role},
+        )
+        return member
+
+    async def update_member_profile(
+        self,
+        db: AsyncSession,
+        member: Member,
+        *,
+        full_name: str | None = None,
+        phone_number: str | None = None,
+        username: str | None = None,
+        date_of_birth=None,
+        preferences: dict | None = None,
+        actor_id: UUID | None = None,
+    ) -> Member:
+        old_full_name = member.full_name
+        old_username = member.username
+        old_dob = member.date_of_birth
+        changed_search = False
+
+        if full_name is not None:
+            member.full_name = full_name.strip()
+            changed_search = True
+        if phone_number is not None:
+            member.phone_number = phone_number.strip()
+        if username is not None:
+            normalized = validate_username(username)
+            if normalized != member.username:
+                taken = await db.execute(
+                    select(Member).where(Member.username == normalized, Member.id != member.id)
+                )
+                if taken.scalar_one_or_none():
+                    raise ValueError("Username already taken")
+                member.username = normalized
+                changed_search = True
+        if date_of_birth is not None:
+            member.date_of_birth = date_of_birth
+            changed_search = True
+        if preferences:
+            current = merge_preferences(member.preferences_json)
+            for key, value in preferences.items():
+                if key in PREFERENCE_KEYS and value is not None:
+                    current[key] = bool(value)
+            member.preferences_json = current
+
+        await db.flush()
+
+        if changed_search:
+            registry._reindex_member(
+                member,
+                old_full_name=old_full_name,
+                old_username=old_username,
+                old_dob=old_dob,
+            )
+
+        await self.log_activity(
+            db,
+            actor_id=actor_id or member.id,
+            action="profile_updated",
+            entity_type="member",
+            entity_id=member.id,
+        )
+        return member
+
+    async def set_member_avatar(
+        self,
+        db: AsyncSession,
+        member: Member,
+        avatar_url: str,
+        *,
+        actor_id: UUID | None = None,
+    ) -> Member:
+        member.avatar_url = avatar_url
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id or member.id,
+            action="avatar_updated",
+            entity_type="member",
+            entity_id=member.id,
+        )
+        return member
+
+    async def clear_member_avatar(
+        self,
+        db: AsyncSession,
+        member: Member,
+        *,
+        actor_id: UUID | None = None,
+    ) -> Member:
+        member.avatar_url = None
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id or member.id,
+            action="avatar_removed",
+            entity_type="member",
+            entity_id=member.id,
         )
         return member
 

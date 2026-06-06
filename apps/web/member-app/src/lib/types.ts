@@ -1,6 +1,7 @@
-import type { Contribution, DuesSummary, MemberVote } from "@osaja/types";
+import type { Contribution, DuesSummary, Member, MemberVote } from "@osaja/types";
+import { mapPreferences } from "./profile";
 
-export function mapMember(raw: Record<string, unknown>) {
+export function mapMember(raw: Record<string, unknown>): Member {
   return {
     id: String(raw.id),
     fullName: String(raw.full_name),
@@ -10,9 +11,11 @@ export function mapMember(raw: Record<string, unknown>) {
     dateOfBirth: String(raw.date_of_birth),
     membershipId: String(raw.membership_id),
     batch: Number(raw.batch),
-    status: raw.status as "active" | "inactive" | "archived" | "pending",
+    status: raw.status as Member["status"],
     emailVerified: Boolean(raw.email_verified),
     registrationDate: String(raw.registration_date ?? ""),
+    avatarUrl: raw.avatar_url ? String(raw.avatar_url) : undefined,
+    preferences: mapPreferences(raw.preferences as Record<string, unknown> | undefined),
   };
 }
 

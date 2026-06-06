@@ -4,6 +4,17 @@ export type UserRole = "administrator" | "executive" | "member";
 
 export type MemberStatus = "active" | "inactive" | "archived" | "pending";
 
+export interface MemberPreferences {
+  notifyDues: boolean;
+  notifyVotes: boolean;
+  notifyBirthdays: boolean;
+  notifyAnnouncements: boolean;
+  notifyWelfare: boolean;
+  notifyCelebrations: boolean;
+  emailDigest: boolean;
+  compactDashboard: boolean;
+}
+
 export interface Member {
   id: string;
   fullName: string;
@@ -17,6 +28,8 @@ export interface Member {
   status: MemberStatus;
   role?: UserRole;
   emailVerified: boolean;
+  avatarUrl?: string;
+  preferences?: MemberPreferences;
 }
 
 export type WelfareStatus =

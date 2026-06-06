@@ -28,4 +28,8 @@ body {
   .btn-gold {
     @apply rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark shadow-md transition-all hover:bg-brand-gold-light active:scale-[0.98];
   }
+
+  .input-field {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-brand-navy focus:ring-2 focus:ring-brand-navy/10;
+  }
 }

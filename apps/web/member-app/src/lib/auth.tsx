@@ -12,6 +12,7 @@ interface AuthState {
   register: (data: Record<string, unknown>) => Promise<{ requiresEmailConfirmation: boolean; message?: string }>;
   logout: () => void;
   refresh: () => Promise<void>;
+  setMember: (member: Member | null) => void;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ member, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ member, loading, login, register, logout, refresh, setMember }}>
       {children}
     </AuthContext.Provider>
   );

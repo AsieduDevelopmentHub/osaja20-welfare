@@ -54,3 +54,17 @@ export async function apiFetch<T>(
   }
   return json;
 }
+
+export async function apiUpload<T>(path: string, formData: FormData): Promise<ApiResult<T>> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  const json = (await res.json()) as ApiResult<T> & { detail?: unknown };
+  if (!res.ok) {
+    if (res.status === 401 && token) setToken(null);
+    throw new Error(parseApiError(json, res.status));
+  }
+  return json;
+}

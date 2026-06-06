@@ -48,9 +48,23 @@ class AuthLogin(BaseModel):
     password: str
 
 
+class MemberPreferencesUpdate(BaseModel):
+    notify_dues: bool | None = None
+    notify_votes: bool | None = None
+    notify_birthdays: bool | None = None
+    notify_announcements: bool | None = None
+    notify_welfare: bool | None = None
+    notify_celebrations: bool | None = None
+    email_digest: bool | None = None
+    compact_dashboard: bool | None = None
+
+
 class AuthProfileUpdate(BaseModel):
-    full_name: str | None = None
-    phone_number: str | None = None
+    full_name: str | None = Field(default=None, min_length=2, max_length=200)
+    phone_number: str | None = Field(default=None, min_length=10, max_length=20)
+    username: str | None = Field(default=None, min_length=3, max_length=30)
+    date_of_birth: date | None = None
+    preferences: MemberPreferencesUpdate | None = None
 
 
 class TokenResponse(BaseModel):

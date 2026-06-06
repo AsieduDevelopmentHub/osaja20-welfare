@@ -1,6 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
+from v1.core.member_preferences import merge_preferences
 from v1.core.models import Contribution, Member, Vote, VoteOption, WelfareCase
 
 
@@ -19,6 +20,8 @@ def member_to_dict(member: Member) -> dict:
         "email_verified": member.email_verified,
         "registration_date": member.registration_date.isoformat() if member.registration_date else None,
         "auth_user_id": str(member.auth_user_id) if member.auth_user_id else None,
+        "avatar_url": member.avatar_url,
+        "preferences": merge_preferences(member.preferences_json),
     }
 
 

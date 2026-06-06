@@ -4,6 +4,7 @@ import { MobileShell, memberNavItems, PortalShellSkeleton } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth";
 import { getToken } from "@/lib/api";
 
@@ -34,8 +35,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       mobilePrimaryCount={4}
       footer={
         <div className="rounded-xl bg-brand-navy/5 p-4">
-          <p className="truncate text-xs font-semibold text-brand-navy">{member.fullName}</p>
-          <p className="truncate text-[10px] text-slate-500">{member.membershipId}</p>
+          <div className="flex items-center gap-3">
+            <ProfileAvatar member={member} size="md" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-brand-navy">{member.fullName}</p>
+              <p className="truncate text-[10px] text-slate-500">{member.membershipId}</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => {

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     ]
 
     default_batch: int = 2020
+    uploads_dir: str = "uploads"
+    max_avatar_bytes: int = 2 * 1024 * 1024
 
     @field_validator("database_url")
     @classmethod
