@@ -3,6 +3,7 @@
 import { NotificationListSkeleton } from "@osaja/ui";
 import { Bell, CheckCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { apiFetch } from "@/lib/api";
 import type { NotificationItem } from "@/lib/types";
@@ -71,9 +72,11 @@ export default function NotificationsPage() {
                 <div className="flex items-start gap-3">
                   <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-slate-300" : "bg-brand-500"}`} />
                   <div className="min-w-0 flex-1">
+                    <div className="mb-1.5">
+                      <NotificationTypeBadge type={n.type} />
+                    </div>
                     <p className="font-medium text-slate-900">{n.title}</p>
                     <p className="mt-1 text-sm text-slate-600">{n.message}</p>
-                    <p className="mt-1 text-xs text-slate-400">{n.type}</p>
                   </div>
                 </div>
               </button>

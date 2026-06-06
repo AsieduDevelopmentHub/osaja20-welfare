@@ -33,3 +33,6 @@ export function paginate<T>(items: T[], page: number, pageSize: number) {
     totalPages,
   };
 }
+
+export { computeDuesSummary, periodLabel } from "./dues.js";
+export type { DuesSummary, DuesPeriod, DuesPeriodStatus, PaidPeriodInput } from "./dues.js";

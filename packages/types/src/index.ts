@@ -88,6 +88,47 @@ export interface Contribution {
   createdBy: string;
   verifiedBy?: string;
   createdAt: string;
+  periodYear?: number;
+  periodMonth?: number;
+  balance?: number;
+}
+
+export type DuesPeriodStatus = "paid" | "due" | "overdue" | "upcoming";
+
+export interface DuesPeriod {
+  year: number;
+  month: number;
+  label: string;
+  amount: number;
+  status: DuesPeriodStatus;
+  paidAmount: number;
+}
+
+export interface DuesSummary {
+  monthlyAmount: number;
+  currency: string;
+  balance: number;
+  currentMonth: { year: number; month: number; label: string };
+  currentStatus: "paid" | "due" | "overdue";
+  arrearsCount: number;
+  totalOwed: number;
+  totalPaidMonths: number;
+  periods: DuesPeriod[];
+}
+
+export interface MemberVote {
+  id: string;
+  title: string;
+  description?: string;
+  voteType: VoteType;
+  status: VoteLifecycle;
+  opensAt: string;
+  closesAt: string;
+  minimumContribution?: number;
+  executiveOnly: boolean;
+  options: VoteOption[];
+  hasVoted?: boolean;
+  votedOptionId?: string;
 }
 
 export type NotificationType =

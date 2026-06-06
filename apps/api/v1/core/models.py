@@ -107,12 +107,17 @@ class WelfareCase(Base):
 
 class Contribution(Base):
     __tablename__ = "contributions"
+    __table_args__ = (
+        Index("idx_contribution_member_period", "member_id", "period_year", "period_month"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     type: Mapped[str] = mapped_column(String(50), default="dues")
     reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    period_year: Mapped[int | None] = mapped_column(nullable=True)
+    period_month: Mapped[int | None] = mapped_column(nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False)
     verified_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -63,6 +63,8 @@ def contribution_to_dict(
         "amount": float(contribution.amount),
         "type": contribution.type,
         "reference": contribution.reference,
+        "period_year": contribution.period_year,
+        "period_month": contribution.period_month,
         "created_by": str(contribution.created_by),
         "verified_by": str(contribution.verified_by) if contribution.verified_by else None,
         "created_at": contribution.created_at.isoformat(),

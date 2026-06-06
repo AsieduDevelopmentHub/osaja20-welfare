@@ -62,6 +62,28 @@ async def get_my_profile(current: Annotated[Member, Depends(get_current_member)]
     return ApiResponse(success=True, data=member_to_dict(current))
 
 
+@router.get("/me/dues", response_model=ApiResponse)
+async def get_my_dues(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    data = await platform_service.get_member_dues(db, current)
+    return ApiResponse(success=True, data=data)
+
+
+@router.get("/me/contributions", response_model=ApiResponse)
+async def get_my_contributions(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    data = await platform_service.list_member_contributions(
+        db, current.id, page=page, page_size=page_size
+    )
+    return ApiResponse(success=True, data=data)
+
+
 @router.get("/{member_id}", response_model=ApiResponse)
 async def get_member(
     member_id: UUID,
@@ -72,6 +94,44 @@ async def get_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     return ApiResponse(success=True, data=member_to_dict(member))
+
+
+@router.get("/{member_id}/dues", response_model=ApiResponse)
+async def get_member_dues(
+    member_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    if current.role == "member" and current.id != member_id:
+        raise HTTPException(status_code=403, detail="Cannot view another member's dues")
+
+    member = await platform_service.get_member(db, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    data = await platform_service.get_member_dues(db, member)
+    return ApiResponse(success=True, data=data)
+
+
+@router.get("/{member_id}/contributions", response_model=ApiResponse)
+async def get_member_contributions(
+    member_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    if current.role == "member" and current.id != member_id:
+        raise HTTPException(status_code=403, detail="Cannot view another member's contributions")
+
+    member = await platform_service.get_member(db, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    data = await platform_service.list_member_contributions(
+        db, member_id, page=page, page_size=page_size
+    )
+    return ApiResponse(success=True, data=data)
 
 
 @router.get("/{member_id}/balance", response_model=ApiResponse)

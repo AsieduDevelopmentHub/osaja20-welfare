@@ -26,4 +26,6 @@ export const CONTRIBUTION = {
   DECIMAL_PLACES: 2,
 } as const;
 
+export { DUES, PAYMENT_INSTRUCTIONS } from "./dues.js";
+
 export { BRAND, BRAND_COPY, BRAND_PATHS } from "./brand.js";

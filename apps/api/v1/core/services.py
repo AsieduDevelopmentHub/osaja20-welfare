@@ -36,6 +36,7 @@ from v1.core.models import (
     VoteSubmission,
     WelfareCase,
 )
+from v1.core.dues import MONTHLY_DUES_AMOUNT, compute_dues_summary
 from v1.core.member_identity import (
     generate_membership_id,
     generate_username,
@@ -322,6 +323,28 @@ class PlatformService:
         return data
 
     async def record_contribution(self, db: AsyncSession, data: dict, actor_id: UUID | None = None) -> dict:
+        contrib_type = data.get("type", "dues")
+        period_year = data.get("period_year")
+        period_month = data.get("period_month")
+        now = datetime.now(timezone.utc)
+
+        if contrib_type == "dues" and (period_year is None or period_month is None):
+            period_year = now.year
+            period_month = now.month
+
+        if contrib_type == "dues" and period_year and period_month:
+            existing = await db.execute(
+                select(func.coalesce(func.sum(Contribution.amount), 0)).where(
+                    Contribution.member_id == UUID(data["member_id"]),
+                    Contribution.type == "dues",
+                    Contribution.period_year == period_year,
+                    Contribution.period_month == period_month,
+                )
+            )
+            already_paid = float(existing.scalar() or 0)
+            if already_paid >= MONTHLY_DUES_AMOUNT:
+                raise ValueError(f"Dues for {period_month}/{period_year} already recorded")
+
         entry = LedgerEntry(
             id=str(uuid4()),
             member_id=data["member_id"],
@@ -340,7 +363,10 @@ class PlatformService:
             id=UUID(entry.id),
             member_id=UUID(data["member_id"]),
             amount=Decimal(str(data["amount"])),
+            type=contrib_type,
             reference=data.get("reference", ""),
+            period_year=period_year if contrib_type == "dues" else None,
+            period_month=period_month if contrib_type == "dues" else None,
             created_by=UUID(data["created_by"]),
             verified_by=UUID(data["verified_by"]) if data.get("verified_by") else None,
         )
@@ -352,8 +378,24 @@ class PlatformService:
             action="contribution_recorded",
             entity_type="contribution",
             entity_id=contribution.id,
-            metadata={"amount": float(contribution.amount)},
+            metadata={
+                "amount": float(contribution.amount),
+                "type": contrib_type,
+                "period_year": period_year,
+                "period_month": period_month,
+            },
         )
+
+        member_uuid = UUID(data["member_id"])
+        await self.create_notification(
+            db,
+            member_id=member_uuid,
+            type="contribution",
+            title="Contribution recorded",
+            message=f"GHS {float(contribution.amount):.2f} {contrib_type} payment recorded. Ref: {contribution.reference or '—'}",
+            actor_id=actor_id,
+        )
+
         return contribution_to_dict(contribution, registry.ledger.get_balance(data["member_id"]))
 
     async def get_contribution_summary(self, db: AsyncSession) -> dict:
@@ -369,6 +411,69 @@ class PlatformService:
             "balance": registry.ledger.get_balance(mid),
             "reconciliation": registry.ledger.reconcile(mid),
         }
+
+    async def list_member_contributions(
+        self,
+        db: AsyncSession,
+        member_id: UUID,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        if not registry._loaded:
+            await registry.rebuild(db)
+
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        mid = str(member_id)
+
+        count_query = select(func.count()).select_from(Contribution).where(Contribution.member_id == member_id)
+        total = await db.scalar(count_query) or 0
+
+        result = await db.execute(
+            select(Contribution)
+            .where(Contribution.member_id == member_id)
+            .order_by(Contribution.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        items = [
+            contribution_to_dict(c, registry.ledger.get_balance(mid))
+            for c in result.scalars().all()
+        ]
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
+
+    async def get_member_dues(self, db: AsyncSession, member: Member) -> dict:
+        if not registry._loaded:
+            await registry.rebuild(db)
+
+        contributions = (
+            await db.execute(
+                select(Contribution).where(
+                    Contribution.member_id == member.id,
+                    Contribution.type == "dues",
+                )
+            )
+        ).scalars().all()
+
+        paid_periods: list[dict] = []
+        for c in contributions:
+            year = c.period_year or c.created_at.year
+            month = c.period_month or c.created_at.month
+            paid_periods.append({"year": year, "month": month, "amount": float(c.amount)})
+
+        since = member.registration_date or member.created_at
+        summary = compute_dues_summary(since, paid_periods)
+        balance = registry.ledger.get_balance(str(member.id))
+        summary["balance"] = balance
+        return summary
 
     async def create_vote(self, db: AsyncSession, data: dict, created_by: UUID | None = None) -> dict:
         vote = Vote(
@@ -486,6 +591,34 @@ class PlatformService:
             "option_id": str(option_id),
             "locked": True,
         }
+
+    async def list_active_votes(self, db: AsyncSession, member_id: UUID) -> list[dict]:
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            select(Vote)
+            .options(selectinload(Vote.options))
+            .where(Vote.status == VoteLifecycle.OPEN.value)
+            .order_by(Vote.closes_at.asc())
+        )
+        votes = result.scalars().all()
+
+        submissions = (
+            await db.execute(
+                select(VoteSubmission).where(VoteSubmission.member_id == member_id)
+            )
+        ).scalars().all()
+        voted_map = {str(s.vote_id): str(s.option_id) for s in submissions}
+
+        items: list[dict] = []
+        for vote in votes:
+            if vote.opens_at > now or vote.closes_at < now:
+                continue
+            data = vote_to_dict(vote)
+            vid = str(vote.id)
+            data["has_voted"] = vid in voted_map
+            data["voted_option_id"] = voted_map.get(vid)
+            items.append(data)
+        return items
 
     async def get_vote_results(self, db: AsyncSession, vote_id: UUID) -> dict:
         result = await db.execute(

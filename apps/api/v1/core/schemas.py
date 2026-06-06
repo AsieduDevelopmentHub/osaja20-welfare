@@ -72,7 +72,10 @@ class WelfareTransition(BaseModel):
 class ContributionCreate(BaseModel):
     member_id: str
     amount: float = Field(gt=0)
+    type: Literal["dues", "donation", "welfare", "other"] = "dues"
     reference: str = ""
+    period_year: int | None = Field(default=None, ge=2020, le=2100)
+    period_month: int | None = Field(default=None, ge=1, le=12)
     verified_by: str | None = None
 
 

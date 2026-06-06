@@ -13,6 +13,15 @@ from v1.core.services import platform_service
 router = APIRouter(prefix="/voting", tags=["Voting"])
 
 
+@router.get("", response_model=ApiResponse)
+async def list_votes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    votes = await platform_service.list_active_votes(db, current.id)
+    return ApiResponse(success=True, data=votes)
+
+
 @router.post("", response_model=ApiResponse)
 async def create_vote(
     payload: VoteCreate,
