@@ -110,7 +110,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs">
                   <span className="rounded-full bg-white/10 px-2 py-0.5 capitalize text-slate-300">{m.status}</span>
-                  <span className="text-slate-500">{m.membershipId}</span>
+                  <span className="truncate text-xs text-slate-400">@{m.username} · {m.membershipId}</span>
                 </div>
               </li>
             ))}

@@ -29,7 +29,8 @@ async def create_admin(
     email: str,
     password: str,
     full_name: str = "System Administrator",
-    membership_id: str = "OSA-ADMIN-001",
+    membership_id: str | None = None,
+    username: str | None = None,
     phone_number: str = "0000000000",
     batch: int = 2020,
 ) -> Member:
@@ -98,6 +99,7 @@ async def create_admin(
                     phone_number=phone_number,
                     date_of_birth=date(1990, 1, 1),
                     membership_id=membership_id,
+                    username=username,
                     batch=batch,
                     password=None,
                     role=UserRole.ADMINISTRATOR.value,
@@ -133,6 +135,7 @@ async def create_admin(
             phone_number=phone_number,
             date_of_birth=date(1990, 1, 1),
             membership_id=membership_id,
+            username=username,
             batch=batch,
             password=password,
             role=UserRole.ADMINISTRATOR.value,
@@ -148,7 +151,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--email", required=True, help="Admin email address")
     parser.add_argument("--password", required=True, help="Admin password (min 8 characters)")
     parser.add_argument("--full-name", default="System Administrator", help="Display name")
-    parser.add_argument("--membership-id", default="OSA-ADMIN-001", help="Membership ID")
+    parser.add_argument("--membership-id", default=None, help="Member ID (auto-generated if omitted)")
+    parser.add_argument("--username", default=None, help="Login username (auto-generated if omitted)")
     parser.add_argument("--phone", default="0000000000", help="Phone number")
     parser.add_argument("--batch", type=int, default=2020, help="Batch year")
     return parser.parse_args()
@@ -168,6 +172,7 @@ async def main() -> None:
         password=args.password,
         full_name=args.full_name,
         membership_id=args.membership_id,
+        username=args.username,
         phone_number=args.phone,
         batch=args.batch,
     )
@@ -176,7 +181,8 @@ async def main() -> None:
     print(f"  Email:          {member.email}")
     print(f"  Member ID:      {member.id}")
     print(f"  Role:           {member.role}")
-    print(f"  Membership ID:  {member.membership_id}")
+    print(f"  Username:       {member.username}")
+    print(f"  Member ID:      {member.membership_id}")
     print(f"  Admin login:    http://localhost:3001/login")
 
 
