@@ -113,7 +113,28 @@ pytest tests/ -q
 
 | Mode | When | Endpoints |
 |------|------|-----------|
-| **Local** | `USE_LOCAL_AUTH=true` (default) | `/auth/register`, `/auth/login` with bcrypt |
-| **Supabase** | Set `SUPABASE_URL`, keys, `USE_LOCAL_AUTH=false` | Proxies to Supabase Auth |
+| **Local** | `USE_LOCAL_AUTH=true` | `/auth/register`, `/auth/login` with bcrypt |
+| **Supabase** | Supabase env vars set + `USE_LOCAL_AUTH=false` | Supabase Auth tokens + local member profiles |
+
+## Supabase setup
+
+In `apps/api/.env`:
+
+```env
+DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://[ref].supabase.co
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_KEY=...
+SUPABASE_JWT_SECRET=...   # Project Settings → API → JWT Secret
+USE_LOCAL_AUTH=false
+```
+
+The API automatically:
+- Converts `postgresql://` → `postgresql+asyncpg://` (no psycopg2 needed)
+- Enables SSL for remote Supabase hosts
+- Returns Supabase access tokens on login/register
+- Links `auth_user_id` on members table to Supabase users
+
+On first run, tables are created via SQLAlchemy. For production, prefer running `docs/architecture/schema.sql` in the Supabase SQL editor.
 
 All protected routes require `Authorization: Bearer <token>`.

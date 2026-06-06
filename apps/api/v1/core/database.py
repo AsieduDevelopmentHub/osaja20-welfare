@@ -7,9 +7,20 @@ from v1.core.config import settings
 
 
 def _engine_kwargs() -> dict:
-    kwargs: dict = {"echo": settings.debug}
+    kwargs: dict = {"echo": settings.debug, "pool_pre_ping": True}
     if settings.database_url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
+        return kwargs
+
+    connect_args: dict = {}
+    if settings.database_requires_ssl:
+        connect_args["ssl"] = "require"
+    if settings.database_uses_pgbouncer:
+        # PgBouncer transaction pooler does not support asyncpg prepared statements
+        connect_args["statement_cache_size"] = 0
+
+    if connect_args:
+        kwargs["connect_args"] = connect_args
     return kwargs
 
 

@@ -4,7 +4,14 @@
   "description": "Asuofua D/A JHS Block A Batch 2020 Welfare Platform",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#006fc7",
-  "icons": []
+  "background_color": "#faf8f5",
+  "theme_color": "#0a2d6e",
+  "icons": [
+    {
+      "src": "/brand/welfare-logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
 }

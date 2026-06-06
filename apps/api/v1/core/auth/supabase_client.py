@@ -27,30 +27,44 @@ class SupabaseAuthClient:
             "Content-Type": "application/json",
         }
 
+    @staticmethod
+    def _parse_error(response: httpx.Response) -> str:
+        try:
+            body = response.json()
+        except Exception:
+            return response.text or "Request failed"
+        return (
+            body.get("msg")
+            or body.get("error_description")
+            or body.get("message")
+            or body.get("error")
+            or "Request failed"
+        )
+
     async def sign_up(self, email: str, password: str, metadata: dict | None = None) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/auth/v1/signup",
                 headers=self._headers(),
                 json={"email": email, "password": password, "data": metadata or {}},
             )
         if response.status_code >= 400:
-            raise SupabaseAuthError(response.json().get("msg", "Signup failed"), response.status_code)
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
         return response.json()
 
     async def sign_in(self, email: str, password: str) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/auth/v1/token?grant_type=password",
                 headers=self._headers(),
                 json={"email": email, "password": password},
             )
         if response.status_code >= 400:
-            raise SupabaseAuthError(response.json().get("error_description", "Login failed"), response.status_code)
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
         return response.json()
 
     async def get_user(self, access_token: str) -> dict:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self.base_url}/auth/v1/user",
                 headers={**self._headers(), "Authorization": f"Bearer {access_token}"},

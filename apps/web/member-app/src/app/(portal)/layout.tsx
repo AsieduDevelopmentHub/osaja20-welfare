@@ -1,9 +1,11 @@
 "use client";
 
 import { MobileShell, memberNavItems } from "@osaja/ui";
+import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
+import { getToken } from "@/lib/api";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const { member, loading, logout } = useAuth();
@@ -11,36 +13,41 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !member) {
+    if (!loading && (!member || !getToken())) {
       router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
   }, [loading, member, router, pathname]);
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-brand-cream">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-navy border-t-transparent" />
+        <p className="text-sm text-slate-500">Loading your portal...</p>
       </div>
     );
   }
 
-  if (!member) return null;
+  if (!member || !getToken()) return null;
 
   return (
     <MobileShell
       navItems={memberNavItems}
-      brandTitle="OSAJA'20"
+      logoSrc={BRAND_PATHS.welfareLogo}
+      logoAlt={`${BRAND_COPY.name} ${BRAND_COPY.welfare} logo`}
+      brandTitle={BRAND_COPY.name}
       brandSubtitle="Member Portal"
+      mobilePrimaryCount={4}
       footer={
-        <div className="rounded-xl bg-brand-50 p-4">
-          <p className="truncate text-xs font-medium text-brand-800">{member.fullName}</p>
+        <div className="rounded-xl bg-brand-navy/5 p-4">
+          <p className="truncate text-xs font-semibold text-brand-navy">{member.fullName}</p>
+          <p className="truncate text-[10px] text-slate-500">{member.membershipId}</p>
           <button
             type="button"
             onClick={() => {
               logout();
               router.replace("/login");
             }}
-            className="mt-2 text-xs font-semibold text-brand-600 hover:underline"
+            className="mt-2 text-xs font-semibold text-brand-gold-dark hover:underline"
           >
             Sign out
           </button>

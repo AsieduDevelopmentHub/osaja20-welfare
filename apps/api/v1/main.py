@@ -62,5 +62,5 @@ async def health():
         "app": settings.app_name,
         "version": settings.api_version,
         "database": "sqlite" if settings.database_url.startswith("sqlite") else "postgresql",
-        "auth_mode": "supabase" if settings.supabase_url and not settings.use_local_auth else "local",
+        "auth_mode": "supabase" if settings.uses_supabase_auth else "local",
     }

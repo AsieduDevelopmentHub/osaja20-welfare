@@ -25,3 +25,5 @@ export const CONTRIBUTION = {
   CURRENCY: "GHS",
   DECIMAL_PLACES: 2,
 } as const;
+
+export { BRAND, BRAND_COPY, BRAND_PATHS } from "./brand.js";

@@ -7,6 +7,11 @@ from jose import JWTError, jwt
 from v1.core.config import settings
 
 
+def _api_jwt_secret() -> str:
+    """Secret used for API-issued member tokens."""
+    return settings.jwt_secret
+
+
 def _jwt_secret() -> str:
     return settings.supabase_jwt_secret or settings.jwt_secret
 
@@ -31,16 +36,30 @@ def create_access_token(
         "iat": datetime.now(timezone.utc),
         "aud": "authenticated",
     }
-    return jwt.encode(payload, _jwt_secret(), algorithm=settings.jwt_algorithm)
+    return jwt.encode(payload, _api_jwt_secret(), algorithm=settings.jwt_algorithm)
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    return jwt.decode(
-        token,
-        _jwt_secret(),
-        algorithms=[settings.jwt_algorithm],
-        options={"verify_aud": False},
-    )
+    secrets: list[str] = []
+    for secret in (_api_jwt_secret(), settings.supabase_jwt_secret):
+        if secret and secret not in secrets:
+            secrets.append(secret)
+
+    last_error: JWTError | None = None
+    for secret in secrets:
+        try:
+            return jwt.decode(
+                token,
+                secret,
+                algorithms=[settings.jwt_algorithm],
+                options={"verify_aud": False},
+            )
+        except JWTError as exc:
+            last_error = exc
+
+    if last_error:
+        raise last_error
+    raise JWTError("No JWT secret configured")
 
 
 def extract_member_id(payload: dict[str, Any]) -> UUID | None:

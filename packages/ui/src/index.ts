@@ -1,3 +1,5 @@
+export { BrandHeader, BrandLogo } from "./components/BrandLogo.js";
+export type { BrandHeaderProps, BrandLogoProps } from "./components/BrandLogo.js";
 export { StatCard } from "./components/StatCard.js";
 export type { StatCardProps } from "./components/StatCard.js";
 export { MobileShell } from "./components/MobileShell.js";

@@ -30,7 +30,7 @@ export default function AdminDashboard() {
 
   const statCards = [
     { label: "Total Members", value: String(stats.total_members), icon: Users },
-    { label: "Active Members", value: String(stats.active_members), icon: Users, iconClassName: "text-brand-400" },
+    { label: "Active Members", value: String(stats.active_members), icon: Users, iconClassName: "text-brand-gold" },
     { label: "Pending Welfare", value: String(stats.pending_welfare_cases), icon: Wallet },
     { label: "Contributions", value: formatCurrency(stats.total_contributions), icon: Wallet, iconClassName: "text-green-400" },
     { label: "Active Votes", value: String(stats.active_votes), icon: Vote, iconClassName: "text-purple-400" },
@@ -41,7 +41,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-brand-400">Administration</p>
+          <p className="text-sm font-medium text-brand-gold">Administration</p>
           <h1 className="text-2xl font-bold text-white sm:text-3xl">OSAJA&apos;20 Welfare</h1>
           <p className="text-sm text-slate-400">Leadership analytics & operations</p>
         </div>
@@ -50,7 +50,7 @@ export default function AdminDashboard() {
             <Download className="h-4 w-4" />
             Export
           </button>
-          <a href="/announcements" className="flex items-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+          <a href="/announcements" className="flex items-center gap-2 rounded-xl bg-brand-gold px-3 py-2 text-sm font-semibold text-brand-navy-dark hover:bg-brand-gold-light">
             <Megaphone className="h-4 w-4" />
             Announce
           </a>
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <section className="rounded-2xl border border-slate-700/50 bg-slate-850/80 p-4 sm:p-6">
+      <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-semibold text-white">Management Modules</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {adminModules.map((mod) => {

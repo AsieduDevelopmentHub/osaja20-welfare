@@ -1,26 +1,35 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "../../../packages/ui/src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
         brand: {
-          50: "#f0f7ff",
-          100: "#e0effe",
-          500: "#0c8ce9",
-          600: "#006fc7",
-          700: "#0159a1",
-          800: "#064b85",
-          900: "#0b3f6e",
-        },
-        slate: {
-          850: "#1a2332",
-          950: "#0d1117",
+          navy: {
+            DEFAULT: "#0a2d6e",
+            light: "#1e4a8c",
+            dark: "#061d47",
+          },
+          blue: {
+            DEFAULT: "#2b6cb0",
+            light: "#5a9fd4",
+          },
+          gold: {
+            DEFAULT: "#c9a227",
+            light: "#e4c04a",
+            dark: "#9a7b1a",
+          },
+          cream: "#faf8f5",
+          600: "#0a2d6e",
+          700: "#061d47",
         },
       },
       boxShadow: {
-        glass: "0 8px 32px rgba(0, 0, 0, 0.12)",
+        glass: "0 8px 32px rgba(0, 0, 0, 0.25)",
       },
       backdropBlur: {
         glass: "12px",

@@ -2,188 +2,229 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { MoreHorizontal, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BrandHeader } from "./BrandLogo.js";
 import type { NavItem } from "../nav-config.js";
 
 export interface MobileShellProps {
   children: React.ReactNode;
   navItems: NavItem[];
+  logoSrc: string;
+  logoAlt: string;
   brandTitle?: string;
   brandSubtitle?: string;
-  brandBadge?: string;
   footer?: React.ReactNode;
   variant?: "light" | "dark";
+  /** Items shown in mobile bottom bar before "More" */
+  mobilePrimaryCount?: number;
 }
 
 export function MobileShell({
   children,
   navItems,
+  logoSrc,
+  logoAlt,
   brandTitle = "OSAJA'20",
   brandSubtitle = "Welfare Portal",
-  brandBadge = "O20",
   footer,
   variant = "light",
+  mobilePrimaryCount = 4,
 }: MobileShellProps) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const isDark = variant === "dark";
 
+  const primaryNav = navItems.slice(0, mobilePrimaryCount);
+  const overflowNav = navItems.slice(mobilePrimaryCount);
+  const hasOverflow = overflowNav.length > 0 || !!footer;
+
+  const currentPage = useMemo(
+    () => navItems.find((item) => item.href === pathname),
+    [navItems, pathname]
+  );
+
   useEffect(() => {
-    setMenuOpen(false);
+    setMoreOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
+    document.body.style.overflow = moreOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen]);
+  }, [moreOpen]);
 
-  const linkClass = (active: boolean) => {
+  const shellBg = isDark ? "bg-brand-navy-dark" : "bg-brand-cream";
+  const cardBorder = isDark ? "border-white/10 bg-brand-navy/80" : "border-white/60 bg-white/80";
+  const textMuted = isDark ? "text-slate-400" : "text-slate-500";
+
+  const navLinkClass = (active: boolean) => {
     if (isDark) {
       return active
-        ? "bg-brand-600 text-white"
-        : "text-slate-300 hover:bg-slate-800 hover:text-white";
+        ? "bg-brand-gold text-brand-navy-dark font-semibold"
+        : "text-slate-300 hover:bg-white/10 hover:text-white";
     }
-    return active ? "bg-brand-600 text-white shadow-md" : "text-slate-600 hover:bg-brand-50 hover:text-brand-700";
+    return active
+      ? "bg-brand-navy text-white font-semibold shadow-sm"
+      : "text-slate-600 hover:bg-brand-blue/10 hover:text-brand-navy";
   };
 
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <>
-      {navItems.map((item) => {
-        const active = pathname === item.href;
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${linkClass(active)}`}
-          >
-            <Icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
-    </>
-  );
+  const bottomLinkClass = (active: boolean) =>
+    active
+      ? isDark
+        ? "text-brand-gold"
+        : "text-brand-navy"
+      : isDark
+        ? "text-slate-500"
+        : "text-slate-400";
 
-  const bottomNav = navItems.slice(0, 5);
+  const NavLink = ({
+    item,
+    onNavigate,
+    compact = false,
+  }: {
+    item: NavItem;
+    onNavigate?: () => void;
+    compact?: boolean;
+  }) => {
+    const active = pathname === item.href;
+    const Icon = item.icon;
+    return (
+      <Link
+        href={item.href}
+        onClick={onNavigate}
+        className={`flex items-center gap-3 rounded-xl transition-colors ${
+          compact ? "flex-col gap-1 px-1 py-2" : "px-4 py-2.5 text-sm font-medium"
+        } ${navLinkClass(active)}`}
+      >
+        <Icon className={`shrink-0 ${compact ? "h-5 w-5" : "h-5 w-5"}`} strokeWidth={active ? 2.25 : 1.75} />
+        {!compact ? <span>{item.label}</span> : <span className="max-w-[4.5rem] truncate text-[10px] font-medium">{item.label.split(" ")[0]}</span>}
+      </Link>
+    );
+  };
 
   return (
-    <div className={`min-h-screen ${isDark ? "bg-slate-950 text-slate-100" : ""}`}>
-      {/* Mobile header */}
+    <div className={`min-h-screen ${shellBg} ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+      {/* ── Mobile top bar (logo only — no duplicate menu) ── */}
       <header
-        className={`sticky top-0 z-40 flex items-center justify-between border-b px-4 py-3 backdrop-blur-md lg:hidden ${
-          isDark ? "border-slate-800 bg-slate-950/90" : "border-slate-200/60 bg-white/80"
-        }`}
+        className={`sticky top-0 z-40 border-b backdrop-blur-md lg:hidden ${cardBorder}`}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-bold text-white">
-            {brandBadge}
-          </div>
-          <div>
-            <p className={`text-sm font-bold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              {brandTitle}
-            </p>
-            <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{brandSubtitle}</p>
-          </div>
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <BrandHeader
+            logoSrc={logoSrc}
+            logoAlt={logoAlt}
+            title={brandTitle}
+            subtitle={currentPage?.label ?? brandSubtitle}
+            size="sm"
+            variant={variant}
+          />
         </div>
-        <button
-          type="button"
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMenuOpen((o) => !o)}
-          className={`rounded-xl p-2 ${isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"}`}
-        >
-          {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
       </header>
 
-      {/* Mobile drawer */}
-      {menuOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close menu overlay"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMenuOpen(false)}
-          />
-          <aside
-            className={`absolute left-0 top-0 flex h-full w-[min(100%,280px)] flex-col p-5 shadow-2xl ${
-              isDark ? "bg-slate-900" : "bg-white"
-            }`}
-          >
-            <div className="mb-6 flex items-center justify-between">
-              <p className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Menu</p>
-              <button type="button" onClick={() => setMenuOpen(false)} className="rounded-lg p-1">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <nav className="flex flex-col gap-1">
-              <NavLinks onNavigate={() => setMenuOpen(false)} />
-            </nav>
-            {footer ? <div className="mt-auto pt-6">{footer}</div> : null}
-          </aside>
-        </div>
-      ) : null}
-
-      <div className="mx-auto flex max-w-7xl gap-6 lg:p-6">
-        {/* Desktop sidebar */}
+      {/* ── Desktop layout ── */}
+      <div className="mx-auto flex max-w-7xl lg:gap-6 lg:p-6">
         <aside
-          className={`hidden w-64 shrink-0 flex-col rounded-2xl border p-6 lg:flex ${
-            isDark
-              ? "border-slate-700/50 bg-slate-850/80 shadow-glass"
-              : "border-white/40 bg-white/70 shadow-glass backdrop-blur-md"
-          }`}
+          className={`sticky top-6 hidden h-[calc(100vh-3rem)] w-64 shrink-0 flex-col rounded-2xl border p-5 shadow-glass backdrop-blur-md lg:flex ${cardBorder}`}
         >
-          <div className="mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-lg font-bold text-white shadow-md">
-              {brandBadge}
-            </div>
-            <h1 className={`mt-3 text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-              {brandTitle}
-            </h1>
-            <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{brandSubtitle}</p>
+          <div className="mb-6">
+            <BrandHeader
+              logoSrc={logoSrc}
+              logoAlt={logoAlt}
+              title={brandTitle}
+              subtitle={brandSubtitle}
+              size="md"
+              variant={variant}
+            />
+            {!isDark ? (
+              <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-brand-gold-dark">
+                Caring • Supporting • Uplifting
+              </p>
+            ) : null}
           </div>
-          <nav className="flex flex-1 flex-col gap-1">
-            <NavLinks />
+
+          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+            {navItems.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
           </nav>
-          {footer ? <div className="mt-auto">{footer}</div> : null}
+
+          {footer ? <div className="mt-4 border-t border-white/10 pt-4">{footer}</div> : null}
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-4 pb-24 lg:px-0 lg:py-0 lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:px-0 lg:py-0 lg:pb-0">
+          {children}
+        </main>
       </div>
 
-      {/* Mobile bottom nav */}
+      {/* ── Mobile bottom nav (single nav — no sidebar drawer) ── */}
       <nav
-        className={`fixed bottom-0 left-0 right-0 z-30 border-t px-1 py-1 lg:hidden ${
-          isDark ? "border-slate-800 bg-slate-950/95" : "border-slate-200/80 bg-white/95"
-        } backdrop-blur-md`}
+        className={`fixed bottom-0 left-0 right-0 z-30 border-t backdrop-blur-md lg:hidden ${cardBorder}`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto flex max-w-lg justify-around">
-          {bottomNav.map((item) => {
+        <div className="mx-auto flex max-w-lg items-stretch">
+          {primaryNav.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-[10px] font-medium sm:text-xs ${
-                  active
-                    ? "text-brand-600"
-                    : isDark
-                      ? "text-slate-400"
-                      : "text-slate-500"
-                }`}
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 ${bottomLinkClass(active)}`}
               >
                 <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
-                <span className="truncate">{item.label.split(" ")[0]}</span>
+                <span className="max-w-full truncate px-0.5 text-[10px] font-medium">{item.label.split(" ")[0]}</span>
               </Link>
             );
           })}
+
+          {hasOverflow ? (
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 ${
+                overflowNav.some((i) => i.href === pathname) ? bottomLinkClass(true) : bottomLinkClass(false)
+              }`}
+            >
+              <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
+              <span className="text-[10px] font-medium">More</span>
+            </button>
+          ) : null}
         </div>
       </nav>
+
+      {/* ── Mobile "More" sheet (overflow routes + account) ── */}
+      {moreOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Close menu"
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMoreOpen(false)}
+          />
+          <div
+            className={`absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-2xl border-t p-5 shadow-2xl ${cardBorder}`}
+            style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <p className={`text-sm font-semibold ${isDark ? "text-white" : "text-brand-navy"}`}>More</p>
+              <button type="button" onClick={() => setMoreOpen(false)} className={`rounded-lg p-1.5 ${textMuted}`}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {overflowNav.length > 0 ? (
+              <nav className="mb-4 flex flex-col gap-1">
+                {overflowNav.map((item) => (
+                  <NavLink key={item.href} item={item} onNavigate={() => setMoreOpen(false)} />
+                ))}
+              </nav>
+            ) : null}
+
+            {footer ? <div className="border-t border-white/10 pt-4">{footer}</div> : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -18,6 +18,22 @@ export function setToken(token: string | null) {
   else localStorage.removeItem("osaja_token");
 }
 
+function parseApiError(json: unknown, status: number): string {
+  if (typeof json === "object" && json !== null) {
+    const obj = json as Record<string, unknown>;
+    const detail = obj.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => (typeof item === "object" && item && "msg" in item ? String((item as { msg: string }).msg) : String(item)))
+        .join(", ");
+    }
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.error === "string") return obj.error;
+  }
+  return `Request failed (${status})`;
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -29,9 +45,12 @@ export async function apiFetch<T>(
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const json = (await res.json()) as ApiResult<T>;
+  const json = (await res.json()) as ApiResult<T> & { detail?: unknown };
   if (!res.ok) {
-    throw new Error(json.error ?? json.message ?? `Request failed (${res.status})`);
+    if (res.status === 401 && token) {
+      setToken(null);
+    }
+    throw new Error(parseApiError(json, res.status));
   }
   return json;
 }

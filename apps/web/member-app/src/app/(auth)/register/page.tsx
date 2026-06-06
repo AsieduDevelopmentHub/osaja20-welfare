@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
+import { BrandHeader } from "@osaja/ui";
+import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
 export default function RegisterPage() {
@@ -12,13 +14,16 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [success, setSuccess] = useState("");
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     try {
-      await register({
+      const result = await register({
         full_name: fd.get("full_name"),
         email: fd.get("email"),
         password: fd.get("password"),
@@ -27,6 +32,12 @@ export default function RegisterPage() {
         membership_id: fd.get("membership_id"),
         batch: 2020,
       });
+
+      if (result.requiresEmailConfirmation) {
+        setSuccess(result.message ?? "Check your email to confirm your account, then sign in.");
+        return;
+      }
+
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -36,19 +47,33 @@ export default function RegisterPage() {
   };
 
   const inputClass =
-    "w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20";
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-8">
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Join OSAJA&apos;20</h1>
-          <p className="mt-1 text-sm text-slate-500">Create your welfare account</p>
+        <div className="mb-6">
+          <BrandHeader
+            logoSrc={BRAND_PATHS.welfareLogo}
+            logoAlt={`${BRAND_COPY.name} logo`}
+            title={`Join ${BRAND_COPY.name}`}
+            subtitle={BRAND_COPY.batch}
+            size="lg"
+            centered
+          />
         </div>
 
         <form onSubmit={handleSubmit} className="glass-card space-y-3 p-6 sm:p-8">
           {error ? (
             <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+          ) : null}
+          {success ? (
+            <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <p>{success}</p>
+              <Link href="/login" className="mt-2 inline-block font-semibold text-brand-navy hover:underline">
+                Go to sign in
+              </Link>
+            </div>
           ) : null}
 
           <input name="full_name" required placeholder="Full name" className={inputClass} />
@@ -66,7 +91,7 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Already registered?{" "}
-          <Link href="/login" className="font-semibold text-brand-600 hover:underline">
+          <Link href="/login" className="font-semibold text-brand-navy hover:underline">
             Sign in
           </Link>
         </p>

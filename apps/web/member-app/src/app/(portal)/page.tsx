@@ -40,11 +40,11 @@ export default function DashboardPage() {
         description="Here's what's happening in your welfare community."
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="My Contributions" value={formatCurrency(balance)} icon={Wallet} iconClassName="text-accent-green" />
-        <StatCard label="Unread" value={String(unread)} icon={Bell} />
-        <StatCard label="Active Votes" value="—" icon={Vote} iconClassName="text-purple-600" />
-        <StatCard label="Birthdays" value={String(birthdays)} icon={Cake} iconClassName="text-amber-600" />
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+        <StatCard label="Contributions" value={formatCurrency(balance)} icon={Wallet} iconClassName="text-emerald-600" />
+        <StatCard label="Unread alerts" value={String(unread)} icon={Bell} iconClassName="text-brand-blue" />
+        <StatCard label="Active votes" value="—" icon={Vote} iconClassName="text-brand-navy-light" />
+        <StatCard label="Birthdays" value={String(birthdays)} icon={Cake} iconClassName="text-brand-gold-dark" />
       </div>
 
       <section className="glass-card p-4 sm:p-6">

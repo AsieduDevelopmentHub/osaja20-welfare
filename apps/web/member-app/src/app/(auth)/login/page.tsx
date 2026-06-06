@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 import { useState } from "react";
+import { BrandHeader } from "@osaja/ui";
+import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -29,14 +31,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-8">
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-lg font-bold text-white shadow-lg">
-            O20
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back</h1>
-          <p className="mt-1 text-sm text-slate-500">Sign in to your welfare account</p>
+        <div className="mb-8">
+          <BrandHeader
+            logoSrc={BRAND_PATHS.welfareLogo}
+            logoAlt={`${BRAND_COPY.name} logo`}
+            title="Welcome back"
+            subtitle={`Sign in to ${BRAND_COPY.name} ${BRAND_COPY.welfare}`}
+            size="lg"
+            centered
+          />
+          <p className="mt-4 text-center text-xs font-medium uppercase tracking-wider text-brand-gold-dark">
+            {BRAND_COPY.tagline}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass-card space-y-4 p-6 sm:p-8">
@@ -55,7 +63,7 @@ export default function LoginPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
             />
           </div>
 
@@ -70,7 +78,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
             />
           </div>
 
@@ -82,7 +90,7 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-slate-500">
           No account?{" "}
-          <Link href="/register" className="font-semibold text-brand-600 hover:underline">
+          <Link href="/register" className="font-semibold text-brand-navy hover:underline">
             Register
           </Link>
         </p>

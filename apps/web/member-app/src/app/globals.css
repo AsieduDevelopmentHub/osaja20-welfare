@@ -3,36 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: rgba(255, 255, 255, 0.85);
-  --border: rgba(148, 163, 184, 0.2);
+  --brand-navy: #0a2d6e;
+  --brand-gold: #c9a227;
+  --background: #faf8f5;
+  --foreground: #031025;
 }
 
 body {
   color: var(--foreground);
-  background: linear-gradient(135deg, #f0f7ff 0%, #f8fafc 50%, #fef9f0 100%);
+  background: linear-gradient(160deg, #eef4fc 0%, #faf8f5 45%, #fff9eb 100%);
   min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @layer components {
   .glass-card {
-    @apply rounded-2xl border border-white/40 bg-white/70 shadow-glass backdrop-blur-glass;
-  }
-
-  .stat-card {
-    @apply glass-card p-6 transition-all duration-300 hover:shadow-card hover:-translate-y-0.5;
-  }
-
-  .nav-link {
-    @apply rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-brand-50 hover:text-brand-700;
-  }
-
-  .nav-link-active {
-    @apply bg-brand-600 text-white shadow-md hover:bg-brand-700 hover:text-white;
+    @apply rounded-2xl border border-white/60 bg-white/85 shadow-glass backdrop-blur-glass;
   }
 
   .btn-primary {
-    @apply rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-brand-700 hover:shadow-lg active:scale-[0.98];
+    @apply rounded-xl bg-brand-navy px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-brand-navy-light active:scale-[0.98];
+  }
+
+  .btn-gold {
+    @apply rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark shadow-md transition-all hover:bg-brand-gold-light active:scale-[0.98];
   }
 }

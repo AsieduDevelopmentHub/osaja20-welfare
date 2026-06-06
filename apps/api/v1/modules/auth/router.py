@@ -1,5 +1,4 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -8,6 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from v1.core.auth.dependencies import get_current_member
 from v1.core.auth.jwt import create_access_token
 from v1.core.auth.supabase_client import SupabaseAuthError, supabase_auth
+from v1.core.auth.supabase_service import (
+    extract_supabase_user,
+    is_duplicate_signup_error,
+    link_or_create_member_from_supabase,
+    member_token_response,
+)
 from v1.core.config import settings
 from v1.core.database import get_db
 from v1.core.models import Member, MemberStatus
@@ -20,11 +25,14 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.get("/health", response_model=ApiResponse)
 async def auth_health():
-    mode = "supabase" if supabase_auth.is_configured else "local"
     return ApiResponse(
         success=True,
-        message=f"Auth module active ({mode} mode)",
-        data={"provider": mode, "status": "ready"},
+        message=f"Auth module active ({'supabase' if settings.uses_supabase_auth else 'local'} mode)",
+        data={
+            "provider": "supabase" if settings.uses_supabase_auth else "local",
+            "supabase_configured": supabase_auth.is_configured,
+            "database": "postgresql" if not settings.database_url.startswith("sqlite") else "sqlite",
+        },
     )
 
 
@@ -34,20 +42,59 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    auth_user_id = None
-    email_verified = False
+    if settings.uses_supabase_auth:
+        metadata = {
+            "full_name": payload.full_name,
+            "membership_id": payload.membership_id,
+            "phone_number": payload.phone_number,
+            "date_of_birth": payload.date_of_birth.isoformat(),
+            "batch": payload.batch,
+        }
+        profile = {
+            "full_name": payload.full_name,
+            "email": payload.email,
+            "phone_number": payload.phone_number,
+            "date_of_birth": payload.date_of_birth,
+            "membership_id": payload.membership_id,
+            "batch": payload.batch,
+        }
 
-    if supabase_auth.is_configured and not settings.use_local_auth:
+        sb: dict
         try:
-            sb_user = await supabase_auth.sign_up(
-                payload.email,
-                payload.password,
-                metadata={"full_name": payload.full_name, "membership_id": payload.membership_id},
-            )
-            auth_user_id = UUID(sb_user["user"]["id"]) if sb_user.get("user") else None
-            email_verified = bool(sb_user.get("user", {}).get("email_confirmed_at"))
+            sb = await supabase_auth.sign_up(payload.email, payload.password, metadata=metadata)
         except SupabaseAuthError as e:
-            raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+            if not is_duplicate_signup_error(e):
+                raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+            try:
+                sb = await supabase_auth.sign_in(payload.email, payload.password)
+            except SupabaseAuthError as login_err:
+                detail = str(login_err)
+                if "email not confirmed" in detail.lower():
+                    detail = "Email not confirmed yet — check your inbox, then sign in."
+                raise HTTPException(status_code=login_err.status_code, detail=detail) from login_err
+
+        user = extract_supabase_user(sb)
+        if not user.get("id"):
+            raise HTTPException(status_code=400, detail="Supabase signup did not return a user")
+
+        member = await link_or_create_member_from_supabase(db, user=user, session=sb, profile=profile)
+
+        if sb.get("access_token"):
+            token = member_token_response(member)
+            message = "Registration successful"
+        else:
+            token = None
+            message = "Account created — confirm your email, then sign in."
+
+        return ApiResponse(
+            success=True,
+            data={
+                "member": member_to_dict(member),
+                "token": token,
+                "requires_email_confirmation": token is None,
+            },
+            message=message,
+        )
 
     member = await platform_service.register_member(
         db,
@@ -57,13 +104,11 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
         date_of_birth=payload.date_of_birth,
         membership_id=payload.membership_id,
         batch=payload.batch,
-        password=payload.password if settings.use_local_auth or not supabase_auth.is_configured else None,
-        auth_user_id=auth_user_id,
-        email_verified=email_verified,
+        password=payload.password,
     )
 
     token = create_access_token(
-        subject=str(auth_user_id or member.id),
+        subject=str(member.id),
         email=member.email,
         role=member.role,
         member_id=str(member.id),
@@ -84,29 +129,30 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
 
 @router.post("/login", response_model=ApiResponse)
 async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]):
-    if supabase_auth.is_configured and not settings.use_local_auth:
+    if settings.uses_supabase_auth:
         try:
             session = await supabase_auth.sign_in(payload.email, payload.password)
         except SupabaseAuthError as e:
             raise HTTPException(status_code=e.status_code, detail=str(e)) from e
 
-        user = session.get("user", {})
-        result = await db.execute(
-            select(Member).where(Member.auth_user_id == UUID(user["id"]))
+        user = extract_supabase_user(session)
+        if not user.get("id"):
+            raise HTTPException(status_code=401, detail="Invalid Supabase session")
+
+        member = await link_or_create_member_from_supabase(db, user=user, session=session)
+
+        if member.status == MemberStatus.ARCHIVED.value:
+            raise HTTPException(status_code=403, detail="Account archived")
+
+        await platform_service.log_activity(
+            db, actor_id=member.id, action="login", entity_type="member", entity_id=member.id
         )
-        member = result.scalar_one_or_none()
-        if not member:
-            raise HTTPException(status_code=404, detail="Member profile not found")
 
         return ApiResponse(
             success=True,
             data={
                 "member": member_to_dict(member),
-                "token": {
-                    "access_token": session["access_token"],
-                    "token_type": "bearer",
-                    "expires_in": session.get("expires_in", 3600),
-                },
+                "token": member_token_response(member),
             },
             message="Login successful",
         )
