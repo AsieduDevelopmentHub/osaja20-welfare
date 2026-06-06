@@ -15,6 +15,7 @@ from v1.core.auth.supabase_service import (
 )
 from v1.core.config import settings
 from v1.core.database import get_db
+from v1.core.member_identity import validate_username
 from v1.core.models import Member, MemberStatus
 from v1.core.schemas import ApiResponse, AuthLogin, AuthProfileUpdate, AuthRegister, TokenResponse
 from v1.core.serializers import member_to_dict
@@ -42,21 +43,34 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    if payload.username:
+        try:
+            username = validate_username(payload.username)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        taken = await db.execute(select(Member).where(Member.username == username))
+        if taken.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Username already taken")
+    else:
+        username = None
+
     if settings.uses_supabase_auth:
         metadata = {
             "full_name": payload.full_name,
-            "membership_id": payload.membership_id,
             "phone_number": payload.phone_number,
             "date_of_birth": payload.date_of_birth.isoformat(),
             "batch": payload.batch,
         }
+        if username:
+            metadata["username"] = username
+
         profile = {
             "full_name": payload.full_name,
             "email": payload.email,
             "phone_number": payload.phone_number,
             "date_of_birth": payload.date_of_birth,
-            "membership_id": payload.membership_id,
             "batch": payload.batch,
+            "username": username,
         }
 
         sb: dict
@@ -77,14 +91,23 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
         if not user.get("id"):
             raise HTTPException(status_code=400, detail="Supabase signup did not return a user")
 
-        member = await link_or_create_member_from_supabase(db, user=user, session=sb, profile=profile)
+        try:
+            member = await link_or_create_member_from_supabase(db, user=user, session=sb, profile=profile)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
 
         if sb.get("access_token"):
             token = member_token_response(member)
-            message = "Registration successful"
+            message = (
+                f"Registration successful. Your member ID is {member.membership_id} "
+                f"and username is {member.username}."
+            )
         else:
             token = None
-            message = "Account created — confirm your email, then sign in."
+            message = (
+                f"Account created — confirm your email, then sign in. "
+                f"Your member ID is {member.membership_id} and username is {member.username}."
+            )
 
         return ApiResponse(
             success=True,
@@ -96,16 +119,22 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
             message=message,
         )
 
-    member = await platform_service.register_member(
-        db,
-        full_name=payload.full_name,
-        email=payload.email,
-        phone_number=payload.phone_number,
-        date_of_birth=payload.date_of_birth,
-        membership_id=payload.membership_id,
-        batch=payload.batch,
-        password=payload.password,
-    )
+    try:
+        member = await platform_service.register_member(
+            db,
+            full_name=payload.full_name,
+            email=payload.email,
+            phone_number=payload.phone_number,
+            date_of_birth=payload.date_of_birth,
+            batch=payload.batch,
+            username=username,
+            password=payload.password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    member.status = MemberStatus.ACTIVE.value
+    await db.flush()
 
     token = create_access_token(
         subject=str(member.id),
@@ -123,15 +152,22 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
                 expires_in=settings.jwt_expire_minutes * 60,
             ).model_dump(),
         },
-        message="Registration successful",
+        message=(
+            f"Registration successful. Your member ID is {member.membership_id} "
+            f"and username is {member.username}."
+        ),
     )
 
 
 @router.post("/login", response_model=ApiResponse)
 async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]):
     if settings.uses_supabase_auth:
+        login_email = await platform_service.resolve_login_email(db, payload.identifier)
+        if not login_email:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
         try:
-            session = await supabase_auth.sign_in(payload.email, payload.password)
+            session = await supabase_auth.sign_in(login_email, payload.password)
         except SupabaseAuthError as e:
             raise HTTPException(status_code=e.status_code, detail=str(e)) from e
 
@@ -157,7 +193,7 @@ async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]
             message="Login successful",
         )
 
-    member = await platform_service.authenticate_local(db, payload.email, payload.password)
+    member = await platform_service.authenticate_local(db, payload.identifier, payload.password)
     if not member:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 

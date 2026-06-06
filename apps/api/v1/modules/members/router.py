@@ -39,6 +39,7 @@ async def create_member(
         phone_number=payload.phone_number,
         date_of_birth=payload.date_of_birth,
         membership_id=payload.membership_id,
+        username=payload.username,
         batch=payload.batch,
         actor_id=admin.id,
     )

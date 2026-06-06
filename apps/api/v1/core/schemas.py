@@ -9,7 +9,8 @@ class MemberCreate(BaseModel):
     email: EmailStr
     phone_number: str = Field(min_length=10, max_length=20)
     date_of_birth: date
-    membership_id: str
+    membership_id: str | None = None
+    username: str | None = Field(default=None, min_length=3, max_length=30)
     batch: int = 2020
 
 
@@ -20,6 +21,7 @@ class MemberRoleUpdate(BaseModel):
 class MemberResponse(BaseModel):
     id: str
     full_name: str
+    username: str
     email: str
     phone_number: str
     date_of_birth: str
@@ -37,12 +39,12 @@ class AuthRegister(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     phone_number: str = Field(min_length=10, max_length=20)
     date_of_birth: date
-    membership_id: str
+    username: str | None = Field(default=None, min_length=3, max_length=30)
     batch: int = 2020
 
 
 class AuthLogin(BaseModel):
-    email: EmailStr
+    identifier: str = Field(min_length=1, max_length=255, description="Email, username, or member ID")
     password: str
 
 

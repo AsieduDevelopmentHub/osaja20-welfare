@@ -85,10 +85,8 @@ async def link_or_create_member_from_supabase(
         email=email,
         phone_number=profile.get("phone_number") or metadata.get("phone_number") or "0000000000",
         date_of_birth=dob,
-        membership_id=profile.get("membership_id")
-        or metadata.get("membership_id")
-        or f"OSA-{auth_user_id[:8].upper()}",
         batch=int(profile.get("batch") or metadata.get("batch") or 2020),
+        username=profile.get("username") or metadata.get("username"),
         password=None,
         auth_user_id=UUID(auth_user_id),
         email_verified=bool(user.get("email_confirmed_at")),

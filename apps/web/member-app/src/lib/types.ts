@@ -4,6 +4,7 @@ export function mapMember(raw: Record<string, unknown>): Member {
   return {
     id: String(raw.id),
     fullName: String(raw.full_name),
+    username: String(raw.username ?? ""),
     email: String(raw.email),
     phoneNumber: String(raw.phone_number),
     dateOfBirth: String(raw.date_of_birth),

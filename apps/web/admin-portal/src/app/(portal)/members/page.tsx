@@ -137,6 +137,7 @@ export default function MembersPage() {
                     <p className="truncate font-semibold text-white">{m.fullName}</p>
                     <p className="truncate text-sm text-slate-400">{m.email}</p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">@{m.username}</span>
                       <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">{m.membershipId}</span>
                       <span className="rounded-full bg-white/10 px-2 py-0.5 capitalize text-slate-300">{m.status}</span>
                       <span className="rounded-full bg-brand-gold/20 px-2 py-0.5 capitalize text-brand-gold">

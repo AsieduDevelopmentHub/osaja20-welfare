@@ -36,6 +36,12 @@ from v1.core.models import (
     VoteSubmission,
     WelfareCase,
 )
+from v1.core.member_identity import (
+    generate_membership_id,
+    generate_username,
+    resolve_member_by_identifier,
+    validate_username,
+)
 from v1.core.password import hash_password, verify_password
 from v1.core.serializers import (
     contribution_to_dict,
@@ -94,6 +100,7 @@ class AlgorithmRegistry:
             member.full_name,
             member.email,
             member.membership_id,
+            member.username,
         )
         self.birthday_index.insert(
             BirthdayMember(
@@ -141,17 +148,30 @@ class PlatformService:
         email: str,
         phone_number: str,
         date_of_birth,
-        membership_id: str,
         batch: int,
+        membership_id: str | None = None,
+        username: str | None = None,
         password: str | None = None,
         role: str = UserRole.MEMBER.value,
         auth_user_id: UUID | None = None,
         email_verified: bool = False,
         actor_id: UUID | None = None,
     ) -> Member:
+        email = email.lower()
+        if not membership_id:
+            membership_id = await generate_membership_id(db, batch)
+        if username:
+            username = validate_username(username)
+            taken = await db.execute(select(Member).where(Member.username == username))
+            if taken.scalar_one_or_none():
+                raise ValueError("Username already taken")
+        else:
+            username = await generate_username(db, full_name, email)
+
         member = Member(
             full_name=full_name,
-            email=email.lower(),
+            username=username,
+            email=email,
             phone_number=phone_number,
             date_of_birth=date_of_birth,
             membership_id=membership_id,
@@ -175,14 +195,17 @@ class PlatformService:
         )
         return member
 
-    async def authenticate_local(self, db: AsyncSession, email: str, password: str) -> Member | None:
-        result = await db.execute(select(Member).where(Member.email == email.lower()))
-        member = result.scalar_one_or_none()
+    async def authenticate_local(self, db: AsyncSession, identifier: str, password: str) -> Member | None:
+        member = await resolve_member_by_identifier(db, identifier)
         if not member or not member.password_hash:
             return None
         if not verify_password(password, member.password_hash):
             return None
         return member
+
+    async def resolve_login_email(self, db: AsyncSession, identifier: str) -> str | None:
+        member = await resolve_member_by_identifier(db, identifier)
+        return member.email if member else None
 
     async def search_members(self, db: AsyncSession, query: str, limit: int = 20) -> list[dict]:
         if not registry._loaded:

@@ -8,6 +8,7 @@ def member_to_dict(member: Member) -> dict:
     return {
         "id": str(member.id),
         "full_name": member.full_name,
+        "username": member.username,
         "email": member.email,
         "phone_number": member.phone_number,
         "date_of_birth": member.date_of_birth.isoformat(),

@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth";
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(identifier.trim(), password);
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -29,6 +29,9 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const inputClass =
+    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
@@ -53,17 +56,18 @@ export default function LoginPage() {
           ) : null}
 
           <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Email
+            <label htmlFor="identifier" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Email, username, or member ID
             </label>
             <input
-              id="email"
-              type="email"
+              id="identifier"
+              type="text"
               required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+              autoComplete="username"
+              placeholder="e.g. you@email.com or OSA2020-00001"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              className={inputClass}
             />
           </div>
 
@@ -78,7 +82,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20"
+              className={inputClass}
             />
           </div>
 

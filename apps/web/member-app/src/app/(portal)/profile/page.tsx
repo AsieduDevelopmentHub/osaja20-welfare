@@ -28,9 +28,10 @@ export default function ProfilePage() {
 
   const rows = [
     { icon: User, label: "Full name", value: member.fullName },
+    { icon: User, label: "Username", value: member.username },
     { icon: Mail, label: "Email", value: member.email },
     { icon: Phone, label: "Phone", value: member.phoneNumber },
-    { icon: User, label: "Membership ID", value: member.membershipId },
+    { icon: User, label: "Member ID", value: member.membershipId },
   ];
 
   return (

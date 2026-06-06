@@ -13,7 +13,7 @@ function AdminLoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/";
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,7 @@ function AdminLoginForm() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      await login(identifier.trim(), password);
       router.replace(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -60,16 +60,17 @@ function AdminLoginForm() {
           ) : null}
 
           <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-300">
-              Email
+            <label htmlFor="identifier" className="mb-1.5 block text-sm font-medium text-slate-300">
+              Email, username, or member ID
             </label>
             <input
-              id="email"
-              type="email"
+              id="identifier"
+              type="text"
               required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              placeholder="admin@osaja.com or OSA2020-00001"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
             />
           </div>

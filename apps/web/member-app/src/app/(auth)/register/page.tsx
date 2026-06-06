@@ -13,7 +13,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const [success, setSuccess] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -22,6 +21,8 @@ export default function RegisterPage() {
     setSuccess("");
     setLoading(true);
     const fd = new FormData(e.currentTarget);
+    const username = String(fd.get("username") ?? "").trim();
+
     try {
       const result = await register({
         full_name: fd.get("full_name"),
@@ -29,7 +30,7 @@ export default function RegisterPage() {
         password: fd.get("password"),
         phone_number: fd.get("phone_number"),
         date_of_birth: fd.get("date_of_birth"),
-        membership_id: fd.get("membership_id"),
+        ...(username ? { username } : {}),
         batch: 2020,
       });
 
@@ -78,10 +79,22 @@ export default function RegisterPage() {
 
           <input name="full_name" required placeholder="Full name" className={inputClass} />
           <input name="email" type="email" required placeholder="Email" className={inputClass} />
+          <input
+            name="username"
+            placeholder="Username (optional — auto-assigned if blank)"
+            minLength={3}
+            maxLength={30}
+            pattern="[a-z0-9_]{3,30}"
+            title="Lowercase letters, numbers, underscores only"
+            className={inputClass}
+          />
           <input name="password" type="password" required minLength={8} placeholder="Password (min 8)" className={inputClass} />
           <input name="phone_number" required placeholder="Phone number" className={inputClass} />
           <input name="date_of_birth" type="date" required className={inputClass} />
-          <input name="membership_id" required placeholder="Membership ID (e.g. OSA-001)" className={inputClass} />
+
+          <p className="text-xs text-slate-500">
+            Your member ID will be assigned automatically after registration.
+          </p>
 
           <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-3">
             <UserPlus className="h-5 w-5" />

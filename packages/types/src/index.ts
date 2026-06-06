@@ -7,6 +7,7 @@ export type MemberStatus = "active" | "inactive" | "archived" | "pending";
 export interface Member {
   id: string;
   fullName: string;
+  username: string;
   email: string;
   phoneNumber: string;
   dateOfBirth: string;

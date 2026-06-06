@@ -8,7 +8,7 @@ import { EXECUTIVE_ROLES, isExecutiveRole, mapMember } from "./types";
 interface AuthState {
   member: Member | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -46,12 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
     const res = await apiFetch<{ member: Record<string, unknown>; token: { access_token: string } }>(
       "/auth/login",
       {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier, password }),
       }
     );
 
