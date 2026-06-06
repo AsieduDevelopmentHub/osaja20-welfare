@@ -13,6 +13,10 @@ class MemberCreate(BaseModel):
     batch: int = 2020
 
 
+class MemberRoleUpdate(BaseModel):
+    role: Literal["administrator", "executive", "member"]
+
+
 class MemberResponse(BaseModel):
     id: str
     full_name: str

@@ -14,6 +14,7 @@ export interface Member {
   batch: number;
   registrationDate: string;
   status: MemberStatus;
+  role?: UserRole;
   emailVerified: boolean;
 }
 

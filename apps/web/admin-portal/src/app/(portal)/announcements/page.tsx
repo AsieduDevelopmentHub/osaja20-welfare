@@ -2,8 +2,7 @@
 
 import { Megaphone, Send } from "lucide-react";
 import { useState } from "react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+import { apiFetch } from "@/lib/api";
 
 export default function AnnouncementsPage() {
   const [title, setTitle] = useState("");
@@ -15,18 +14,11 @@ export default function AnnouncementsPage() {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-    const token = localStorage.getItem("osaja_token");
     try {
-      const res = await fetch(`${API_BASE}/announcements`, {
+      await apiFetch("/announcements", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ title, content, target_audience: ["all"], notify_members: true }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.detail ?? "Failed");
       setMessage("Announcement published — members notified in-app (push when configured).");
       setTitle("");
       setContent("");

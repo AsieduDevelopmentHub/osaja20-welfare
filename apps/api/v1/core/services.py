@@ -197,6 +197,58 @@ class PlatformService:
         members = {str(m.id): m for m in result.scalars().all()}
         return [member_to_dict(members[mid]) for mid in ids if mid in members]
 
+    async def list_members(
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+    ) -> dict:
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        query = select(Member).order_by(Member.created_at.desc())
+        count_query = select(func.count()).select_from(Member)
+
+        if status:
+            query = query.where(Member.status == status)
+            count_query = count_query.where(Member.status == status)
+
+        total = await db.scalar(count_query) or 0
+        result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+        items = [member_to_dict(m) for m in result.scalars().all()]
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
+
+    async def update_member_role(
+        self,
+        db: AsyncSession,
+        member_id: UUID,
+        role: str,
+        *,
+        actor_id: UUID | None = None,
+    ) -> Member:
+        member = await self.get_member(db, member_id)
+        if not member:
+            raise ValueError("Member not found")
+        member.role = role
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="member_role_updated",
+            entity_type="member",
+            entity_id=member.id,
+            metadata={"role": role},
+        )
+        return member
+
     async def create_welfare_case(self, db: AsyncSession, data: dict, actor_id: UUID | None = None) -> dict:
         case = WelfareCase(
             member_id=UUID(data["member_id"]),

@@ -7,11 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from v1.core.auth.dependencies import get_current_member, require_admin, require_executive
 from v1.core.database import get_db
 from v1.core.models import Member
-from v1.core.schemas import ApiResponse, MemberCreate
+from v1.core.schemas import ApiResponse, MemberCreate, MemberRoleUpdate
 from v1.core.serializers import member_to_dict
 from v1.core.services import platform_service
 
 router = APIRouter(prefix="/members", tags=["Members"])
+
+
+@router.get("", response_model=ApiResponse)
+async def list_members(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    status: str | None = None,
+):
+    data = await platform_service.list_members(db, page=page, page_size=page_size, status=status)
+    return ApiResponse(success=True, data=data)
 
 
 @router.post("", response_model=ApiResponse)
@@ -76,3 +88,20 @@ async def get_member_balance(
 
     balance_data = await platform_service.get_member_balance(db, member_id)
     return ApiResponse(success=True, data=balance_data)
+
+
+@router.patch("/{member_id}/role", response_model=ApiResponse)
+async def update_member_role(
+    member_id: UUID,
+    payload: MemberRoleUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    admin: Annotated[Member, Depends(require_admin)],
+):
+    try:
+        member = await platform_service.update_member_role(
+            db, member_id, payload.role, actor_id=admin.id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    return ApiResponse(success=True, data=member_to_dict(member), message="Role updated")
