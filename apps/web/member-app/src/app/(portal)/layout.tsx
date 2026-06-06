@@ -1,6 +1,6 @@
 "use client";
 
-import { MobileShell, memberNavItems } from "@osaja/ui";
+import { MobileShell, memberNavItems, PortalShellSkeleton } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -19,12 +19,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   }, [loading, member, router, pathname]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-brand-cream">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-navy border-t-transparent" />
-        <p className="text-sm text-slate-500">Loading your portal...</p>
-      </div>
-    );
+    return <PortalShellSkeleton variant="light" />;
   }
 
   if (!member || !getToken()) return null;

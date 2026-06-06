@@ -1,6 +1,7 @@
 "use client";
 
 import type { Member, UserRole } from "@osaja/types";
+import { MemberListSkeleton } from "@osaja/ui";
 import { RefreshCw, Search, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -123,10 +124,11 @@ export default function MembersPage() {
 
       {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
 
+      {loading ? (
+        <MemberListSkeleton variant="dark" />
+      ) : (
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-brand-navy/60">
-        {loading ? (
-          <p className="p-6 text-sm text-slate-400">Loading members...</p>
-        ) : members.length === 0 ? (
+        {members.length === 0 ? (
           <p className="p-6 text-sm text-slate-400">No members found.</p>
         ) : (
           <ul className="divide-y divide-white/5">
@@ -172,6 +174,7 @@ export default function MembersPage() {
           </ul>
         )}
       </div>
+      )}
 
       {!query && totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-slate-400">

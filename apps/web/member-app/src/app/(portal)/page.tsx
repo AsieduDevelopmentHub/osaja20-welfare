@@ -1,6 +1,6 @@
 "use client";
 
-import { StatCard } from "@osaja/ui";
+import { DashboardPageSkeleton, StatCard } from "@osaja/ui";
 import { formatCurrency } from "@osaja/utils";
 import { Bell, Cake, Vote, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -11,6 +11,7 @@ import type { NotificationItem } from "@/lib/types";
 
 export default function DashboardPage() {
   const { member } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(0);
   const [unread, setUnread] = useState(0);
   const [birthdays, setBirthdays] = useState(0);
@@ -18,20 +19,29 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!member) return;
-    apiFetch<{ balance: number }>(`/members/${member.id}/balance`)
-      .then((r) => setBalance(r.data?.balance ?? 0))
-      .catch(() => {});
-    apiFetch<{ count: number }>("/notifications/unread-count")
-      .then((r) => setUnread(r.data?.count ?? 0))
-      .catch(() => {});
-    apiFetch<NotificationItem[]>("/notifications?unread_only=false")
-      .then((r) => setNotifications((r.data as NotificationItem[])?.slice(0, 4) ?? []))
-      .catch(() => {});
+
+    setLoading(true);
     const month = new Date().getMonth() + 1;
-    apiFetch<{ day: number }[]>(`/dashboard/birthdays?month=${month}`)
-      .then((r) => setBirthdays(Array.isArray(r.data) ? r.data.length : 0))
-      .catch(() => {});
+
+    Promise.all([
+      apiFetch<{ balance: number }>(`/members/${member.id}/balance`),
+      apiFetch<{ count: number }>("/notifications/unread-count"),
+      apiFetch<NotificationItem[]>("/notifications?unread_only=false"),
+      apiFetch<{ day: number }[]>(`/dashboard/birthdays?month=${month}`),
+    ])
+      .then(([balanceRes, unreadRes, notifRes, birthdaysRes]) => {
+        setBalance(balanceRes.data?.balance ?? 0);
+        setUnread(unreadRes.data?.count ?? 0);
+        setNotifications((notifRes.data as NotificationItem[])?.slice(0, 4) ?? []);
+        setBirthdays(Array.isArray(birthdaysRes.data) ? birthdaysRes.data.length : 0);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [member]);
+
+  if (loading) {
+    return <DashboardPageSkeleton variant="light" />;
+  }
 
   return (
     <div className="space-y-6">

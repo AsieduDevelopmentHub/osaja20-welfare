@@ -1,6 +1,6 @@
 "use client";
 
-import { StatCard, adminModules } from "@osaja/ui";
+import { adminModules, DashboardPageSkeleton, Skeleton, StatCard } from "@osaja/ui";
 import { formatCurrency } from "@osaja/utils";
 import { Cake, Download, Megaphone, Users, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
@@ -12,6 +12,7 @@ import type { Member } from "@osaja/types";
 
 export default function AdminDashboard() {
   const { member } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     total_members: 0,
     active_members: 0,
@@ -26,6 +27,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!member) return;
 
+    setLoading(true);
     setError("");
     Promise.all([
       apiFetch<DashboardStats>("/dashboard/stats"),
@@ -38,8 +40,28 @@ export default function AdminDashboard() {
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
-      });
+      })
+      .finally(() => setLoading(false));
   }, [member]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <Skeleton variant="dark" className="h-4 w-28" />
+            <Skeleton variant="dark" className="h-8 w-56 sm:h-9" />
+            <Skeleton variant="dark" className="h-4 w-64" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton variant="dark" className="h-10 w-24 rounded-xl" />
+            <Skeleton variant="dark" className="h-10 w-28 rounded-xl" />
+          </div>
+        </header>
+        <DashboardPageSkeleton variant="dark" />
+      </div>
+    );
+  }
 
   const statCards = [
     { label: "Total members", value: String(stats.total_members), icon: Users },
@@ -110,7 +132,9 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs">
                   <span className="rounded-full bg-white/10 px-2 py-0.5 capitalize text-slate-300">{m.status}</span>
-                  <span className="truncate text-xs text-slate-400">@{m.username} · {m.membershipId}</span>
+                  <span className="truncate text-xs text-slate-400">
+                    @{m.username} · {m.membershipId}
+                  </span>
                 </div>
               </li>
             ))}

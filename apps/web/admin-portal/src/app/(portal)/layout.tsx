@@ -1,6 +1,6 @@
 "use client";
 
-import { MobileShell, adminNavItems } from "@osaja/ui";
+import { MobileShell, adminNavItems, PortalShellSkeleton } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -19,12 +19,7 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
   }, [loading, member, router, pathname]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-brand-navy-dark">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
-        <p className="text-sm text-slate-400">Loading admin portal...</p>
-      </div>
-    );
+    return <PortalShellSkeleton variant="dark" />;
   }
 
   if (!member || !getToken()) return null;

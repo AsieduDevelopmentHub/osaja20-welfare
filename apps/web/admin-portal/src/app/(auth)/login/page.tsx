@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Shield } from "lucide-react";
-import { BrandHeader } from "@osaja/ui";
+import { AuthFormSkeleton, BrandHeader } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
@@ -118,7 +118,9 @@ export default function AdminLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center text-slate-400">Loading...</div>
+        <div className="flex min-h-screen items-center justify-center px-4 py-8">
+          <AuthFormSkeleton variant="dark" />
+        </div>
       }
     >
       <AdminLoginForm />

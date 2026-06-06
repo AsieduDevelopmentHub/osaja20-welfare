@@ -4,6 +4,19 @@ export { StatCard } from "./components/StatCard.js";
 export type { StatCardProps } from "./components/StatCard.js";
 export { MobileShell } from "./components/MobileShell.js";
 export type { MobileShellProps } from "./components/MobileShell.js";
+export {
+  Skeleton,
+  PageHeaderSkeleton,
+  StatCardsSkeleton,
+  ListRowsSkeleton,
+  NotificationListSkeleton,
+  MemberListSkeleton,
+  ContributionCardSkeleton,
+  PortalShellSkeleton,
+  AuthFormSkeleton,
+  DashboardPageSkeleton,
+} from "./components/Skeleton.js";
+export type { SkeletonProps, SkeletonVariant } from "./components/Skeleton.js";
 export { memberNavItems } from "./nav-config.js";
 export type { NavItem } from "./nav-config.js";
 export { adminNavItems, adminModules } from "./admin-nav.js";
