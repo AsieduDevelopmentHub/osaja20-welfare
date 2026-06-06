@@ -4,8 +4,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from passlib.context import CryptContext
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -21,8 +20,6 @@ from v1.core.algorithms import (
     VoteEngine,
     WelfareStateMachine,
 )
-from sqlalchemy import delete
-
 from v1.core.models import (
     ActivityLog,
     Announcement,
@@ -39,15 +36,13 @@ from v1.core.models import (
     VoteSubmission,
     WelfareCase,
 )
+from v1.core.password import hash_password, verify_password
 from v1.core.serializers import (
     contribution_to_dict,
     member_to_dict,
     vote_to_dict,
     welfare_case_to_dict,
 )
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 class AlgorithmRegistry:
     """In-memory indexes rebuilt from PostgreSQL on startup."""
@@ -165,7 +160,7 @@ class PlatformService:
             role=role,
             email_verified=email_verified,
             auth_user_id=auth_user_id,
-            password_hash=pwd_context.hash(password) if password else None,
+            password_hash=hash_password(password) if password else None,
         )
         db.add(member)
         await db.flush()
@@ -185,7 +180,7 @@ class PlatformService:
         member = result.scalar_one_or_none()
         if not member or not member.password_hash:
             return None
-        if not pwd_context.verify(password, member.password_hash):
+        if not verify_password(password, member.password_hash):
             return None
         return member
 
