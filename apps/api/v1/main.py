@@ -8,8 +8,11 @@ from v1.core.database import async_session
 from v1.core.init_db import init_database, warm_indexes
 from v1.modules.auth.router import router as auth_router
 from v1.modules.contributions.router import router as contributions_router
+from v1.modules.announcements.router import router as announcements_router
 from v1.modules.dashboard.router import router as dashboard_router
 from v1.modules.members.router import router as members_router
+from v1.modules.notifications.router import router as notifications_router
+from v1.modules.push.router import router as push_router
 from v1.modules.voting.router import router as voting_router
 from v1.modules.welfare.router import router as welfare_router
 
@@ -47,6 +50,9 @@ app.include_router(welfare_router, prefix=API_PREFIX)
 app.include_router(contributions_router, prefix=API_PREFIX)
 app.include_router(voting_router, prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
+app.include_router(notifications_router, prefix=API_PREFIX)
+app.include_router(announcements_router, prefix=API_PREFIX)
+app.include_router(push_router, prefix=API_PREFIX)
 
 
 @app.get("/health")

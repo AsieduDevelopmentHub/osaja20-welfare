@@ -22,6 +22,9 @@ const config: Config = {
           gold: "#d4a853",
           green: "#2d8a5e",
         },
+        slate: {
+          850: "#1a2332",
+        },
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

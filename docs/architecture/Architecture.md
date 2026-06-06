@@ -43,9 +43,20 @@ osaja20-welfare/
 
 PostgreSQL with `UNIQUE(member_id, vote_id)` constraint for vote duplicate protection at the persistence layer.
 
+## Notifications (No Celery)
+
+Background workers are **not** used to keep hosting costs low. Instead:
+
+| Feature | Approach |
+|---------|----------|
+| In-app notifications | Created synchronously via API |
+| Birthday scan | On-demand `POST /notifications/scan-birthdays` |
+| Announcements | Fan-out notifications at publish time |
+| Push notifications | Web Push API + stored subscriptions (`POST /push/subscribe`) |
+
 ## Deployment
 
 - Frontend: Vercel
 - Backend: Render
 - Database/Auth: Supabase
-- Cache/Jobs: Redis + Celery
+- Push: Web Push (VAPID keys on server when ready)

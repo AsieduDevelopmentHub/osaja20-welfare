@@ -22,6 +22,9 @@ const config: Config = {
       boxShadow: {
         glass: "0 8px 32px rgba(0, 0, 0, 0.12)",
       },
+      backdropBlur: {
+        glass: "12px",
+      },
     },
   },
   plugins: [],

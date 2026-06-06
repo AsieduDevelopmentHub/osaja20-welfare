@@ -86,6 +86,31 @@ class VoteSubmit(BaseModel):
     option_id: str
 
 
+class NotificationCreate(BaseModel):
+    member_id: str
+    type: Literal["meeting", "welfare", "announcement", "contribution", "celebration", "voting"] = "announcement"
+    title: str
+    message: str
+
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    target_audience: list[str] = Field(default_factory=lambda: ["all"])
+    notify_members: bool = True
+
+
+class PushKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscribe(BaseModel):
+    endpoint: str
+    keys: PushKeys
+    user_agent: str | None = None
+
+
 class ApiResponse(BaseModel):
     success: bool
     data: dict | list | None = None

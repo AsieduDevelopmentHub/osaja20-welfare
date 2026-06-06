@@ -12,7 +12,9 @@
   "dependencies": {
     "@osaja/config": "workspace:*",
     "@osaja/types": "workspace:*",
+    "@osaja/ui": "workspace:*",
     "@osaja/utils": "workspace:*",
+    "lucide-react": "^0.469.0",
     "next": "^15.1.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

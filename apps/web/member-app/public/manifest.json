@@ -1,0 +1,10 @@
+{
+  "name": "OSAJA'20 Welfare",
+  "short_name": "OSAJA'20",
+  "description": "Asuofua D/A JHS Block A Batch 2020 Welfare Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#006fc7",
+  "icons": []
+}

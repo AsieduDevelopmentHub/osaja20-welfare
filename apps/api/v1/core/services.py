@@ -21,11 +21,16 @@ from v1.core.algorithms import (
     VoteEngine,
     WelfareStateMachine,
 )
+from sqlalchemy import delete
+
 from v1.core.models import (
     ActivityLog,
+    Announcement,
     Contribution,
     Member,
     MemberStatus,
+    Notification,
+    PushSubscription,
     UserRole,
     Vote,
     VoteAuditLog,
@@ -467,6 +472,197 @@ class PlatformService:
             await registry.rebuild(db)
         birthdays = registry.birthday_index.get_birthdays_for_month(month)
         return [{"member_id": b.member_id, "full_name": b.full_name, "day": b.day} for b in birthdays]
+
+    async def create_notification(
+        self,
+        db: AsyncSession,
+        *,
+        member_id: UUID,
+        type: str,
+        title: str,
+        message: str,
+        actor_id: UUID | None = None,
+        push_pending: bool = True,
+    ) -> dict:
+        now = datetime.now(timezone.utc)
+        notification = Notification(
+            member_id=member_id,
+            type=type,
+            title=title,
+            message=message,
+            sent_at=now,
+            push_pending=push_pending,
+        )
+        db.add(notification)
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="notification_created",
+            entity_type="notification",
+            entity_id=notification.id,
+        )
+        return {
+            "id": str(notification.id),
+            "member_id": str(member_id),
+            "type": type,
+            "title": title,
+            "message": message,
+            "read": False,
+            "push_pending": push_pending,
+            "created_at": notification.created_at.isoformat(),
+        }
+
+    async def scan_birthday_notifications(self, db: AsyncSession, actor_id: UUID | None = None) -> int:
+        if not registry._loaded:
+            await registry.rebuild(db)
+
+        today = datetime.now(timezone.utc).date()
+        birthdays = registry.birthday_index.get_birthdays_for_date(today.month, today.day)
+        if not birthdays:
+            return 0
+
+        day_start = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+        created = 0
+
+        for b in birthdays:
+            member_uuid = UUID(b.member_id)
+            await self.create_notification(
+                db,
+                member_id=member_uuid,
+                type="celebration",
+                title="Happy Birthday!",
+                message=f"Happy birthday, {b.full_name}! The OSAJA'20 family celebrates you today.",
+                actor_id=actor_id,
+            )
+            created += 1
+
+        active_members = (
+            await db.execute(select(Member).where(Member.status == MemberStatus.ACTIVE.value))
+        ).scalars().all()
+
+        for b in birthdays:
+            birthday_id = UUID(b.member_id)
+            for member in active_members:
+                if member.id == birthday_id:
+                    continue
+                existing = await db.scalar(
+                    select(func.count())
+                    .select_from(Notification)
+                    .where(
+                        Notification.member_id == member.id,
+                        Notification.type == "celebration",
+                        Notification.created_at >= day_start,
+                        Notification.message.contains(b.full_name),
+                    )
+                )
+                if existing:
+                    continue
+                await self.create_notification(
+                    db,
+                    member_id=member.id,
+                    type="celebration",
+                    title="Birthday Today",
+                    message=f"Join us in celebrating {b.full_name}'s birthday today!",
+                    actor_id=actor_id,
+                )
+                created += 1
+
+        return created
+
+    async def publish_announcement(
+        self,
+        db: AsyncSession,
+        *,
+        title: str,
+        content: str,
+        target_audience: list[str],
+        created_by: UUID,
+        notify_members: bool = True,
+    ) -> dict:
+        now = datetime.now(timezone.utc)
+        announcement = Announcement(
+            title=title,
+            content=content,
+            target_audience=target_audience,
+            published_at=now,
+            created_by=created_by,
+        )
+        db.add(announcement)
+        await db.flush()
+
+        if notify_members:
+            members = (await db.execute(select(Member).where(Member.status == MemberStatus.ACTIVE.value))).scalars().all()
+            for member in members:
+                if "all" not in target_audience and member.role not in target_audience:
+                    continue
+                await self.create_notification(
+                    db,
+                    member_id=member.id,
+                    type="announcement",
+                    title=title,
+                    message=content[:500],
+                    actor_id=created_by,
+                )
+
+        await self.log_activity(
+            db,
+            actor_id=created_by,
+            action="announcement_published",
+            entity_type="announcement",
+            entity_id=announcement.id,
+        )
+        return {
+            "id": str(announcement.id),
+            "title": title,
+            "content": content,
+            "published_at": now.isoformat(),
+        }
+
+    async def register_push_subscription(
+        self,
+        db: AsyncSession,
+        *,
+        member_id: UUID,
+        endpoint: str,
+        p256dh_key: str,
+        auth_key: str,
+        user_agent: str | None,
+    ) -> dict:
+        existing = await db.execute(
+            select(PushSubscription).where(
+                PushSubscription.member_id == member_id,
+                PushSubscription.endpoint == endpoint,
+            )
+        )
+        sub = existing.scalar_one_or_none()
+        if sub:
+            sub.p256dh_key = p256dh_key
+            sub.auth_key = auth_key
+            sub.user_agent = user_agent
+        else:
+            sub = PushSubscription(
+                member_id=member_id,
+                endpoint=endpoint,
+                p256dh_key=p256dh_key,
+                auth_key=auth_key,
+                user_agent=user_agent,
+            )
+            db.add(sub)
+        await db.flush()
+        return {"id": str(sub.id), "endpoint": endpoint}
+
+    async def remove_push_subscription(
+        self, db: AsyncSession, *, member_id: UUID, endpoint: str
+    ) -> bool:
+        result = await db.execute(
+            delete(PushSubscription).where(
+                PushSubscription.member_id == member_id,
+                PushSubscription.endpoint == endpoint,
+            )
+        )
+        await db.flush()
+        return result.rowcount > 0
 
 
 platform_service = PlatformService()

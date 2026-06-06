@@ -9,8 +9,8 @@
 | Web | Next.js 15, TypeScript, Tailwind CSS |
 | API | FastAPI, Python 3.12 |
 | Database | PostgreSQL (Supabase) |
-| Cache | Redis |
 | Auth | Supabase Auth (JWT) |
+| Notifications | In-app + Web Push (no Celery) |
 
 ## Monorepo Structure
 
