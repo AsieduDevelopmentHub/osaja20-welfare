@@ -73,5 +73,37 @@ class SupabaseAuthClient:
             raise SupabaseAuthError("Invalid session", response.status_code)
         return response.json()
 
+    def _service_headers(self) -> dict[str, str]:
+        if not settings.supabase_service_key:
+            raise SupabaseAuthError("SUPABASE_SERVICE_KEY is not configured", 500)
+        return {
+            "apikey": settings.supabase_service_key,
+            "Authorization": f"Bearer {settings.supabase_service_key}",
+            "Content-Type": "application/json",
+        }
+
+    async def admin_create_user(
+        self,
+        email: str,
+        password: str,
+        *,
+        metadata: dict | None = None,
+        email_confirm: bool = True,
+    ) -> dict:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.base_url}/auth/v1/admin/users",
+                headers=self._service_headers(),
+                json={
+                    "email": email,
+                    "password": password,
+                    "email_confirm": email_confirm,
+                    "user_metadata": metadata or {},
+                },
+            )
+        if response.status_code >= 400:
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
+        return response.json()
+
 
 supabase_auth = SupabaseAuthClient()
