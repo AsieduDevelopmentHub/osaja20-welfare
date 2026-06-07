@@ -107,29 +107,51 @@ export default function WelfarePage() {
         </button>
       </div>
 
-      {message ? <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</p> : null}
-      {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      <div aria-live="polite" aria-atomic="true">
+        {message ? (
+          <p className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">
+            {message}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
 
       {showForm ? (
         <form onSubmit={submit} className="glass-card space-y-4 p-5 sm:p-6">
           <h2 className="font-semibold text-slate-900">Submit a welfare request</h2>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            minLength={3}
-            placeholder="Brief title (e.g. Medical support)"
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-            minLength={10}
-            rows={4}
-            placeholder="Describe your situation and what support you need..."
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900"
-          />
+          <div>
+            <label htmlFor="welfare-title" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Title
+            </label>
+            <input
+              id="welfare-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              minLength={3}
+              placeholder="e.g. Medical support"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900"
+            />
+          </div>
+          <div>
+            <label htmlFor="welfare-description" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Description
+            </label>
+            <textarea
+              id="welfare-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+              minLength={10}
+              rows={4}
+              placeholder="Describe your situation and what support you need..."
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900"
+            />
+          </div>
           <button type="submit" disabled={busy} className="btn-primary disabled:opacity-50">
             {busy ? "Submitting..." : "Submit request"}
           </button>

@@ -1,6 +1,6 @@
 """Database-backed service layer with in-memory algorithm indexes."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -49,6 +49,8 @@ from v1.core.member_identity import (
 )
 from v1.core.member_preferences import PREFERENCE_KEYS, merge_preferences
 from v1.core.password import hash_password, verify_password
+from v1.core.email_service import build_digest_email, is_email_configured, send_email
+from v1.core.jobs.queue import job_queue
 from v1.core.push_service import (
     build_payload,
     is_push_configured,
@@ -1090,17 +1092,27 @@ class PlatformService:
         )
 
         if push_pending:
-            delivered = await self.deliver_push_notification(
-                db,
-                member_id=member_id,
-                notification_id=notification.id,
-                notification_type=type,
-                title=title,
-                message=message,
-            )
-            if delivered:
-                notification.push_pending = False
-                await db.flush()
+            push_payload = {
+                "member_id": str(member_id),
+                "notification_id": str(notification.id),
+                "notification_type": type,
+                "title": title,
+                "message": message,
+                "url": "/notifications",
+            }
+            queued = await job_queue.enqueue("push_notification", push_payload)
+            if not queued:
+                delivered = await self.deliver_push_notification(
+                    db,
+                    member_id=member_id,
+                    notification_id=notification.id,
+                    notification_type=type,
+                    title=title,
+                    message=message,
+                )
+                if delivered:
+                    notification.push_pending = False
+                    await db.flush()
 
         return {
             "id": str(notification.id),
@@ -1418,6 +1430,126 @@ class PlatformService:
         )
         await db.flush()
         return result.rowcount > 0
+
+    async def list_activity_logs(
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+        action: str | None = None,
+    ) -> dict:
+        filters = []
+        if action:
+            filters.append(ActivityLog.action == action)
+
+        count_q = select(func.count(ActivityLog.id))
+        if filters:
+            count_q = count_q.where(*filters)
+        total = (await db.execute(count_q)).scalar_one()
+
+        query = select(ActivityLog)
+        if filters:
+            query = query.where(*filters)
+
+        offset = (page - 1) * page_size
+        result = await db.execute(
+            query.order_by(ActivityLog.created_at.desc()).offset(offset).limit(page_size)
+        )
+        logs = result.scalars().all()
+
+        actor_ids = {log.actor_id for log in logs if log.actor_id}
+        actors: dict[UUID, Member] = {}
+        if actor_ids:
+            actor_rows = await db.execute(select(Member).where(Member.id.in_(actor_ids)))
+            actors = {m.id: m for m in actor_rows.scalars().all()}
+
+        items = []
+        for log in logs:
+            actor = actors.get(log.actor_id) if log.actor_id else None
+            items.append(
+                {
+                    "id": str(log.id),
+                    "action": log.action,
+                    "entity_type": log.entity_type,
+                    "entity_id": str(log.entity_id),
+                    "metadata": log.metadata_json or {},
+                    "created_at": log.created_at.isoformat(),
+                    "actor": (
+                        {
+                            "id": str(actor.id),
+                            "full_name": actor.full_name,
+                            "membership_id": actor.membership_id,
+                        }
+                        if actor
+                        else None
+                    ),
+                }
+            )
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
+
+    async def send_member_email_digest(self, db: AsyncSession, member_id: UUID) -> bool:
+        if not is_email_configured():
+            return False
+
+        member = await self.get_member(db, member_id)
+        if not member or member.status != MemberStatus.ACTIVE.value:
+            return False
+
+        prefs = merge_preferences(member.preferences_json)
+        if not prefs.get("email_digest"):
+            return False
+
+        since = datetime.now(timezone.utc) - timedelta(days=7)
+        result = await db.execute(
+            select(Notification)
+            .where(
+                Notification.member_id == member_id,
+                Notification.created_at >= since,
+            )
+            .order_by(Notification.created_at.desc())
+            .limit(20)
+        )
+        notifications = result.scalars().all()
+        if not notifications:
+            return False
+
+        items = [
+            {"type": n.type, "title": n.title, "message": n.message}
+            for n in notifications
+        ]
+        subject, body_text, body_html = build_digest_email(
+            member_name=member.full_name,
+            items=items,
+        )
+        send_email(
+            to_email=member.email,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+        )
+
+        stored = dict(member.preferences_json or {})
+        stored["last_email_digest_at"] = datetime.now(timezone.utc).isoformat()
+        member.preferences_json = stored
+        await db.flush()
+
+        await self.log_activity(
+            db,
+            actor_id=member.id,
+            action="email_digest_sent",
+            entity_type="member",
+            entity_id=member.id,
+            metadata={"notification_count": len(items)},
+        )
+        return True
 
 
 platform_service = PlatformService()

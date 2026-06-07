@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a2d6e" />
+    <title>Offline — OSAJA'20 Welfare</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        background: #faf8f5;
+        color: #0a2d6e;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+      p { color: #475569; max-width: 24rem; line-height: 1.5; }
+      button {
+        margin-top: 1.5rem;
+        background: #0a2d6e;
+        color: #fff;
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.25rem;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You're offline</h1>
+      <p>Reconnect to view live dues, votes, and welfare updates. Cached pages may still be available.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

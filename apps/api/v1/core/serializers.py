@@ -5,8 +5,8 @@ from v1.core.member_preferences import merge_preferences
 from v1.core.models import Contribution, Member, Vote, VoteOption, WelfareCase
 
 
-def member_to_dict(member: Member) -> dict:
-    return {
+def member_to_dict(member: Member, *, include_internal: bool = False) -> dict:
+    data = {
         "id": str(member.id),
         "full_name": member.full_name,
         "username": member.username,
@@ -19,10 +19,12 @@ def member_to_dict(member: Member) -> dict:
         "role": member.role,
         "email_verified": member.email_verified,
         "registration_date": member.registration_date.isoformat() if member.registration_date else None,
-        "auth_user_id": str(member.auth_user_id) if member.auth_user_id else None,
         "avatar_url": member.avatar_url,
         "preferences": merge_preferences(member.preferences_json),
     }
+    if include_internal and member.auth_user_id:
+        data["auth_user_id"] = str(member.auth_user_id)
+    return data
 
 
 def welfare_case_to_dict(case: WelfareCase) -> dict:

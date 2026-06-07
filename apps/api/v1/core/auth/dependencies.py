@@ -29,6 +29,11 @@ async def get_current_member(
         result = await db.execute(select(Member).where(Member.id == member_id))
         member = result.scalar_one_or_none()
         if member:
+            if member.status == MemberStatus.PENDING.value:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account pending executive approval",
+                )
             if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
             return member
@@ -40,6 +45,11 @@ async def get_current_member(
         )
         member = result.scalar_one_or_none()
         if member:
+            if member.status == MemberStatus.PENDING.value:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account pending executive approval",
+                )
             if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
             return member

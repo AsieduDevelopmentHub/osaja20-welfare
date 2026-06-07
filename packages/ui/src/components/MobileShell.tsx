@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { MoreHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { BrandHeader } from "./BrandLogo.js";
+import { SkipLink } from "./SkipLink.js";
 import type { NavItem } from "../nav-config.js";
 
 export interface MobileShellProps {
@@ -94,6 +95,7 @@ export function MobileShell({
       <Link
         href={item.href}
         onClick={onNavigate}
+        aria-current={active ? "page" : undefined}
         className={`flex items-center gap-3 rounded-xl transition-colors ${
           compact ? "flex-col gap-1 px-1 py-2" : "px-4 py-2.5 text-sm font-medium"
         } ${navLinkClass(active)}`}
@@ -106,6 +108,7 @@ export function MobileShell({
 
   return (
     <div className={`min-h-screen ${shellBg} ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+      <SkipLink />
       {/* ── Mobile top bar (logo only — no duplicate menu) ── */}
       <header
         className={`sticky top-0 z-40 border-b backdrop-blur-md lg:hidden ${cardBorder}`}
@@ -143,7 +146,7 @@ export function MobileShell({
             ) : null}
           </div>
 
-          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+          <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto" aria-label="Main navigation">
             {navItems.map((item) => (
               <NavLink key={item.href} item={item} />
             ))}
@@ -152,13 +155,18 @@ export function MobileShell({
           {footer ? <div className="mt-4 border-t border-white/10 pt-4">{footer}</div> : null}
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:px-0 lg:py-0 lg:pb-0">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-w-0 flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:px-0 lg:py-0 lg:pb-0"
+        >
           {children}
         </main>
       </div>
 
       {/* ── Mobile bottom nav (single nav — no sidebar drawer) ── */}
       <nav
+        aria-label="Mobile navigation"
         className={`fixed bottom-0 left-0 right-0 z-30 border-t backdrop-blur-md lg:hidden ${cardBorder}`}
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
@@ -170,6 +178,8 @@ export function MobileShell({
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
+                aria-label={item.label}
                 className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 ${bottomLinkClass(active)}`}
               >
                 <Icon className="h-5 w-5" strokeWidth={active ? 2.25 : 1.75} />
@@ -182,6 +192,9 @@ export function MobileShell({
             <button
               type="button"
               onClick={() => setMoreOpen(true)}
+              aria-expanded={moreOpen}
+              aria-haspopup="dialog"
+              aria-label="More navigation options"
               className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 ${
                 overflowNav.some((i) => i.href === pathname) ? bottomLinkClass(true) : bottomLinkClass(false)
               }`}
@@ -203,6 +216,9 @@ export function MobileShell({
             onClick={() => setMoreOpen(false)}
           />
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="More navigation"
             className={`absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-2xl border-t p-5 shadow-2xl ${cardBorder}`}
             style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
           >
@@ -214,7 +230,7 @@ export function MobileShell({
             </div>
 
             {overflowNav.length > 0 ? (
-              <nav className="mb-4 flex flex-col gap-1">
+              <nav className="mb-4 flex flex-col gap-1" aria-label="Additional navigation">
                 {overflowNav.map((item) => (
                   <NavLink key={item.href} item={item} onNavigate={() => setMoreOpen(false)} />
                 ))}

@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  ClipboardList,
   HeartHandshake,
   Megaphone,
   Settings,
@@ -18,6 +19,7 @@ export const adminNavItems: NavItem[] = [
   { href: "/voting", label: "Voting", icon: Vote },
   { href: "/announcements", label: "Announcements", icon: Megaphone },
   { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/activity", label: "Activity", icon: ClipboardList },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

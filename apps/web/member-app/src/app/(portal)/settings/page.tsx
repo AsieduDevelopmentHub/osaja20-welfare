@@ -106,8 +106,18 @@ export default function SettingsPage() {
     <div className="space-y-6 pb-8">
       <PageHeader title="Settings" description="Update your profile, photo, and notification preferences." />
 
-      {message ? <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p> : null}
-      {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      <div aria-live="polite" aria-atomic="true">
+        {message ? (
+          <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
+            {message}
+          </p>
+        ) : null}
+        {error ? (
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
 
       <section className="glass-card p-5 sm:p-6">
         <h3 className="mb-4 font-semibold text-slate-900">Profile photo</h3>
@@ -134,8 +144,9 @@ export default function SettingsPage() {
         <section className="glass-card p-5 sm:p-6">
           <h3 className="mb-4 font-semibold text-slate-900">Personal details</h3>
           <div className="space-y-4">
-            <Field label="Full name">
+            <Field label="Full name" htmlFor="settings-full-name">
               <input
+                id="settings-full-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -143,10 +154,13 @@ export default function SettingsPage() {
                 className="input-field"
               />
             </Field>
-            <Field label="Username">
+            <Field label="Username" htmlFor="settings-username">
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">@</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true">
+                  @
+                </span>
                 <input
+                  id="settings-username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
                   required
@@ -158,8 +172,9 @@ export default function SettingsPage() {
               </div>
               <p className="mt-1 text-xs text-slate-500">Used to sign in · lowercase letters, numbers, underscores</p>
             </Field>
-            <Field label="Phone number">
+            <Field label="Phone number" htmlFor="settings-phone">
               <input
+                id="settings-phone"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 required
@@ -168,8 +183,9 @@ export default function SettingsPage() {
                 className="input-field"
               />
             </Field>
-            <Field label="Date of birth">
+            <Field label="Date of birth" htmlFor="settings-dob">
               <input
+                id="settings-dob"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
                 required
@@ -271,10 +287,20 @@ export default function SettingsPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-700">{label}</label>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-slate-700">
+        {label}
+      </label>
       {children}
     </div>
   );

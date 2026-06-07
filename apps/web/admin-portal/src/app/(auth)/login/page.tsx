@@ -7,6 +7,9 @@ import { AuthFormSkeleton, BrandHeader } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
+const memberPortalUrl =
+  process.env.NEXT_PUBLIC_MEMBER_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+
 function AdminLoginForm() {
   const { login } = useAuth();
   const router = useRouter();
@@ -103,7 +106,7 @@ function AdminLoginForm() {
         <p className="mt-6 text-center text-sm text-slate-500">
           Member portal?{" "}
           <a
-            href="http://localhost:3000/login"
+            href={`${memberPortalUrl}/login`}
             className="font-semibold text-brand-gold hover:underline"
           >
             Sign in as member

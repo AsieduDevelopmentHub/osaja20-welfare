@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 import { useState } from "react";
-import { BrandHeader } from "@osaja/ui";
+import { BrandHeader, SkipLink } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
@@ -35,7 +35,8 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
+      <SkipLink />
+      <main id="main-content" className="w-full max-w-md" tabIndex={-1}>
         <div className="mb-8">
           <BrandHeader
             logoSrc={BRAND_PATHS.welfareLogo}
@@ -86,6 +87,12 @@ export default function LoginPage() {
             />
           </div>
 
+          <div className="flex justify-end">
+            <Link href="/forgot-password" className="text-sm font-medium text-brand-navy hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+
           <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-3">
             <LogIn className="h-5 w-5" />
             {loading ? "Signing in..." : "Sign in"}
@@ -98,7 +105,7 @@ export default function LoginPage() {
             Register
           </Link>
         </p>
-      </div>
+      </main>
     </div>
   );
 }

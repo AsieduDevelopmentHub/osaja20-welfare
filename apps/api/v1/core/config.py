@@ -8,9 +8,25 @@ class Settings(BaseSettings):
     app_name: str = "OSAJA'20 Welfare API"
     api_version: str = "v1"
     debug: bool = False
+    # When false, new local registrations stay pending until an executive activates them
+    registration_auto_approve: bool = True
+    # Auth endpoints: max requests per IP per minute
+    rate_limit_auth_per_minute: int = 10
+    rate_limit_push_test_per_minute: int = 5
+    # Allow Cloudflare quick-tunnel origins in CORS (disable in production)
+    allow_tunnel_cors: bool = True
 
     database_url: str = "sqlite+aiosqlite:///./osaja_welfare.db"
     redis_url: str = "redis://localhost:6379/0"
+    job_worker_enabled: bool = True
+
+    email_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_use_tls: bool = True
 
     supabase_url: str = ""
     supabase_anon_key: str = ""
@@ -71,6 +87,12 @@ class Settings(BaseSettings):
         if self.database_url.startswith("sqlite"):
             return False
         return "localhost" not in self.database_url and "127.0.0.1" not in self.database_url
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        if self.allow_tunnel_cors and self.debug:
+            return self.cors_allow_origin_regex or None
+        return None
 
     @property
     def database_uses_pgbouncer(self) -> bool:

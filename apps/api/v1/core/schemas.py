@@ -48,6 +48,15 @@ class AuthLogin(BaseModel):
     password: str
 
 
+class AuthForgotPassword(BaseModel):
+    email: EmailStr
+    redirect_to: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Password reset redirect URL (Supabase auth only)",
+    )
+
+
 class MemberPreferencesUpdate(BaseModel):
     notify_dues: bool | None = None
     notify_votes: bool | None = None

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="OSAJA'20 Welfare">
+  <rect width="512" height="512" rx="96" fill="#0a2d6e"/>
+  <circle cx="256" cy="200" r="88" fill="none" stroke="#c9a227" stroke-width="28"/>
+  <path d="M128 380c40-72 216-72 256 0" fill="none" stroke="#c9a227" stroke-width="28" stroke-linecap="round"/>
+  <text x="256" y="460" text-anchor="middle" fill="#ffffff" font-family="system-ui,sans-serif" font-size="52" font-weight="700">20</text>
+</svg>

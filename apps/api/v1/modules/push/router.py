@@ -1,9 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.auth.dependencies import get_current_member
+from v1.core.config import settings
+from v1.core.rate_limit import check_rate_limit
 from v1.core.database import get_db
 from v1.core.models import Member
 from v1.core.push_service import get_vapid_public_key, is_push_configured
@@ -56,9 +58,15 @@ async def unsubscribe_push(
 
 @router.post("/test", response_model=ApiResponse)
 async def test_push(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current: Annotated[Member, Depends(get_current_member)],
 ):
+    check_rate_limit(
+        request,
+        key="push_test",
+        limit=settings.rate_limit_push_test_per_minute,
+    )
     """Send a test notification to the current member's registered devices."""
     try:
         result = await platform_service.send_test_push(db, current)

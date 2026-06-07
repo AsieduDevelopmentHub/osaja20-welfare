@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +17,15 @@ from v1.core.config import settings
 from v1.core.database import get_db
 from v1.core.member_identity import validate_username
 from v1.core.models import Member, MemberStatus
-from v1.core.schemas import ApiResponse, AuthLogin, AuthProfileUpdate, AuthRegister, TokenResponse
+from v1.core.rate_limit import check_rate_limit
+from v1.core.schemas import (
+    ApiResponse,
+    AuthForgotPassword,
+    AuthLogin,
+    AuthProfileUpdate,
+    AuthRegister,
+    TokenResponse,
+)
 from v1.core.avatar_storage import delete_member_avatar_files, save_avatar
 from v1.core.serializers import member_to_dict
 from v1.core.services import platform_service
@@ -39,7 +47,16 @@ async def auth_health():
 
 
 @router.post("/register", response_model=ApiResponse)
-async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(get_db)]):
+async def register(
+    request: Request,
+    payload: AuthRegister,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    check_rate_limit(
+        request,
+        key="auth_register",
+        limit=settings.rate_limit_auth_per_minute,
+    )
     existing = await db.execute(select(Member).where(Member.email == payload.email.lower()))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -134,34 +151,57 @@ async def register(payload: AuthRegister, db: Annotated[AsyncSession, Depends(ge
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    member.status = MemberStatus.ACTIVE.value
-    await db.flush()
+    if settings.registration_auto_approve:
+        member.status = MemberStatus.ACTIVE.value
+        await db.flush()
 
-    token = create_access_token(
-        subject=str(member.id),
-        email=member.email,
-        role=member.role,
-        member_id=str(member.id),
-    )
+    token = None
+    if member.status == MemberStatus.ACTIVE.value:
+        token = create_access_token(
+            subject=str(member.id),
+            email=member.email,
+            role=member.role,
+            member_id=str(member.id),
+        )
 
+    pending = member.status == MemberStatus.PENDING.value
     return ApiResponse(
         success=True,
         data={
             "member": member_to_dict(member),
-            "token": TokenResponse(
-                access_token=token,
-                expires_in=settings.jwt_expire_minutes * 60,
-            ).model_dump(),
+            "token": (
+                TokenResponse(
+                    access_token=token,
+                    expires_in=settings.jwt_expire_minutes * 60,
+                ).model_dump()
+                if token
+                else None
+            ),
+            "requires_approval": pending,
         },
         message=(
-            f"Registration successful. Your member ID is {member.membership_id} "
-            f"and username is {member.username}."
+            f"Registration received — an executive will approve your account shortly. "
+            f"Your member ID is {member.membership_id} and username is {member.username}."
+            if pending
+            else (
+                f"Registration successful. Your member ID is {member.membership_id} "
+                f"and username is {member.username}."
+            )
         ),
     )
 
 
 @router.post("/login", response_model=ApiResponse)
-async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]):
+async def login(
+    request: Request,
+    payload: AuthLogin,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    check_rate_limit(
+        request,
+        key="auth_login",
+        limit=settings.rate_limit_auth_per_minute,
+    )
     if settings.uses_supabase_auth:
         login_email = await platform_service.resolve_login_email(db, payload.identifier)
         if not login_email:
@@ -178,6 +218,8 @@ async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]
 
         member = await link_or_create_member_from_supabase(db, user=user, session=session)
 
+        if member.status == MemberStatus.PENDING.value:
+            raise HTTPException(status_code=403, detail="Account pending executive approval")
         if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
             raise HTTPException(status_code=403, detail="Account deactivated")
 
@@ -198,6 +240,8 @@ async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]
     if not member:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    if member.status == MemberStatus.PENDING.value:
+        raise HTTPException(status_code=403, detail="Account pending executive approval")
     if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
         raise HTTPException(status_code=403, detail="Account deactivated")
 
@@ -278,3 +322,41 @@ async def remove_avatar(
 @router.post("/logout", response_model=ApiResponse)
 async def logout(current: Annotated[Member, Depends(get_current_member)]):
     return ApiResponse(success=True, message="Logged out — discard token on client")
+
+
+@router.post("/forgot-password", response_model=ApiResponse)
+async def forgot_password(
+    request: Request,
+    payload: AuthForgotPassword,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Request a password reset email (Supabase) or generic guidance (local auth)."""
+    check_rate_limit(
+        request,
+        key="auth_forgot_password",
+        limit=settings.rate_limit_auth_per_minute,
+    )
+
+    if settings.uses_supabase_auth:
+        if not supabase_auth.is_configured:
+            raise HTTPException(status_code=503, detail="Password reset is not configured")
+        try:
+            await supabase_auth.reset_password_for_email(
+                payload.email.lower(),
+                redirect_to=payload.redirect_to,
+            )
+        except SupabaseAuthError as e:
+            raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+    else:
+        result = await db.execute(select(Member).where(Member.email == payload.email.lower()))
+        if not result.scalar_one_or_none():
+            pass  # Do not reveal whether the email exists
+
+    return ApiResponse(
+        success=True,
+        message=(
+            "If an account exists for that email, password reset instructions have been sent."
+            if settings.uses_supabase_auth
+            else "Contact an executive to reset your password for local auth accounts."
+        ),
+    )

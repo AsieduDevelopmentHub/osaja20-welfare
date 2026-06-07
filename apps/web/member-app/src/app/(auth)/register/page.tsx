@@ -34,8 +34,13 @@ export default function RegisterPage() {
         batch: 2020,
       });
 
-      if (result.requiresEmailConfirmation) {
-        setSuccess(result.message ?? "Check your email to confirm your account, then sign in.");
+      if (result.requiresEmailConfirmation || result.requiresApproval) {
+        setSuccess(
+          result.message ??
+            (result.requiresApproval
+              ? "Registration received — an executive will approve your account shortly."
+              : "Check your email to confirm your account, then sign in.")
+        );
         return;
       }
 
@@ -77,20 +82,58 @@ export default function RegisterPage() {
             </div>
           ) : null}
 
-          <input name="full_name" required placeholder="Full name" className={inputClass} />
-          <input name="email" type="email" required placeholder="Email" className={inputClass} />
-          <input
-            name="username"
-            placeholder="Username (optional — auto-assigned if blank)"
-            minLength={3}
-            maxLength={30}
-            pattern="[a-z0-9_]{3,30}"
-            title="Lowercase letters, numbers, underscores only"
-            className={inputClass}
-          />
-          <input name="password" type="password" required minLength={8} placeholder="Password (min 8)" className={inputClass} />
-          <input name="phone_number" required placeholder="Phone number" className={inputClass} />
-          <input name="date_of_birth" type="date" required className={inputClass} />
+          <div>
+            <label htmlFor="full_name" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Full name
+            </label>
+            <input id="full_name" name="full_name" required className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Email
+            </label>
+            <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Username <span className="font-normal text-slate-500">(optional)</span>
+            </label>
+            <input
+              id="username"
+              name="username"
+              minLength={3}
+              maxLength={30}
+              pattern="[a-z0-9_]{3,30}"
+              title="Lowercase letters, numbers, underscores only"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Password
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="phone_number" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Phone number
+            </label>
+            <input id="phone_number" name="phone_number" required autoComplete="tel" className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="date_of_birth" className="mb-1.5 block text-sm font-medium text-slate-700">
+              Date of birth
+            </label>
+            <input id="date_of_birth" name="date_of_birth" type="date" required className={inputClass} />
+          </div>
 
           <p className="text-xs text-slate-500">
             Your member ID will be assigned automatically after registration.

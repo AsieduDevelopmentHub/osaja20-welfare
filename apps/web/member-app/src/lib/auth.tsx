@@ -9,7 +9,11 @@ interface AuthState {
   member: Member | null;
   loading: boolean;
   login: (identifier: string, password: string) => Promise<void>;
-  register: (data: Record<string, unknown>) => Promise<{ requiresEmailConfirmation: boolean; message?: string }>;
+  register: (data: Record<string, unknown>) => Promise<{
+    requiresEmailConfirmation: boolean;
+    requiresApproval: boolean;
+    message?: string;
+  }>;
   logout: () => void;
   refresh: () => Promise<void>;
   setMember: (member: Member | null) => void;
@@ -56,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       member: Record<string, unknown>;
       token: { access_token: string } | null;
       requires_email_confirmation?: boolean;
+      requires_approval?: boolean;
     }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
@@ -67,8 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMember(res.data?.member ? mapMember(res.data.member) : null);
     }
 
+    const requiresApproval = Boolean(res.data?.requires_approval);
     return {
-      requiresEmailConfirmation: Boolean(res.data?.requires_email_confirmation ?? !token),
+      requiresEmailConfirmation: Boolean(res.data?.requires_email_confirmation ?? (!token && !requiresApproval)),
+      requiresApproval,
       message: res.message,
     };
   };

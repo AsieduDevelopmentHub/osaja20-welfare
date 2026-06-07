@@ -13,6 +13,24 @@ ALLOWED_AVATAR_TYPES = {
     "image/webp": ".webp",
 }
 
+_MAGIC_SIGNATURES: list[tuple[bytes, str]] = [
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"RIFF", "image/webp"),  # WebP: RIFF....WEBP verified below
+]
+
+
+def _detect_image_type(data: bytes) -> str | None:
+    if len(data) < 12:
+        return None
+    for magic, mime in _MAGIC_SIGNATURES:
+        if mime == "image/webp":
+            if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+                return mime
+        elif data.startswith(magic):
+            return mime
+    return None
+
 
 def avatars_dir() -> Path:
     base = Path(settings.uploads_dir) / "avatars"
@@ -45,6 +63,13 @@ async def save_avatar(member_id: UUID, file: UploadFile) -> str:
         raise HTTPException(status_code=400, detail="Avatar must be under 2 MB")
     if len(data) < 100:
         raise HTTPException(status_code=400, detail="Invalid image file")
+
+    detected = _detect_image_type(data)
+    if not detected or detected != content_type:
+        raise HTTPException(
+            status_code=400,
+            detail="File content does not match declared image type",
+        )
 
     ext = ALLOWED_AVATAR_TYPES[content_type]
     delete_member_avatar_files(member_id)

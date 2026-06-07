@@ -82,6 +82,19 @@ class SupabaseAuthClient:
             "Content-Type": "application/json",
         }
 
+    async def reset_password_for_email(self, email: str, redirect_to: str | None = None) -> None:
+        payload: dict = {"email": email}
+        if redirect_to:
+            payload["redirect_to"] = redirect_to
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.base_url}/auth/v1/recover",
+                headers=self._headers(),
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
+
     async def admin_create_user(
         self,
         email: str,
