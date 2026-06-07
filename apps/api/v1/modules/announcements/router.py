@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from v1.core.auth.dependencies import get_current_member, require_admin
+from v1.core.auth.dependencies import get_current_member, require_executive
 from v1.core.database import get_db
 from v1.core.models import Announcement, Member
 from v1.core.schemas import AnnouncementCreate, ApiResponse
@@ -45,14 +45,14 @@ async def list_announcements(
 async def publish_announcement(
     payload: AnnouncementCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
-    admin: Annotated[Member, Depends(require_admin)],
+    executive: Annotated[Member, Depends(require_executive)],
 ):
     announcement = await platform_service.publish_announcement(
         db,
         title=payload.title,
         content=payload.content,
         target_audience=payload.target_audience,
-        created_by=admin.id,
+        created_by=executive.id,
         notify_members=payload.notify_members,
     )
     return ApiResponse(success=True, data=announcement, message="Announcement published")

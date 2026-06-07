@@ -15,6 +15,7 @@ from v1.modules.dashboard.router import router as dashboard_router
 from v1.modules.members.router import router as members_router
 from v1.modules.notifications.router import router as notifications_router
 from v1.modules.push.router import router as push_router
+from v1.modules.settings.router import router as settings_router
 from v1.modules.voting.router import router as voting_router
 from v1.modules.welfare.router import router as welfare_router
 
@@ -58,6 +59,7 @@ app.include_router(dashboard_router, prefix=API_PREFIX)
 app.include_router(notifications_router, prefix=API_PREFIX)
 app.include_router(announcements_router, prefix=API_PREFIX)
 app.include_router(push_router, prefix=API_PREFIX)
+app.include_router(settings_router, prefix=API_PREFIX)
 
 uploads_path = Path(settings.uploads_dir)
 if uploads_path.exists():

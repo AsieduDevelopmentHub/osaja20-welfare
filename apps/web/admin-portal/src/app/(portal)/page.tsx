@@ -86,13 +86,13 @@ export default function AdminDashboard() {
           <p className="text-sm text-slate-400">Leadership analytics & operations</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
+          <Link
+            href="/reports"
             className="flex items-center gap-2 rounded-xl border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
           >
             <Download className="h-4 w-4" />
             Export
-          </button>
+          </Link>
           <Link
             href="/announcements"
             className="flex items-center gap-2 rounded-xl bg-brand-gold px-3 py-2 text-sm font-semibold text-brand-navy-dark hover:bg-brand-gold-light"

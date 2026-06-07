@@ -8,3 +8,9 @@ body {
   min-height: 100vh;
   -webkit-tap-highlight-color: transparent;
 }
+
+@layer components {
+  .input-dark {
+    @apply w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white placeholder:text-slate-500;
+  }
+}

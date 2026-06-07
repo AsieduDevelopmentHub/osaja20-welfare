@@ -1,10 +1,87 @@
-import { Copy, Smartphone, Building2 } from "lucide-react";
-import { useState } from "react";
+"use client";
+
+import { Copy, Smartphone, Building2, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { env } from "@/lib/env";
+
+interface PaymentConfig {
+  title: string;
+  note: string;
+  momo: {
+    enabled: boolean;
+    label: string;
+    detail: string;
+    number: string;
+    accountName: string;
+  };
+  bank: {
+    enabled: boolean;
+    label: string;
+    detail: string;
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+  };
+}
+
+function configFromEnv(): PaymentConfig {
+  return {
+    title: env.payment.title,
+    note: env.payment.note,
+    momo: {
+      enabled: env.payment.momo.enabled,
+      label: env.payment.momo.label,
+      detail: env.payment.momo.detail,
+      number: env.payment.momo.number,
+      accountName: env.payment.momo.accountName,
+    },
+    bank: {
+      enabled: env.payment.bank.enabled,
+      label: env.payment.bank.label,
+      detail: env.payment.bank.detail,
+      bankName: env.payment.bank.bankName,
+      accountName: env.payment.bank.accountName,
+      accountNumber: env.payment.bank.accountNumber,
+    },
+  };
+}
+
+function configFromApi(raw: Record<string, unknown>): PaymentConfig {
+  return {
+    title: String(raw.title ?? env.payment.title),
+    note: String(raw.note ?? env.payment.note),
+    momo: {
+      enabled: Boolean(raw.momo_enabled ?? env.payment.momo.enabled),
+      label: String(raw.momo_label ?? env.payment.momo.label),
+      detail: String(raw.momo_detail ?? env.payment.momo.detail),
+      number: String(raw.momo_number ?? env.payment.momo.number),
+      accountName: String(raw.momo_account_name ?? env.payment.momo.accountName),
+    },
+    bank: {
+      enabled: Boolean(raw.bank_enabled ?? env.payment.bank.enabled),
+      label: String(raw.bank_label ?? env.payment.bank.label),
+      detail: String(raw.bank_detail ?? env.payment.bank.detail),
+      bankName: String(raw.bank_name ?? env.payment.bank.bankName),
+      accountName: String(raw.bank_account_name ?? env.payment.bank.accountName),
+      accountNumber: String(raw.bank_account_number ?? env.payment.bank.accountNumber),
+    },
+  };
+}
 
 export function PaymentInstructions({ membershipId }: { membershipId: string }) {
   const [copied, setCopied] = useState<string | null>(null);
-  const { payment } = env;
+  const [payment, setPayment] = useState<PaymentConfig>(configFromEnv);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<Record<string, unknown>>("/settings/payment")
+      .then((res) => {
+        if (res.data) setPayment(configFromApi(res.data));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   const copy = async (text: string, key: string) => {
     try {
@@ -15,6 +92,14 @@ export function PaymentInstructions({ membershipId }: { membershipId: string }) 
       /* ignore */
     }
   };
+
+  if (loading) {
+    return (
+      <div className="glass-card flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-brand-navy" />
+      </div>
+    );
+  }
 
   return (
     <div className="glass-card overflow-hidden">

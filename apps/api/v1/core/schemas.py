@@ -128,6 +128,24 @@ class PushKeys(BaseModel):
     auth: str
 
 
+class PaymentSettingsUpdate(BaseModel):
+    monthly_amount: float | None = Field(default=None, gt=0)
+    currency: str | None = None
+    title: str | None = None
+    note: str | None = None
+    momo_enabled: bool | None = None
+    momo_label: str | None = None
+    momo_detail: str | None = None
+    momo_number: str | None = None
+    momo_account_name: str | None = None
+    bank_enabled: bool | None = None
+    bank_label: str | None = None
+    bank_detail: str | None = None
+    bank_name: str | None = None
+    bank_account_name: str | None = None
+    bank_account_number: str | None = None
+
+
 class PushSubscribe(BaseModel):
     endpoint: str
     keys: PushKeys

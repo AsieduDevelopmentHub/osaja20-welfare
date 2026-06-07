@@ -3,6 +3,7 @@ import {
   BarChart3,
   HeartHandshake,
   Megaphone,
+  Settings,
   Users,
   Vote,
   Wallet,
@@ -16,6 +17,8 @@ export const adminNavItems: NavItem[] = [
   { href: "/contributions", label: "Contributions", icon: Wallet },
   { href: "/voting", label: "Voting", icon: Vote },
   { href: "/announcements", label: "Announcements", icon: Megaphone },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export interface AdminModule {
@@ -31,5 +34,6 @@ export const adminModules: AdminModule[] = [
   { name: "Contributions", desc: "Ledger & receipts", href: "/contributions", icon: Wallet },
   { name: "Voting", desc: "Elections & decisions", href: "/voting", icon: Vote },
   { name: "Announcements", desc: "Publish & notify", href: "/announcements", icon: Megaphone },
-  { name: "Reports", desc: "Export CSV & Excel", href: "/", icon: BarChart3 },
+  { name: "Reports", desc: "Export CSV & summaries", href: "/reports", icon: BarChart3 },
+  { name: "Settings", desc: "Payment gateways & dues", href: "/settings", icon: Settings },
 ];

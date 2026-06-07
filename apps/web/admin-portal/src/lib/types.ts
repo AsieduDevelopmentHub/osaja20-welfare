@@ -1,4 +1,4 @@
-import type { Member, UserRole } from "@osaja/types";
+import type { Member, UserRole, WelfareStatus } from "@osaja/types";
 
 export function mapMember(raw: Record<string, unknown>): Member {
   return {
@@ -26,12 +26,81 @@ export interface DashboardStats {
   active_votes: number;
 }
 
-export interface MemberListResponse {
-  items: Record<string, unknown>[];
+export interface PaginatedResponse<T> {
+  items: T[];
   total: number;
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+export type MemberListResponse = PaginatedResponse<Record<string, unknown>>;
+
+export interface WelfareCaseItem {
+  id: string;
+  member_id: string;
+  member_name?: string;
+  membership_id?: string;
+  title: string;
+  description: string;
+  status: WelfareStatus;
+  created_at: string;
+  updated_at: string;
+  available_transitions?: string[];
+}
+
+export interface VoteItem {
+  id: string;
+  title: string;
+  description?: string;
+  vote_type: string;
+  status: string;
+  opens_at: string;
+  closes_at: string;
+  minimum_contribution?: number;
+  executive_only: boolean;
+  options: { id: string; label: string }[];
+  submission_count?: number;
+}
+
+export interface ContributionItem {
+  id: string;
+  member_id: string;
+  member_name?: string;
+  membership_id?: string;
+  amount: number;
+  type: string;
+  reference: string;
+  period_year?: number;
+  period_month?: number;
+  created_at: string;
+}
+
+export interface AnnouncementItem {
+  id: string;
+  title: string;
+  content: string;
+  target_audience: string[];
+  published_at?: string;
+  created_at: string;
+}
+
+export interface PaymentSettings {
+  monthly_amount: number;
+  currency: string;
+  title: string;
+  note: string;
+  momo_enabled: boolean;
+  momo_label: string;
+  momo_detail: string;
+  momo_number: string;
+  momo_account_name: string;
+  bank_enabled: boolean;
+  bank_label: string;
+  bank_detail: string;
+  bank_name: string;
+  bank_account_name: string;
+  bank_account_number: string;
 }
 
 export const EXECUTIVE_ROLES = new Set<UserRole>(["administrator", "executive"]);
@@ -39,3 +108,23 @@ export const EXECUTIVE_ROLES = new Set<UserRole>(["administrator", "executive"])
 export function isExecutiveRole(role?: UserRole | string): boolean {
   return role === "administrator" || role === "executive";
 }
+
+export function isAdministrator(role?: UserRole | string): boolean {
+  return role === "administrator";
+}
+
+export const WELFARE_STATUS_LABELS: Record<string, string> = {
+  created: "Created",
+  executive_review: "Executive review",
+  approved: "Approved",
+  support_allocated: "Support allocated",
+  resolved: "Resolved",
+  archived: "Archived",
+};
+
+export const VOTE_STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  open: "Open",
+  closed: "Closed",
+  archived: "Archived",
+};

@@ -43,7 +43,7 @@ export default function ContributionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Contributions"
-        description={`Monthly welfare dues of ${formatCurrency(env.monthlyDuesAmount)} keep our fund running for every member.`}
+        description={`Monthly welfare dues of ${formatCurrency(dues?.monthlyAmount ?? env.monthlyDuesAmount)} keep our fund running for every member.`}
       />
 
       {error ? (

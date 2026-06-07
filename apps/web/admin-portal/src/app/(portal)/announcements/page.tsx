@@ -1,14 +1,35 @@
 "use client";
 
-import { Megaphone, Send } from "lucide-react";
-import { useState } from "react";
+import { formatDate } from "@osaja/utils";
+import { Loader2, Megaphone, Send } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AdminHeader } from "@/components/AdminHeader";
 import { apiFetch } from "@/lib/api";
+import type { AnnouncementItem } from "@/lib/types";
 
 export default function AnnouncementsPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<AnnouncementItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await apiFetch<AnnouncementItem[]>("/announcements");
+      setHistory(res.data ?? []);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +43,7 @@ export default function AnnouncementsPage() {
       setMessage("Announcement published — members notified in-app (push when configured).");
       setTitle("");
       setContent("");
+      await loadHistory();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to publish");
     } finally {
@@ -31,18 +53,18 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-white">Announcements</h1>
-        <p className="text-sm text-slate-400">Publish to all members — creates in-app notifications instantly.</p>
-      </header>
+      <AdminHeader
+        title="Announcements"
+        description="Publish to all members — creates in-app notifications instantly."
+      />
 
-      <form onSubmit={publish} className="space-y-4 rounded-2xl border border-slate-700/50 bg-slate-850/80 p-4 sm:p-6">
+      <form onSubmit={publish} className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
           placeholder="Announcement title"
-          className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white outline-none focus:border-brand-500"
+          className="input-dark"
         />
         <textarea
           value={content}
@@ -50,24 +72,50 @@ export default function AnnouncementsPage() {
           required
           rows={5}
           placeholder="Write your announcement..."
-          className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white outline-none focus:border-brand-500"
+          className="input-dark"
         />
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 font-semibold text-white hover:bg-brand-700 sm:w-auto sm:px-6"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold py-3 font-semibold text-brand-navy-dark disabled:opacity-50 sm:w-auto sm:px-6"
         >
           <Send className="h-5 w-5" />
           {loading ? "Publishing..." : "Publish & notify"}
         </button>
-        {message ? <p className="text-sm text-brand-300">{message}</p> : null}
+        {message ? <p className="text-sm text-brand-gold">{message}</p> : null}
       </form>
 
-      <div className="flex items-start gap-3 rounded-xl border border-slate-700/50 bg-slate-900/50 p-4 text-sm text-slate-400">
-        <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-brand-400" />
+      <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+        <h2 className="mb-4 font-semibold text-white">Recent announcements</h2>
+        {historyLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-brand-gold" />
+          </div>
+        ) : history.length === 0 ? (
+          <p className="text-sm text-slate-400">No announcements published yet.</p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {history.map((a) => (
+              <li key={a.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-medium text-white">{a.title}</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{a.content}</p>
+                  </div>
+                  <time className="shrink-0 text-xs text-slate-500">
+                    {a.published_at ? formatDate(a.published_at) : formatDate(a.created_at)}
+                  </time>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-slate-900/50 p-4 text-sm text-slate-400">
+        <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold" />
         <p>
-          No Celery required — notifications are created synchronously. Web Push delivery will use stored
-          subscriptions when VAPID keys are added.
+          Notifications are created synchronously. Web Push uses stored subscriptions when VAPID keys are configured.
         </p>
       </div>
     </div>

@@ -39,6 +39,7 @@ from v1.core.models import (
     WelfareCase,
 )
 from v1.core.dues import MONTHLY_DUES_AMOUNT, compute_dues_summary
+from v1.core.platform_settings import get_monthly_dues_amount
 from v1.core.member_identity import (
     generate_membership_id,
     generate_username,
@@ -445,6 +446,44 @@ class PlatformService:
         data["available_transitions"] = registry.welfare_fsm.get_available_transitions(case.status)
         return data
 
+    async def list_welfare_cases(
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+    ) -> dict:
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        query = (
+            select(WelfareCase, Member.full_name, Member.membership_id)
+            .join(Member, WelfareCase.member_id == Member.id)
+            .order_by(WelfareCase.created_at.desc())
+        )
+        count_query = select(func.count()).select_from(WelfareCase)
+        if status:
+            query = query.where(WelfareCase.status == status)
+            count_query = count_query.where(WelfareCase.status == status)
+
+        total = await db.scalar(count_query) or 0
+        result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+        items = []
+        for case, full_name, membership_id in result.all():
+            row = welfare_case_to_dict(case)
+            row["member_name"] = full_name
+            row["membership_id"] = membership_id
+            row["available_transitions"] = registry.welfare_fsm.get_available_transitions(case.status)
+            items.append(row)
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
+
     async def record_contribution(self, db: AsyncSession, data: dict, actor_id: UUID | None = None) -> dict:
         contrib_type = data.get("type", "dues")
         period_year = data.get("period_year")
@@ -465,7 +504,8 @@ class PlatformService:
                 )
             )
             already_paid = float(existing.scalar() or 0)
-            if already_paid >= MONTHLY_DUES_AMOUNT:
+            monthly_dues = await get_monthly_dues_amount(db)
+            if already_paid >= monthly_dues:
                 raise ValueError(f"Dues for {period_month}/{period_year} already recorded")
 
         entry = LedgerEntry(
@@ -525,6 +565,46 @@ class PlatformService:
         if not registry._loaded:
             await registry.rebuild(db)
         return {"total_contributions": registry.ledger.get_total_contributions()}
+
+    async def list_contributions(
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        member_id: UUID | None = None,
+    ) -> dict:
+        if not registry._loaded:
+            await registry.rebuild(db)
+
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        query = (
+            select(Contribution, Member.full_name, Member.membership_id)
+            .join(Member, Contribution.member_id == Member.id)
+            .order_by(Contribution.created_at.desc())
+        )
+        count_query = select(func.count()).select_from(Contribution)
+        if member_id:
+            query = query.where(Contribution.member_id == member_id)
+            count_query = count_query.where(Contribution.member_id == member_id)
+
+        total = await db.scalar(count_query) or 0
+        result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+        items = []
+        for contrib, full_name, membership_id in result.all():
+            row = contribution_to_dict(contrib, registry.ledger.get_balance(str(contrib.member_id)))
+            row["member_name"] = full_name
+            row["membership_id"] = membership_id
+            items.append(row)
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
 
     async def get_member_balance(self, db: AsyncSession, member_id: UUID) -> dict:
         if not registry._loaded:
@@ -642,6 +722,63 @@ class PlatformService:
             db, actor_id=actor_id, action="vote_opened", entity_type="vote", entity_id=vote.id
         )
         return vote_to_dict(vote)
+
+    async def close_vote(self, db: AsyncSession, vote_id: UUID, actor_id: UUID | None = None) -> dict:
+        result = await db.execute(
+            select(Vote).options(selectinload(Vote.options)).where(Vote.id == vote_id)
+        )
+        vote = result.scalar_one_or_none()
+        if not vote:
+            raise ValueError("Vote not found")
+        vote.status = VoteLifecycle.CLOSED.value
+        await db.flush()
+        await self.log_activity(
+            db, actor_id=actor_id, action="vote_closed", entity_type="vote", entity_id=vote.id
+        )
+        return vote_to_dict(vote)
+
+    async def list_all_votes(
+        self,
+        db: AsyncSession,
+        *,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        query = select(Vote).options(selectinload(Vote.options)).order_by(Vote.created_at.desc())
+        count_query = select(func.count()).select_from(Vote)
+        if status:
+            query = query.where(Vote.status == status)
+            count_query = count_query.where(Vote.status == status)
+
+        total = await db.scalar(count_query) or 0
+        votes = (await db.execute(query.offset((page - 1) * page_size).limit(page_size))).scalars().all()
+
+        submission_counts: dict[str, int] = {}
+        if votes:
+            vote_ids = [v.id for v in votes]
+            rows = await db.execute(
+                select(VoteSubmission.vote_id, func.count())
+                .where(VoteSubmission.vote_id.in_(vote_ids))
+                .group_by(VoteSubmission.vote_id)
+            )
+            submission_counts = {str(vid): cnt for vid, cnt in rows.all()}
+
+        items = []
+        for vote in votes:
+            data = vote_to_dict(vote)
+            data["submission_count"] = submission_counts.get(str(vote.id), 0)
+            items.append(data)
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
 
     async def submit_vote(
         self, db: AsyncSession, vote_id: UUID, member_id: UUID, option_id: UUID, actor_id: UUID | None = None

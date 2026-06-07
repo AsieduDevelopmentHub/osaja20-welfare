@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.auth.dependencies import get_current_member, require_executive
@@ -11,6 +11,18 @@ from v1.core.schemas import ApiResponse, WelfareCaseCreate, WelfareTransition
 from v1.core.services import platform_service
 
 router = APIRouter(prefix="/welfare", tags=["Welfare"])
+
+
+@router.get("/cases", response_model=ApiResponse)
+async def list_cases(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    status: str | None = None,
+):
+    data = await platform_service.list_welfare_cases(db, page=page, page_size=page_size, status=status)
+    return ApiResponse(success=True, data=data)
 
 
 @router.post("/cases", response_model=ApiResponse)
