@@ -1,3 +1,5 @@
+"use client";
+
 export function SkipLink({ targetId = "main-content" }: { targetId?: string }) {
   return (
     <a
