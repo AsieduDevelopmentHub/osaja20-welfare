@@ -82,6 +82,21 @@ class SupabaseAuthClient:
             "Content-Type": "application/json",
         }
 
+    async def update_user_password(self, access_token: str, password: str) -> None:
+        """Apply a new password using a recovery access token from the reset email."""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.put(
+                f"{self.base_url}/auth/v1/user",
+                headers={
+                    "apikey": self.anon_key,
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json={"password": password},
+            )
+        if response.status_code >= 400:
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
+
     async def reset_password_for_email(self, email: str, redirect_to: str | None = None) -> None:
         payload: dict = {"email": email}
         if redirect_to:

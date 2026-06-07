@@ -1,4 +1,5 @@
 from typing import Annotated
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
@@ -24,6 +25,7 @@ from v1.core.schemas import (
     AuthLogin,
     AuthProfileUpdate,
     AuthRegister,
+    AuthResetPassword,
     TokenResponse,
 )
 from v1.core.avatar_storage import delete_member_avatar_files, save_avatar
@@ -31,6 +33,22 @@ from v1.core.serializers import member_to_dict
 from v1.core.services import platform_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+def _normalize_reset_redirect(url: str | None) -> str:
+    default = f"{settings.member_portal_url.rstrip('/')}/reset-password"
+    if not url:
+        return default
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="redirect_to must be a valid http(s) URL")
+    path = (parsed.path or "/").rstrip("/")
+    if not path.endswith("reset-password"):
+        raise HTTPException(
+            status_code=400,
+            detail="redirect_to must point to /reset-password — add that URL in Supabase Auth redirect URLs",
+        )
+    return url.strip()
 
 
 @router.get("/health", response_model=ApiResponse)
@@ -340,10 +358,11 @@ async def forgot_password(
     if settings.uses_supabase_auth:
         if not supabase_auth.is_configured:
             raise HTTPException(status_code=503, detail="Password reset is not configured")
+        redirect_to = _normalize_reset_redirect(payload.redirect_to)
         try:
             await supabase_auth.reset_password_for_email(
                 payload.email.lower(),
-                redirect_to=payload.redirect_to,
+                redirect_to=redirect_to,
             )
         except SupabaseAuthError as e:
             raise HTTPException(status_code=e.status_code, detail=str(e)) from e
@@ -360,3 +379,31 @@ async def forgot_password(
             else "Contact an executive to reset your password for local auth accounts."
         ),
     )
+
+
+@router.post("/reset-password", response_model=ApiResponse)
+async def reset_password(
+    request: Request,
+    payload: AuthResetPassword,
+):
+    """Complete Supabase password recovery using the token from the email link."""
+    check_rate_limit(
+        request,
+        key="auth_reset_password",
+        limit=settings.rate_limit_auth_per_minute,
+    )
+
+    if not settings.uses_supabase_auth:
+        raise HTTPException(
+            status_code=400,
+            detail="Password reset via email is only available with Supabase auth",
+        )
+    if not supabase_auth.is_configured:
+        raise HTTPException(status_code=503, detail="Password reset is not configured")
+
+    try:
+        await supabase_auth.update_user_password(payload.access_token, payload.password)
+    except SupabaseAuthError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+
+    return ApiResponse(success=True, message="Password updated successfully")

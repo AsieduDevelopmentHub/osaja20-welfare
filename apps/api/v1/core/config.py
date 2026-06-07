@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_contact_email: str = "admin@osaja.com"
 
+    # Member portal base URL (password reset redirect fallback)
+    member_portal_url: str = "http://localhost:3000"
+
     @field_validator("database_url")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:

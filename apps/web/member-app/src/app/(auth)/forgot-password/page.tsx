@@ -6,6 +6,7 @@ import { Mail } from "lucide-react";
 import { BrandHeader } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { apiFetch } from "@/lib/api";
+import { resetPasswordRedirectUrl } from "@/lib/recovery";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -19,11 +20,9 @@ export default function ForgotPasswordPage() {
     setMessage("");
     setLoading(true);
     try {
-      const redirectTo =
-        typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
       const res = await apiFetch("/auth/forgot-password", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim(), redirect_to: redirectTo }),
+        body: JSON.stringify({ email: email.trim(), redirect_to: resetPasswordRedirectUrl() }),
       });
       setMessage(res.message ?? "Check your email for reset instructions.");
     } catch (err) {

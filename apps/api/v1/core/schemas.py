@@ -53,8 +53,13 @@ class AuthForgotPassword(BaseModel):
     redirect_to: str | None = Field(
         default=None,
         max_length=500,
-        description="Password reset redirect URL (Supabase auth only)",
+        description="Password reset redirect URL — must be /reset-password (Supabase auth only)",
     )
+
+
+class AuthResetPassword(BaseModel):
+    access_token: str = Field(min_length=20)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class MemberPreferencesUpdate(BaseModel):
