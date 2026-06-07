@@ -1,6 +1,6 @@
 /* OSAJA'20 Welfare service worker — push + offline shell */
 
-const CACHE_VERSION = "osaja-v2";
+const CACHE_VERSION = "osaja-v3";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
@@ -119,8 +119,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      icon: "/brand/welfare-logo.jpg",
+      badge: "/brand/welfare-logo.jpg",
       tag: "osaja-notification",
       data: { url: data.url || "/notifications" },
     })

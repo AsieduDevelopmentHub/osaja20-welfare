@@ -1,34 +1,59 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { BRAND, SITE_META, resolveSiteUrl } from "@osaja/config";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const meta = SITE_META.member;
+const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL, meta.defaultUrl);
 
 export const metadata: Metadata = {
-  title: "OSAJA'20 Welfare — Member Portal",
-  description: "Asuofua D/A JHS Block A Batch 2020 Welfare Platform",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: meta.title,
+    template: `%s | ${meta.siteName}`,
+  },
+  description: meta.description,
   manifest: "/manifest.json",
   icons: {
-    icon: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon.svg", type: "image/svg+xml" },
-    ],
-    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    icon: [{ url: meta.favicon, type: "image/jpeg" }],
+    shortcut: meta.favicon,
+    apple: [{ url: meta.favicon, type: "image/jpeg" }],
   },
   appleWebApp: {
     capable: true,
-    title: "OSAJA'20",
+    title: meta.siteName,
     statusBarStyle: "default",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_GH",
+    url: siteUrl,
+    siteName: meta.siteName,
+    title: meta.title,
+    description: meta.description,
+    images: [
+      {
+        url: meta.ogImage,
+        alt: meta.ogImageAlt,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: meta.title,
+    description: meta.description,
+    images: [meta.ogImage],
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0a2d6e",
+  themeColor: BRAND.navy.DEFAULT,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

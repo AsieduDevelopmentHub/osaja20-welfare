@@ -29,3 +29,4 @@ export const CONTRIBUTION = {
 export { DUES } from "./dues.js";
 
 export { BRAND, BRAND_COPY, BRAND_PATHS } from "./brand.js";
+export { SITE_META, resolveSiteUrl } from "./site.js";

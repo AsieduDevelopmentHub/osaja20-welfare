@@ -1,5 +1,6 @@
 "use client";
 
+import { BRAND_PATHS } from "@osaja/config";
 import { Download, Share, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -107,7 +108,7 @@ export function PwaInstallBanner() {
     >
       <div className="flex items-start gap-3 rounded-2xl border border-brand-navy/10 bg-white p-4 shadow-xl ring-1 ring-black/5">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy">
-          <img src="/icons/icon-192.png" alt="" className="h-8 w-8 rounded-lg" />
+          <img src={BRAND_PATHS.welfareLogo} alt="" className="h-8 w-8 rounded-lg object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-brand-navy">Install OSAJA&apos;20 Welfare</p>
