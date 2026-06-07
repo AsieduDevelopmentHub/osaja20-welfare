@@ -116,8 +116,19 @@ async def run_job_worker(stop_event: asyncio.Event) -> None:
         return
 
     logger.info("Job worker started (Redis queue)")
+    redis_warned = False
     while not stop_event.is_set():
         try:
+            if not await job_queue.is_available():
+                if not redis_warned:
+                    logger.warning(
+                        "Redis unavailable at %s — job queue idle (start Redis or set JOB_WORKER_ENABLED=false)",
+                        settings.redis_url,
+                    )
+                    redis_warned = True
+                await asyncio.sleep(10)
+                continue
+            redis_warned = False
             await maybe_run_digest_scan()
             job = await job_queue.dequeue(timeout=2)
             if job:

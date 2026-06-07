@@ -36,11 +36,11 @@ const steps = [
   {
     id: "e2e",
     label: "Playwright E2E",
-    cmd: "pnpm",
-    argv: ["test:e2e"],
+    cmd: "node",
+    argv: ["scripts/run-e2e.mjs"],
     cwd: root,
     skip: skipE2e,
-    env: { CI: "true" },
+    env: { PLAYWRIGHT_SKIP_BUILD: skipBuild ? "1" : "" },
   },
 ];
 
@@ -90,7 +90,16 @@ Options:
   }
 
   const start = Date.now();
+  let buildCompleted = false;
   for (const step of steps) {
+    if (step.id === "build" && !step.skip && (!only || only.includes("build"))) {
+      if (!runStep(step)) process.exit(1);
+      buildCompleted = true;
+      continue;
+    }
+    if (step.id === "e2e") {
+      step.env = { PLAYWRIGHT_SKIP_BUILD: buildCompleted ? "1" : "" };
+    }
     if (!runStep(step)) {
       process.exit(1);
     }

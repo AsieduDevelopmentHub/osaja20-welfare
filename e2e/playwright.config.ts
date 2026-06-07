@@ -1,18 +1,21 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const memberBase = process.env.MEMBER_BASE_URL ?? "http://localhost:3000";
-const adminBase = process.env.ADMIN_BASE_URL ?? "http://localhost:3001";
+/** Dedicated ports so E2E does not collide with local dev on 3000/3001 */
+const memberBase = process.env.MEMBER_BASE_URL ?? "http://localhost:3100";
+const adminBase = process.env.ADMIN_BASE_URL ?? "http://localhost:3101";
 
 export default defineConfig({
   testDir: "./tests",
-  fullyParallel: true,
+  outputDir: "../test-results",
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [["list"], ["html", { open: "never" }]],
+  workers: 1,
+  reporter: [["list"], ["html", { open: "never", outputFolder: "../playwright-report" }]],
   use: {
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    serviceWorkers: "block",
   },
   projects: [
     {
@@ -30,16 +33,16 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: "npx pnpm dev:member",
-          url: memberBase,
-          reuseExistingServer: true,
-          timeout: 120_000,
+          command: "npx pnpm --filter @osaja/member-app dev:e2e",
+          url: `${memberBase}/login`,
+          reuseExistingServer: false,
+          timeout: 180_000,
         },
         {
-          command: "npx pnpm dev:admin",
-          url: adminBase,
-          reuseExistingServer: true,
-          timeout: 120_000,
+          command: "npx pnpm --filter @osaja/admin-portal dev:e2e",
+          url: `${adminBase}/login`,
+          reuseExistingServer: false,
+          timeout: 180_000,
         },
       ],
 });

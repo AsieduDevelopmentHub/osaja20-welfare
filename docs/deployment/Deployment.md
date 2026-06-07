@@ -108,7 +108,9 @@ pnpm ci:local -- --skip-build    # skip Next.js production build
 pnpm ci:local -- --only=lint,typecheck,test
 ```
 
-**Prerequisites:** Node 20+, pnpm 9+, Python 3.11+ with API deps (`pip install -r apps/api/requirements.txt`). For E2E locally, Playwright installs browsers on first run (`npx playwright install chromium`).
+**Prerequisites:** Node 20+, pnpm 9+, Python 3.11+ (`pnpm setup:api`). For E2E, install Chromium once with `pnpm setup:e2e`.
+
+**Tip:** Stop any running `dev:member` / `dev:admin` servers before `pnpm test:e2e` or `pnpm ci:local` — E2E starts its own dev servers on ports 3000/3001. Playwright artifacts (`test-results/`, `playwright-report/`) are gitignored.
 
 ## Related
 

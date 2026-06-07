@@ -12,7 +12,9 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @osaja/utils test && node scripts/run-api-tests.mjs",
     "setup:api": "node scripts/run-api-tests.mjs --setup-only",
-    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "setup:e2e": "playwright install chromium",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:quick": "playwright test --config e2e/playwright.config.ts",
     "ci:local": "node scripts/ci.mjs",
     "ci:fast": "node scripts/ci.mjs --fast",
     "icons:pwa": "python scripts/generate_pwa_icons.py"

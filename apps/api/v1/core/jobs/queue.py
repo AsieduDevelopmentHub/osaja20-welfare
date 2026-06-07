@@ -18,19 +18,29 @@ class JobQueue:
         self._redis = None
         self._available: bool | None = None
 
-    async def _client(self):
+    async def _reset(self) -> None:
         if self._redis is not None:
+            try:
+                await self._redis.aclose()
+            except Exception:
+                pass
+        self._redis = None
+        self._available = False
+
+    async def _client(self):
+        if self._redis is not None and self._available:
             return self._redis
         try:
             import redis.asyncio as redis
 
-            self._redis = redis.from_url(settings.redis_url, decode_responses=True)
-            await self._redis.ping()
+            client = redis.from_url(settings.redis_url, decode_responses=True)
+            await client.ping()
+            self._redis = client
             self._available = True
             return self._redis
         except Exception as exc:
             logger.debug("Redis unavailable: %s", exc)
-            self._available = False
+            await self._reset()
             return None
 
     async def is_available(self) -> bool:
@@ -50,16 +60,19 @@ class JobQueue:
         client = await self._client()
         if not client:
             return None
-        result = await client.blpop(JOB_QUEUE_KEY, timeout=timeout)
+        try:
+            result = await client.blpop(JOB_QUEUE_KEY, timeout=timeout)
+        except Exception as exc:
+            logger.debug("Redis dequeue failed: %s", exc)
+            await self._reset()
+            return None
         if not result:
             return None
         _, raw = result
         return json.loads(raw)
 
     async def close(self) -> None:
-        if self._redis is not None:
-            await self._redis.aclose()
-            self._redis = None
+        await self._reset()
 
 
 job_queue = JobQueue()
