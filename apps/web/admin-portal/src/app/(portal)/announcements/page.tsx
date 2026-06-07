@@ -2,7 +2,7 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
-import { Bell, BellOff, Megaphone, Pencil, Send, Trash2 } from "lucide-react";
+import { Pencil, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { apiFetch } from "@/lib/api";
@@ -15,7 +15,6 @@ export default function AnnouncementsPage() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<AnnouncementItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [pushConfigured, setPushConfigured] = useState<boolean | null>(null);
   const [editing, setEditing] = useState<AnnouncementItem | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
@@ -35,9 +34,6 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     loadHistory();
-    apiFetch<{ configured: boolean }>("/push/vapid-public-key")
-      .then((r) => setPushConfigured(Boolean(r.data?.configured)))
-      .catch(() => setPushConfigured(false));
   }, [loadHistory]);
 
   const publish = async (e: React.FormEvent) => {
@@ -49,10 +45,7 @@ export default function AnnouncementsPage() {
         method: "POST",
         body: JSON.stringify({ title, content, target_audience: ["all"], notify_members: true }),
       });
-      const pushNote = pushConfigured
-        ? " In-app + web push sent to subscribed members."
-        : " In-app notifications sent (configure VAPID keys in API .env for web push).";
-      setMessage(`Announcement published.${pushNote}`);
+      setMessage("Announcement published — members notified in-app and via push.");
       setTitle("");
       setContent("");
       await loadHistory();
@@ -115,29 +108,8 @@ export default function AnnouncementsPage() {
     <div className="space-y-6">
       <AdminHeader
         title="Announcements"
-        description="Publish to all members — in-app notifications and web push (when VAPID is configured on the API)."
+        description="Publish to all members — in-app notifications and push alerts for subscribed devices."
       />
-
-      <div
-        className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${
-          pushConfigured
-            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-            : "border-amber-500/30 bg-amber-500/10 text-amber-200"
-        }`}
-      >
-        {pushConfigured ? (
-          <Bell className="mt-0.5 h-5 w-5 shrink-0" />
-        ) : (
-          <BellOff className="mt-0.5 h-5 w-5 shrink-0" />
-        )}
-        <p>
-          {pushConfigured === null
-            ? "Checking web push configuration..."
-            : pushConfigured
-              ? "Web push is active. Publishing sends in-app notifications and push to members who enabled alerts in Settings."
-              : "Web push is not configured. Add VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_CONTACT_EMAIL to apps/api/.env — members still receive in-app notifications."}
-        </p>
-      </div>
 
       {editing ? (
         <form onSubmit={saveEdit} className="space-y-4 rounded-2xl border border-brand-gold/30 bg-brand-navy/60 p-5 sm:p-6">
@@ -244,14 +216,6 @@ export default function AnnouncementsPage() {
           </ul>
         )}
       </section>
-
-      <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-slate-900/50 p-4 text-sm text-slate-400">
-        <Megaphone className="mt-0.5 h-5 w-5 shrink-0 text-brand-gold" />
-        <p>
-          VAPID keys live on the API server, not in the admin portal. Members subscribe to push from the member app
-          Settings page after you configure keys in <code className="text-slate-300">apps/api/.env</code>.
-        </p>
-      </div>
     </div>
   );
 }

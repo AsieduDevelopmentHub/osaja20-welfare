@@ -16,7 +16,7 @@ export function isPushSupported(): boolean {
 async function getVapidPublicKey(): Promise<string> {
   const res = await apiFetch<{ public_key: string }>("/push/vapid-public-key");
   const key = res.data?.public_key;
-  if (!key) throw new Error("Push is not configured on the server");
+  if (!key) throw new Error("Could not load push credentials");
   return key;
 }
 

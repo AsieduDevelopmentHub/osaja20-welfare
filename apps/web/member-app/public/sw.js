@@ -1,4 +1,4 @@
-/* OSAJA'20 Welfare — Web Push service worker */
+/* OSAJA'20 Welfare service worker */
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
