@@ -36,3 +36,7 @@ export function getApiBase(): string {
 
   return LOCAL_API;
 }
+
+export function getApiOrigin(): string {
+  return getApiBase().replace(/\/api\/v1\/?$/, "");
+}

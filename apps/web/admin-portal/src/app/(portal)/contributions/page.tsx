@@ -1,7 +1,8 @@
 "use client";
 
 import { formatCurrency } from "@osaja/utils";
-import { Loader2, Receipt, Search, Wallet } from "lucide-react";
+import { ListRowsSkeleton } from "@osaja/ui";
+import { Receipt, Search, Wallet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { apiFetch } from "@/lib/api";
@@ -257,9 +258,7 @@ export default function ContributionsPage() {
             Recent contributions
           </h2>
           {ledgerLoading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="h-8 w-8 animate-spin text-brand-gold" />
-            </div>
+            <ListRowsSkeleton rows={6} variant="dark" />
           ) : ledger.length === 0 ? (
             <p className="text-sm text-slate-400">No contributions recorded yet.</p>
           ) : (

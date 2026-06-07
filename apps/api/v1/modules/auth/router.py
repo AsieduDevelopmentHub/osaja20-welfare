@@ -178,8 +178,8 @@ async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]
 
         member = await link_or_create_member_from_supabase(db, user=user, session=session)
 
-        if member.status == MemberStatus.ARCHIVED.value:
-            raise HTTPException(status_code=403, detail="Account archived")
+        if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
+            raise HTTPException(status_code=403, detail="Account deactivated")
 
         await platform_service.log_activity(
             db, actor_id=member.id, action="login", entity_type="member", entity_id=member.id
@@ -198,8 +198,8 @@ async def login(payload: AuthLogin, db: Annotated[AsyncSession, Depends(get_db)]
     if not member:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    if member.status == MemberStatus.ARCHIVED.value:
-        raise HTTPException(status_code=403, detail="Account archived")
+    if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
+        raise HTTPException(status_code=403, detail="Account deactivated")
 
     token = create_access_token(
         subject=str(member.auth_user_id or member.id),

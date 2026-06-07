@@ -14,7 +14,18 @@ export function mapMember(raw: Record<string, unknown>): Member {
     role: raw.role as Member["role"],
     emailVerified: Boolean(raw.email_verified),
     registrationDate: String(raw.registration_date ?? ""),
+    avatarUrl: raw.avatar_url ? String(raw.avatar_url) : undefined,
   };
+}
+
+export interface VoteResultsData {
+  vote_id: string;
+  vote_title: string;
+  vote_status: string;
+  total_votes: number;
+  winner_option_id: string | null;
+  winner_label: string | null;
+  results: { option_id: string; label: string; count: number; percentage: number }[];
 }
 
 export interface DashboardStats {

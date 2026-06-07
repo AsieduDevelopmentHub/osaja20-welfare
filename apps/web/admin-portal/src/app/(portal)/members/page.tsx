@@ -2,9 +2,11 @@
 
 import type { Member, UserRole } from "@osaja/types";
 import { MemberListSkeleton } from "@osaja/ui";
-import { RefreshCw, Search, Users } from "lucide-react";
+import { RefreshCw, Search, User, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { MemberProfilePanel } from "@/components/MemberProfilePanel";
 import { apiFetch } from "@/lib/api";
+import { resolveAvatarUrl } from "@/lib/avatars";
 import { useAuth } from "@/lib/auth";
 import { mapMember, type MemberListResponse } from "@/lib/types";
 
@@ -21,6 +23,7 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
     if (!admin) return;
@@ -113,6 +116,7 @@ export default function MembersPage() {
               setSearchInput("");
               setQuery("");
               setPage(1);
+              setSelectedId(null);
             }}
             className="flex items-center gap-1 rounded-xl border border-slate-600 px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800"
           >
@@ -124,56 +128,102 @@ export default function MembersPage() {
 
       {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
 
+      {selectedId ? (
+        <MemberProfilePanel
+          memberId={selectedId}
+          adminId={admin?.id}
+          adminRole={admin?.role}
+          onClose={() => setSelectedId(null)}
+          onUpdated={loadMembers}
+        />
+      ) : null}
+
       {loading ? (
         <MemberListSkeleton variant="dark" />
       ) : (
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-brand-navy/60">
-        {members.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">No members found.</p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {members.map((m) => (
-              <li key={m.id} className="p-4 sm:p-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-white">{m.fullName}</p>
-                    <p className="truncate text-sm text-slate-400">{m.email}</p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">@{m.username}</span>
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">{m.membershipId}</span>
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 capitalize text-slate-300">{m.status}</span>
-                      <span className="rounded-full bg-brand-gold/20 px-2 py-0.5 capitalize text-brand-gold">
-                        {m.role ?? "member"}
-                      </span>
-                    </div>
-                  </div>
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-brand-navy/60">
+          {members.length === 0 ? (
+            <p className="p-6 text-sm text-slate-400">No members found.</p>
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {members.map((m) => {
+                const avatarSrc = resolveAvatarUrl(m.avatarUrl);
+                return (
+                  <li key={m.id} className="p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        {avatarSrc ? (
+                          <img
+                            src={avatarSrc}
+                            alt=""
+                            className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                          />
+                        ) : (
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10">
+                            <User className="h-5 w-5 text-slate-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedId(m.id)}
+                            className="truncate text-left font-semibold text-white hover:text-brand-gold"
+                          >
+                            {m.fullName}
+                          </button>
+                          <p className="truncate text-sm text-slate-400">{m.email}</p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">@{m.username}</span>
+                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">{m.membershipId}</span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 capitalize ${
+                                m.status === "active"
+                                  ? "bg-emerald-500/20 text-emerald-300"
+                                  : m.status === "inactive"
+                                    ? "bg-amber-500/20 text-amber-300"
+                                    : "bg-white/10 text-slate-300"
+                              }`}
+                            >
+                              {m.status}
+                            </span>
+                            <span className="rounded-full bg-brand-gold/20 px-2 py-0.5 capitalize text-brand-gold">
+                              {m.role ?? "member"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                  {admin?.role === "administrator" && m.id !== admin.id ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label htmlFor={`role-${m.id}`} className="sr-only">
-                        Role for {m.fullName}
-                      </label>
-                      <select
-                        id={`role-${m.id}`}
-                        value={m.role ?? "member"}
-                        disabled={updatingId === m.id}
-                        onChange={(e) => promoteRole(m.id, e.target.value as UserRole)}
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-gold"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(m.id)}
+                          className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/5"
+                        >
+                          View profile
+                        </button>
+                        {admin?.role === "administrator" && m.id !== admin.id ? (
+                          <select
+                            id={`role-${m.id}`}
+                            value={m.role ?? "member"}
+                            disabled={updatingId === m.id}
+                            onChange={(e) => promoteRole(m.id, e.target.value as UserRole)}
+                            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-gold"
+                          >
+                            {ROLES.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                      </div>
                     </div>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       {!query && totalPages > 1 ? (

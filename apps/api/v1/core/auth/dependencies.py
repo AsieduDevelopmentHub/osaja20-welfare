@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.auth.jwt import extract_member_id, extract_role, safe_decode
 from v1.core.database import get_db
-from v1.core.models import Member, UserRole
+from v1.core.models import Member, MemberStatus, UserRole
 
 security = HTTPBearer(auto_error=False)
 
@@ -29,6 +29,8 @@ async def get_current_member(
         result = await db.execute(select(Member).where(Member.id == member_id))
         member = result.scalar_one_or_none()
         if member:
+            if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
             return member
 
     auth_user_id = payload.get("sub")
@@ -38,6 +40,8 @@ async def get_current_member(
         )
         member = result.scalar_one_or_none()
         if member:
+            if member.status in (MemberStatus.INACTIVE.value, MemberStatus.ARCHIVED.value):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deactivated")
             return member
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Member profile not found")

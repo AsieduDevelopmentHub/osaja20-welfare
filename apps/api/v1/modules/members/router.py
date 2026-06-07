@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from v1.core.auth.dependencies import get_current_member, require_admin, require_executive
 from v1.core.database import get_db
 from v1.core.models import Member
-from v1.core.schemas import ApiResponse, MemberCreate, MemberRoleUpdate
+from v1.core.schemas import ApiResponse, MemberCreate, MemberRoleUpdate, MemberStatusUpdate
 from v1.core.serializers import member_to_dict
 from v1.core.services import platform_service
 
@@ -166,3 +166,20 @@ async def update_member_role(
         raise HTTPException(status_code=404, detail=str(e)) from e
 
     return ApiResponse(success=True, data=member_to_dict(member), message="Role updated")
+
+
+@router.patch("/{member_id}/status", response_model=ApiResponse)
+async def update_member_status(
+    member_id: UUID,
+    payload: MemberStatusUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        member = await platform_service.update_member_status(
+            db, member_id, payload.status, actor_id=executive.id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return ApiResponse(success=True, data=member_to_dict(member), message="Member status updated")

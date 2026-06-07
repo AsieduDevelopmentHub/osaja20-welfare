@@ -123,6 +123,16 @@ class AnnouncementCreate(BaseModel):
     notify_members: bool = True
 
 
+class AnnouncementUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    notify_members: bool = False
+
+
+class MemberStatusUpdate(BaseModel):
+    status: Literal["active", "inactive", "archived"]
+
+
 class PushKeys(BaseModel):
     p256dh: str
     auth: str

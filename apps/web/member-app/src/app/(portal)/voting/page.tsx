@@ -2,7 +2,7 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatCurrency, formatDate } from "@osaja/utils";
-import { CheckCircle2, Lock, Vote } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lock, Vote } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
@@ -10,10 +10,17 @@ import { apiFetch } from "@/lib/api";
 import { mapVote } from "@/lib/types";
 import type { MemberVote } from "@osaja/types";
 
+interface PendingVote {
+  voteId: string;
+  optionId: string;
+  label: string;
+}
+
 export default function VotingPage() {
   const [votes, setVotes] = useState<MemberVote[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingVote | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -33,16 +40,24 @@ export default function VotingPage() {
     load();
   }, [load]);
 
-  const submitVote = async (voteId: string, optionId: string) => {
-    setSubmitting(voteId);
+  const selectOption = (voteId: string, optionId: string, label: string) => {
+    setPending({ voteId, optionId, label });
+    setError("");
+    setSuccess("");
+  };
+
+  const confirmVote = async () => {
+    if (!pending) return;
+    setSubmitting(pending.voteId);
     setError("");
     setSuccess("");
     try {
-      await apiFetch(`/voting/${voteId}/submit`, {
+      await apiFetch(`/voting/${pending.voteId}/submit`, {
         method: "POST",
-        body: JSON.stringify({ option_id: optionId }),
+        body: JSON.stringify({ option_id: pending.optionId }),
       });
       setSuccess("Your vote has been recorded and locked.");
+      setPending(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not submit vote");
@@ -55,11 +70,44 @@ export default function VotingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Voting"
-        description="Participate in community decisions. Each vote is locked after submission."
+        description="Participate in community decisions. Each vote is locked after you confirm your choice."
       />
 
       {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
       {success ? <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p> : null}
+
+      {pending ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-amber-900">Confirm your vote</p>
+              <p className="mt-1 text-sm text-amber-800">
+                You selected <span className="font-semibold">{pending.label}</span>. This cannot be changed after
+                submission.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={submitting !== null}
+                  onClick={confirmVote}
+                  className="rounded-xl bg-brand-navy px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {submitting ? "Submitting..." : "Confirm vote"}
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting !== null}
+                  onClick={() => setPending(null)}
+                  className="rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <ListRowsSkeleton rows={3} variant="light" />
@@ -112,17 +160,25 @@ export default function VotingPage() {
                   </div>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {vote.options.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        disabled={submitting === vote.id}
-                        onClick={() => submitVote(vote.id, opt.id)}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-800 transition hover:border-brand-navy hover:bg-brand-navy/5 disabled:opacity-50"
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                    {vote.options.map((opt) => {
+                      const isSelected =
+                        pending?.voteId === vote.id && pending.optionId === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          disabled={submitting === vote.id}
+                          onClick={() => selectOption(vote.id, opt.id, opt.label)}
+                          className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition disabled:opacity-50 ${
+                            isSelected
+                              ? "border-brand-navy bg-brand-navy/10 text-brand-navy ring-2 ring-brand-navy/20"
+                              : "border-slate-200 bg-white text-slate-800 hover:border-brand-navy hover:bg-brand-navy/5"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

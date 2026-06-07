@@ -1,7 +1,8 @@
 "use client";
 
 import type { Member } from "@osaja/types";
-import { HeartHandshake, Loader2, Plus } from "lucide-react";
+import { ListRowsSkeleton } from "@osaja/ui";
+import { HeartHandshake, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { MemberSearchInput } from "@/components/MemberSearchInput";
@@ -152,9 +153,7 @@ export default function WelfarePage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-brand-gold" />
-        </div>
+        <ListRowsSkeleton rows={5} variant="dark" />
       ) : cases.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
           <HeartHandshake className="mx-auto mb-3 h-10 w-10" />

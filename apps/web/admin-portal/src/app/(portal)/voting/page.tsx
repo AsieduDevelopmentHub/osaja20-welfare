@@ -1,11 +1,13 @@
 "use client";
 
+import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
-import { Loader2, Plus, Vote } from "lucide-react";
+import { Plus, Vote } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { VoteResultsPanel } from "@/components/VoteResultsPanel";
 import { apiFetch } from "@/lib/api";
-import type { PaginatedResponse, VoteItem } from "@/lib/types";
+import type { PaginatedResponse, VoteItem, VoteResultsData } from "@/lib/types";
 import { VOTE_STATUS_LABELS } from "@/lib/types";
 
 export default function VotingPage() {
@@ -14,7 +16,7 @@ export default function VotingPage() {
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [results, setResults] = useState<Record<string, unknown> | null>(null);
+  const [results, setResults] = useState<VoteResultsData | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -98,7 +100,7 @@ export default function VotingPage() {
   const loadResults = async (id: string) => {
     setBusy(true);
     try {
-      const res = await apiFetch<Record<string, unknown>>(`/voting/${id}/results`);
+      const res = await apiFetch<VoteResultsData>(`/voting/${id}/results`);
       setResults(res.data ?? null);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to load results");
@@ -221,9 +223,7 @@ export default function VotingPage() {
       ) : null}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-brand-gold" />
-        </div>
+        <ListRowsSkeleton rows={4} variant="dark" />
       ) : votes.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
           <Vote className="mx-auto mb-3 h-10 w-10" />
@@ -280,15 +280,7 @@ export default function VotingPage() {
         </ul>
       )}
 
-      {results ? (
-        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
-          <h3 className="mb-3 font-semibold text-white">Results</h3>
-          <pre className="overflow-auto text-xs text-slate-300">{JSON.stringify(results, null, 2)}</pre>
-          <button type="button" onClick={() => setResults(null)} className="mt-3 text-xs text-brand-gold">
-            Close
-          </button>
-        </div>
-      ) : null}
+      {results ? <VoteResultsPanel data={results} onClose={() => setResults(null)} /> : null}
     </div>
   );
 }

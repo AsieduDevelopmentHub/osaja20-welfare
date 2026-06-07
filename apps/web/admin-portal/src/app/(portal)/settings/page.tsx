@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeaderSkeleton, Skeleton } from "@osaja/ui";
 import { Loader2, Save, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
@@ -46,8 +47,14 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-brand-gold" />
+      <div className="space-y-6">
+        <PageHeaderSkeleton variant="dark" />
+        <div className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-6">
+          <Skeleton variant="dark" className="h-5 w-40" />
+          <Skeleton variant="dark" className="h-10 w-full" />
+          <Skeleton variant="dark" className="h-10 w-full" />
+          <Skeleton variant="dark" className="h-24 w-full" />
+        </div>
       </div>
     );
   }

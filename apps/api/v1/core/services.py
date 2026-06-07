@@ -299,6 +299,31 @@ class PlatformService:
         )
         return member
 
+    async def update_member_status(
+        self,
+        db: AsyncSession,
+        member_id: UUID,
+        status: str,
+        *,
+        actor_id: UUID | None = None,
+    ) -> Member:
+        member = await self.get_member(db, member_id)
+        if not member:
+            raise ValueError("Member not found")
+        if actor_id and member_id == actor_id and status != MemberStatus.ACTIVE.value:
+            raise ValueError("Cannot deactivate your own account")
+        member.status = status
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="member_status_updated",
+            entity_type="member",
+            entity_id=member.id,
+            metadata={"status": status},
+        )
+        return member
+
     async def update_member_profile(
         self,
         db: AsyncSession,
@@ -888,16 +913,26 @@ class PlatformService:
         if not vote:
             raise ValueError("Vote not found")
 
-        option_ids = [str(o.id) for o in vote.options]
+        option_labels = {str(o.id): o.label for o in vote.options}
+        option_ids = list(option_labels.keys())
         results = registry.vote_engine.calculate_results(str(vote_id), option_ids)
         winner = registry.vote_engine.get_winner(str(vote_id), option_ids)
 
         return {
+            "vote_id": str(vote_id),
+            "vote_title": vote.title,
+            "vote_status": vote.status,
             "results": [
-                {"option_id": r.option_id, "count": r.count, "percentage": round(r.percentage, 2)}
+                {
+                    "option_id": r.option_id,
+                    "label": option_labels.get(r.option_id, ""),
+                    "count": r.count,
+                    "percentage": round(r.percentage, 2),
+                }
                 for r in results
             ],
             "winner_option_id": winner,
+            "winner_label": option_labels.get(winner, "") if winner else None,
             "total_votes": registry.vote_engine.get_total_votes(str(vote_id)),
         }
 
@@ -1180,6 +1215,76 @@ class PlatformService:
             "content": content,
             "published_at": now.isoformat(),
         }
+
+    async def update_announcement(
+        self,
+        db: AsyncSession,
+        announcement_id: UUID,
+        *,
+        title: str | None = None,
+        content: str | None = None,
+        notify_members: bool = False,
+        actor_id: UUID | None = None,
+    ) -> dict:
+        announcement = await db.get(Announcement, announcement_id)
+        if not announcement or announcement.archived:
+            raise ValueError("Announcement not found")
+
+        if title is not None:
+            announcement.title = title
+        if content is not None:
+            announcement.content = content
+        await db.flush()
+
+        if notify_members:
+            members = (await db.execute(select(Member).where(Member.status == MemberStatus.ACTIVE.value))).scalars().all()
+            audience = announcement.target_audience or ["all"]
+            for member in members:
+                if "all" not in audience and member.role not in audience:
+                    continue
+                await self.create_notification(
+                    db,
+                    member_id=member.id,
+                    type="announcement",
+                    title=announcement.title,
+                    message=announcement.content[:500],
+                    actor_id=actor_id,
+                )
+
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="announcement_updated",
+            entity_type="announcement",
+            entity_id=announcement.id,
+        )
+        return {
+            "id": str(announcement.id),
+            "title": announcement.title,
+            "content": announcement.content,
+            "published_at": announcement.published_at.isoformat() if announcement.published_at else None,
+            "created_at": announcement.created_at.isoformat(),
+        }
+
+    async def archive_announcement(
+        self,
+        db: AsyncSession,
+        announcement_id: UUID,
+        *,
+        actor_id: UUID | None = None,
+    ) -> None:
+        announcement = await db.get(Announcement, announcement_id)
+        if not announcement or announcement.archived:
+            raise ValueError("Announcement not found")
+        announcement.archived = True
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="announcement_archived",
+            entity_type="announcement",
+            entity_id=announcement.id,
+        )
 
     async def register_push_subscription(
         self,
