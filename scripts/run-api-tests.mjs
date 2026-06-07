@@ -20,6 +20,7 @@ const testEnv = {
   USE_LOCAL_AUTH: "true",
   DEBUG: "true",
   REGISTRATION_AUTO_APPROVE: "true",
+  JOB_WORKER_ENABLED: "false",
 };
 
 function run(cmd, argv, { cwd = apiDir, env = {} } = {}) {

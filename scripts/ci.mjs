@@ -15,6 +15,15 @@ import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/** Use npx on Windows when pnpm is not on PATH (Corepack/npx still resolves packageManager). */
+function pnpmInvoke(argv) {
+  const probe = spawnSync("pnpm", ["--version"], { shell: true, encoding: "utf8" });
+  if (probe.status === 0) {
+    return { cmd: "pnpm", argv };
+  }
+  return { cmd: "npx", argv: ["pnpm", ...argv] };
+}
+
 const args = process.argv.slice(2);
 const fast = args.includes("--fast");
 const skipE2e = fast || args.includes("--skip-e2e");
@@ -23,14 +32,13 @@ const onlyArg = args.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.replace("--only=", "").split(",").map((s) => s.trim()) : null;
 
 const steps = [
-  { id: "lint", label: "Lint", cmd: "pnpm", argv: ["lint"], cwd: root },
-  { id: "typecheck", label: "Typecheck", cmd: "pnpm", argv: ["typecheck"], cwd: root },
-  { id: "build", label: "Build", cmd: "pnpm", argv: ["build"], cwd: root, skip: skipBuild },
+  { id: "lint", label: "Lint", ...pnpmInvoke(["lint"]), cwd: root },
+  { id: "typecheck", label: "Typecheck", ...pnpmInvoke(["typecheck"]), cwd: root },
+  { id: "build", label: "Build", ...pnpmInvoke(["build"]), cwd: root, skip: skipBuild },
   {
     id: "test",
     label: "Unit & API tests",
-    cmd: "pnpm",
-    argv: ["test"],
+    ...pnpmInvoke(["test"]),
     cwd: root,
   },
   {

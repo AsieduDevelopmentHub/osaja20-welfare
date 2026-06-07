@@ -62,21 +62,18 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Python dependencies
-        run: pip install -r apps/api/requirements.txt
-
       - name: Utils unit tests
         run: pnpm --filter @osaja/utils test
 
       - name: API integration tests
-        working-directory: apps/api
+        run: node scripts/run-api-tests.mjs
         env:
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           JWT_SECRET: "test-jwt-secret-key-minimum-32-characters-long"
           USE_LOCAL_AUTH: "true"
           DEBUG: "true"
           REGISTRATION_AUTO_APPROVE: "true"
-        run: python -m pytest tests/ -q
+          JOB_WORKER_ENABLED: "false"
 
   e2e:
     name: Playwright E2E
