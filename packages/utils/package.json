@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node run-tests.mjs"
   },
   "dependencies": {
     "@osaja/types": "workspace:*"
