@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { KeyRound } from "lucide-react";
-import { BrandHeader } from "@osaja/ui";
+import { BrandHeader, PasswordInput } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { apiFetch } from "@/lib/api";
 import { parseRecoveryFromUrl } from "@/lib/recovery";
@@ -113,30 +113,28 @@ export default function ResetPasswordPage() {
               <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
                 New password
               </label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={inputClass}
+                inputClassName={inputClass}
               />
             </div>
             <div>
               <label htmlFor="confirm" className="mb-1.5 block text-sm font-medium text-slate-700">
                 Confirm password
               </label>
-              <input
+              <PasswordInput
                 id="confirm"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className={inputClass}
+                inputClassName={inputClass}
               />
             </div>
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { useState } from "react";
-import { BrandHeader } from "@osaja/ui";
+import { BrandHeader, PasswordInput } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
@@ -112,14 +112,13 @@ export default function RegisterPage() {
             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               minLength={8}
               autoComplete="new-password"
-              className={inputClass}
+              inputClassName={inputClass}
             />
           </div>
           <div>

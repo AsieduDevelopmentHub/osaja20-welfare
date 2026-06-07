@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, Shield } from "lucide-react";
-import { AuthFormSkeleton, BrandHeader } from "@osaja/ui";
+import { AuthFormSkeleton, BrandHeader, PasswordInput } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
@@ -82,14 +82,14 @@ function AdminLoginForm() {
             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-300">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
+              variant="dark"
+              inputClassName="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-3 text-white outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
             />
           </div>
 

@@ -1,4 +1,6 @@
 export { SkipLink } from "./components/SkipLink.js";
+export { PasswordInput } from "./components/PasswordInput.js";
+export type { PasswordInputProps } from "./components/PasswordInput.js";
 export { BrandHeader, BrandLogo } from "./components/BrandLogo.js";
 export type { BrandHeaderProps, BrandLogoProps } from "./components/BrandLogo.js";
 export { StatCard } from "./components/StatCard.js";

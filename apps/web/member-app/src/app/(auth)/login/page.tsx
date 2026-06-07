@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 import { useState } from "react";
-import { BrandHeader } from "@osaja/ui";
+import { BrandHeader, PasswordInput } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { useAuth } from "@/lib/auth";
 
@@ -81,14 +81,13 @@ export default function LoginPage() {
             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
+              inputClassName={inputClass}
             />
           </div>
 
