@@ -28,6 +28,7 @@ const args = process.argv.slice(2);
 const fast = args.includes("--fast");
 const skipE2e = fast || args.includes("--skip-e2e");
 const skipBuild = fast || args.includes("--skip-build");
+const skipAudit = args.includes("--skip-audit");
 const onlyArg = args.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.replace("--only=", "").split(",").map((s) => s.trim()) : null;
 
@@ -49,6 +50,14 @@ const steps = [
     cwd: root,
     skip: skipE2e,
     env: { PLAYWRIGHT_SKIP_BUILD: skipBuild ? "1" : "" },
+  },
+  {
+    id: "audit",
+    label: "Dependency audit",
+    ...pnpmInvoke(["audit"]),
+    cwd: root,
+    skip: skipAudit,
+    softFail: true,
   },
 ];
 
@@ -73,6 +82,10 @@ function runStep(step) {
   });
 
   if (result.status !== 0) {
+    if (step.softFail) {
+      console.warn(`\n⚠  ${step.label} reported issues (non-blocking, exit ${result.status ?? 1})\n`);
+      return true;
+    }
     console.error(`\n✗  ${step.label} failed (exit ${result.status ?? 1})\n`);
     return false;
   }
@@ -91,7 +104,8 @@ Options:
   --fast         Skip build and E2E (lint, typecheck, test only)
   --skip-e2e     Skip Playwright tests
   --skip-build   Skip production build
-  --only=a,b     Run only listed steps (lint,typecheck,build,test,e2e)
+  --only=a,b     Run only listed steps (lint,typecheck,build,test,e2e,audit)
+  --skip-audit   Skip pnpm + pip audit (audit is non-blocking in GitHub CI)
   -h, --help     Show this help
 `);
     process.exit(0);
