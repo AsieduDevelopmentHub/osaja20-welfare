@@ -1,6 +1,5 @@
 "use client";
 
-import { formatCurrency } from "@osaja/utils";
 import { LayoutGrid, Receipt, Table } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -29,6 +28,10 @@ const TYPE_LABELS: Record<string, string> = {
 
 function labelFor(item: LedgerItem) {
   return item.typeLabel ?? TYPE_LABELS[item.type] ?? item.type;
+}
+
+function formatAmount(amount: number) {
+  return `GHS ${amount.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function ContributionLedger({
@@ -146,7 +149,7 @@ export function ContributionLedger({
                   isDark ? "text-brand-gold" : "text-emerald-700"
                 }`}
               >
-                +{formatCurrency(c.amount)}
+                +{formatAmount(c.amount)}
               </p>
             </li>
           ))}
@@ -181,7 +184,7 @@ export function ContributionLedger({
                       isDark ? "text-brand-gold" : "text-emerald-700"
                     }`}
                   >
-                    +{formatCurrency(c.amount)}
+                    +{formatAmount(c.amount)}
                   </td>
                 </tr>
               ))}
