@@ -71,8 +71,8 @@ jobs:
       - name: API integration tests
         working-directory: apps/api
         env:
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
-          JWT_SECRET: test-jwt-secret-key-minimum-32-characters-long
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          JWT_SECRET: "test-jwt-secret-key-minimum-32-characters-long"
           USE_LOCAL_AUTH: "true"
           DEBUG: "true"
           REGISTRATION_AUTO_APPROVE: "true"

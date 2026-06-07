@@ -1,0 +1,39 @@
+{
+  "id": "/",
+  "name": "OSAJA'20 Admin",
+  "short_name": "OSAJA Admin",
+  "description": "Executive administration for OSAJA'20 Welfare",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#061d47",
+  "theme_color": "#061d47",
+  "categories": ["business", "finance"],
+  "icons": [
+    {
+      "src": "/brand/batch-logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
