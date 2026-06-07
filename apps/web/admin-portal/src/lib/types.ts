@@ -70,6 +70,7 @@ export interface VoteItem {
   closes_at: string;
   minimum_contribution?: number;
   executive_only: boolean;
+  results_published?: boolean;
   options: { id: string; label: string }[];
   submission_count?: number;
 }
@@ -125,12 +126,10 @@ export function isAdministrator(role?: UserRole | string): boolean {
 }
 
 export const WELFARE_STATUS_LABELS: Record<string, string> = {
-  created: "Created",
-  executive_review: "Executive review",
+  pending: "Pending review",
   approved: "Approved",
-  support_allocated: "Support allocated",
+  allocated: "Support allocated",
   resolved: "Resolved",
-  archived: "Archived",
 };
 
 export const VOTE_STATUS_LABELS: Record<string, string> = {

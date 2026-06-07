@@ -26,12 +26,14 @@ def member_to_dict(member: Member) -> dict:
 
 
 def welfare_case_to_dict(case: WelfareCase) -> dict:
+    from v1.core.algorithms.state_machine import normalize_welfare_status
+
     return {
         "id": str(case.id),
         "member_id": str(case.member_id),
         "title": case.title,
         "description": case.description,
-        "status": case.status,
+        "status": normalize_welfare_status(case.status),
         "created_at": case.created_at.isoformat(),
         "updated_at": case.updated_at.isoformat(),
     }
@@ -50,6 +52,7 @@ def vote_to_dict(vote: Vote, options: list[VoteOption] | None = None) -> dict:
         "require_email_verified": vote.require_email_verified,
         "minimum_contribution": float(vote.minimum_contribution) if vote.minimum_contribution else None,
         "executive_only": vote.executive_only,
+        "results_published": vote.results_published,
         "options": [
             {"id": str(o.id), "label": o.label, "sort_order": o.sort_order} for o in opts
         ],

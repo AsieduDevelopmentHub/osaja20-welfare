@@ -36,12 +36,10 @@ class MemberStatus(str, enum.Enum):
 
 
 class WelfareStatus(str, enum.Enum):
-    CREATED = "created"
-    EXECUTIVE_REVIEW = "executive_review"
+    PENDING = "pending"
     APPROVED = "approved"
-    SUPPORT_ALLOCATED = "support_allocated"
+    ALLOCATED = "allocated"
     RESOLVED = "resolved"
-    ARCHIVED = "archived"
 
 
 class VoteType(str, enum.Enum):
@@ -98,7 +96,7 @@ class WelfareCase(Base):
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(30), default=WelfareStatus.CREATED.value, index=True)
+    status: Mapped[str] = mapped_column(String(30), default=WelfareStatus.PENDING.value, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -140,6 +138,7 @@ class Vote(Base):
     require_email_verified: Mapped[bool] = mapped_column(Boolean, default=True)
     minimum_contribution: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     executive_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    results_published: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

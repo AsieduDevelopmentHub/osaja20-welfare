@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Bell,
   Cake,
+  HeartHandshake,
   LayoutDashboard,
   Settings,
   User,
@@ -18,6 +19,7 @@ export interface NavItem {
 export const memberNavItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contributions", label: "Contributions", icon: Wallet },
+  { href: "/welfare", label: "Welfare", icon: HeartHandshake },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/birthdays", label: "Birthdays", icon: Cake },
   { href: "/voting", label: "Voting", icon: Vote },

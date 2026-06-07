@@ -75,6 +75,28 @@ async def close_vote(
     return ApiResponse(success=True, data=vote, message="Vote closed")
 
 
+@router.patch("/{vote_id}/publish-results", response_model=ApiResponse)
+async def publish_vote_results(
+    vote_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        vote = await platform_service.publish_vote_results(db, vote_id, actor_id=executive.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ApiResponse(success=True, data=vote, message="Results published to members")
+
+
+@router.get("/published-results", response_model=ApiResponse)
+async def published_results(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    data = await platform_service.list_published_vote_results(db, current.id)
+    return ApiResponse(success=True, data=data)
+
+
 @router.post("/{vote_id}/submit", response_model=ApiResponse)
 async def submit_vote(
     vote_id: UUID,
@@ -95,10 +117,13 @@ async def submit_vote(
 async def vote_results(
     vote_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[Member, Depends(get_current_member)],
+    current: Annotated[Member, Depends(get_current_member)],
 ):
+    is_executive = current.role in ("executive", "administrator")
     try:
-        data = await platform_service.get_vote_results(db, vote_id)
+        data = await platform_service.get_vote_results(
+            db, vote_id, allow_member=not is_executive
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     return ApiResponse(success=True, data=data)

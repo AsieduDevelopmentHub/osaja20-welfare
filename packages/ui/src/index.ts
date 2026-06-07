@@ -4,6 +4,8 @@ export { StatCard } from "./components/StatCard.js";
 export type { StatCardProps } from "./components/StatCard.js";
 export { MobileShell } from "./components/MobileShell.js";
 export type { MobileShellProps } from "./components/MobileShell.js";
+export { ContributionLedger } from "./components/ContributionLedger.js";
+export type { LedgerItem, LedgerViewMode, LedgerVariant } from "./components/ContributionLedger.js";
 export {
   Skeleton,
   PageHeaderSkeleton,

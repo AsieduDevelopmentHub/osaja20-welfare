@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, Lock, Vote } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
 import { apiFetch } from "@/lib/api";
 import { mapVote } from "@/lib/types";
 import type { MemberVote } from "@osaja/types";
@@ -18,6 +19,7 @@ interface PendingVote {
 
 export default function VotingPage() {
   const [votes, setVotes] = useState<MemberVote[]>([]);
+  const [publishedResults, setPublishedResults] = useState<PublishedVoteResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingVote | null>(null);
@@ -27,10 +29,15 @@ export default function VotingPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch<Record<string, unknown>[]>("/voting");
-      setVotes((res.data ?? []).map((v) => mapVote(v as Record<string, unknown>)));
+      const [votesRes, resultsRes] = await Promise.all([
+        apiFetch<Record<string, unknown>[]>("/voting"),
+        apiFetch<PublishedVoteResult[]>("/voting/published-results"),
+      ]);
+      setVotes((votesRes.data ?? []).map((v) => mapVote(v as Record<string, unknown>)));
+      setPublishedResults(resultsRes.data ?? []);
     } catch {
       setVotes([]);
+      setPublishedResults([]);
     } finally {
       setLoading(false);
     }
@@ -186,6 +193,15 @@ export default function VotingPage() {
           ))}
         </div>
       )}
+
+      {publishedResults.length > 0 ? (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900">Published results</h2>
+          {publishedResults.map((r) => (
+            <VoteResultsCard key={r.vote_id} data={r} />
+          ))}
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -59,10 +59,10 @@ def test_ledger_balance():
 
 def test_welfare_state_machine():
     fsm = WelfareStateMachine()
-    assert fsm.can_transition("created", "executive_review")
-    assert not fsm.can_transition("created", "resolved")
-    success, status, _ = fsm.transition("created", "executive_review")
-    assert success and status == "executive_review"
+    assert fsm.can_transition("pending", "approved")
+    assert not fsm.can_transition("pending", "resolved")
+    success, status, _ = fsm.transition("pending", "approved")
+    assert success and status == "approved"
 
 
 def test_birthday_index():

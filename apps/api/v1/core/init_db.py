@@ -58,6 +58,30 @@ async def _apply_migrations(conn) -> None:
                 )
             )
 
+        if "votes" in insp.get_table_names():
+            vote_cols = {c["name"] for c in insp.get_columns("votes")}
+            if "results_published" not in vote_cols:
+                sync_conn.execute(
+                    text("ALTER TABLE votes ADD COLUMN results_published BOOLEAN DEFAULT FALSE")
+                )
+
+        if "welfare_cases" in insp.get_table_names():
+            sync_conn.execute(
+                text(
+                    "UPDATE welfare_cases SET status = 'pending' "
+                    "WHERE status IN ('created', 'executive_review')"
+                )
+            )
+            sync_conn.execute(
+                text(
+                    "UPDATE welfare_cases SET status = 'allocated' "
+                    "WHERE status = 'support_allocated'"
+                )
+            )
+            sync_conn.execute(
+                text("UPDATE welfare_cases SET status = 'resolved' WHERE status = 'archived'")
+            )
+
     await conn.run_sync(migrate)
 
 

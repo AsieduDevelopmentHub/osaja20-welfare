@@ -1,13 +1,28 @@
 """Finite state machine for welfare case workflow."""
 
+# Simplified: pending → approved → allocated → resolved
 WELFARE_TRANSITIONS: dict[str, list[str]] = {
-    "created": ["executive_review", "archived"],
-    "executive_review": ["approved", "created", "archived"],
-    "approved": ["support_allocated", "executive_review"],
-    "support_allocated": ["resolved", "approved"],
-    "resolved": ["archived"],
+    "pending": ["approved"],
+    "approved": ["allocated"],
+    "allocated": ["resolved"],
+    "resolved": [],
+    # Legacy statuses (existing rows) — same forward paths after normalization
+    "created": ["approved"],
+    "executive_review": ["approved"],
+    "support_allocated": ["resolved"],
     "archived": [],
 }
+
+WELFARE_STATUS_ALIASES: dict[str, str] = {
+    "created": "pending",
+    "executive_review": "pending",
+    "support_allocated": "allocated",
+    "archived": "resolved",
+}
+
+
+def normalize_welfare_status(status: str) -> str:
+    return WELFARE_STATUS_ALIASES.get(status, status)
 
 
 class WelfareStateMachine:
@@ -18,6 +33,8 @@ class WelfareStateMachine:
         return to_status in self._transitions.get(from_status, [])
 
     def transition(self, current: str, target: str) -> tuple[bool, str | None, str | None]:
+        current = normalize_welfare_status(current)
+        target = normalize_welfare_status(target)
         if current == target:
             return True, current, None
         if not self.can_transition(current, target):
@@ -25,6 +42,7 @@ class WelfareStateMachine:
         return True, target, None
 
     def get_available_transitions(self, status: str) -> list[str]:
+        status = normalize_welfare_status(status)
         return list(self._transitions.get(status, []))
 
     def is_terminal(self, status: str) -> bool:

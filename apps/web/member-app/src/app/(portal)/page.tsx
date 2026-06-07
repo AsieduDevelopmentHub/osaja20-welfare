@@ -2,7 +2,7 @@
 
 import { DashboardPageSkeleton, StatCard } from "@osaja/ui";
 import { formatCurrency } from "@osaja/utils";
-import { Bell, Cake, ChevronRight, Receipt, Vote, Wallet } from "lucide-react";
+import { Bell, Cake, ChevronRight, HeartHandshake, Receipt, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DuesStatusBanner } from "@/components/DuesStatusBanner";
@@ -10,8 +10,10 @@ import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
+import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
 import { mapContribution, mapDuesSummary, type NotificationItem } from "@/lib/types";
-import type { Contribution, DuesSummary } from "@osaja/types";
+import type { Contribution, DuesSummary, WelfareCase, WelfareStatus } from "@osaja/types";
+import { formatDate } from "@osaja/utils";
 
 export default function DashboardPage() {
   const { member } = useAuth();
@@ -22,6 +24,15 @@ export default function DashboardPage() {
   const [activeVotes, setActiveVotes] = useState(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [recentPayments, setRecentPayments] = useState<Contribution[]>([]);
+  const [welfareCases, setWelfareCases] = useState<WelfareCase[]>([]);
+  const [voteResults, setVoteResults] = useState<PublishedVoteResult[]>([]);
+
+  const WELFARE_LABELS: Record<WelfareStatus, string> = {
+    pending: "Pending review",
+    approved: "Approved",
+    allocated: "Support allocated",
+    resolved: "Resolved",
+  };
 
   useEffect(() => {
     if (!member) return;
@@ -36,8 +47,10 @@ export default function DashboardPage() {
       apiFetch<{ day: number }[]>(`/dashboard/birthdays?month=${month}`),
       apiFetch<Record<string, unknown>[]>("/voting"),
       apiFetch<{ items: Record<string, unknown>[] }>("/members/me/contributions?page=1&page_size=3"),
+      apiFetch<{ items: Record<string, unknown>[] }>("/welfare/me/cases?page=1&page_size=3"),
+      apiFetch<PublishedVoteResult[]>("/voting/published-results"),
     ])
-      .then(([duesRes, unreadRes, notifRes, birthdaysRes, votesRes, contribRes]) => {
+      .then(([duesRes, unreadRes, notifRes, birthdaysRes, votesRes, contribRes, welfareRes, resultsRes]) => {
         setDues(mapDuesSummary(duesRes.data as Record<string, unknown>));
         setUnread(unreadRes.data?.count ?? 0);
         setNotifications((notifRes.data as NotificationItem[])?.slice(0, 4) ?? []);
@@ -45,6 +58,19 @@ export default function DashboardPage() {
         setActiveVotes(Array.isArray(votesRes.data) ? votesRes.data.length : 0);
         const items = (contribRes.data?.items ?? []) as Record<string, unknown>[];
         setRecentPayments(items.map(mapContribution));
+        const wItems = welfareRes.data?.items ?? [];
+        setWelfareCases(
+          wItems.map((raw) => ({
+            id: String(raw.id),
+            memberId: String(raw.member_id),
+            title: String(raw.title),
+            description: String(raw.description),
+            status: raw.status as WelfareStatus,
+            createdAt: String(raw.created_at),
+            updatedAt: String(raw.updated_at),
+          }))
+        );
+        setVoteResults((resultsRes.data ?? []).slice(0, 2));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -138,6 +164,56 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
+
+      {welfareCases.length > 0 ? (
+        <section className="glass-card p-4 sm:p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Welfare cases</h3>
+            <Link href="/welfare" className="flex items-center gap-1 text-sm font-medium text-brand-navy hover:underline">
+              View all
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <ul className="space-y-3">
+            {welfareCases.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-800">{c.title}</p>
+                  <p className="text-xs text-slate-500">{formatDate(c.updatedAt)}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  {WELFARE_LABELS[c.status] ?? c.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <Link href="/welfare" className="glass-card flex items-center gap-4 p-4 transition hover:shadow-lg sm:p-5">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50">
+            <HeartHandshake className="h-6 w-6 text-purple-600" strokeWidth={1.75} />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-slate-900">Welfare support</p>
+            <p className="text-sm text-slate-500">Submit or track a welfare request</p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400" />
+        </Link>
+      )}
+
+      {voteResults.length > 0 ? (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Vote results</h3>
+            <Link href="/voting" className="text-sm font-medium text-brand-navy hover:underline">
+              All votes
+            </Link>
+          </div>
+          {voteResults.map((r) => (
+            <VoteResultsCard key={r.vote_id} data={r} compact />
+          ))}
+        </section>
+      ) : null}
 
       {birthdays > 0 ? (
         <Link

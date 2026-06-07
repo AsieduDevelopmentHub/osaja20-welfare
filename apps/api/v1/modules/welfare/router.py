@@ -25,6 +25,19 @@ async def list_cases(
     return ApiResponse(success=True, data=data)
 
 
+@router.get("/me/cases", response_model=ApiResponse)
+async def list_my_cases(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    data = await platform_service.list_member_welfare_cases(
+        db, current.id, page=page, page_size=page_size
+    )
+    return ApiResponse(success=True, data=data)
+
+
 @router.post("/cases", response_model=ApiResponse)
 async def create_case(
     payload: WelfareCaseCreate,

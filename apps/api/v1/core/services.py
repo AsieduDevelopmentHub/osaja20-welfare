@@ -37,6 +37,7 @@ from v1.core.models import (
     VoteOption,
     VoteSubmission,
     WelfareCase,
+    WelfareStatus,
 )
 from v1.core.dues import MONTHLY_DUES_AMOUNT, compute_dues_summary
 from v1.core.platform_settings import get_monthly_dues_amount
@@ -427,7 +428,7 @@ class PlatformService:
             member_id=UUID(data["member_id"]),
             title=data["title"],
             description=data["description"],
-            status="created",
+            status=WelfareStatus.PENDING.value,
         )
         db.add(case)
         await db.flush()
@@ -449,7 +450,9 @@ class PlatformService:
         if not success:
             raise ValueError(error)
 
-        case.status = new_status
+        from v1.core.algorithms.state_machine import normalize_welfare_status
+
+        case.status = normalize_welfare_status(new_status)
         case.updated_at = datetime.now(timezone.utc)
         await db.flush()
         await self.log_activity(
@@ -501,6 +504,39 @@ class PlatformService:
             row["available_transitions"] = registry.welfare_fsm.get_available_transitions(case.status)
             items.append(row)
 
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
+
+    async def list_member_welfare_cases(
+        self,
+        db: AsyncSession,
+        member_id: UUID,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        query = (
+            select(WelfareCase)
+            .where(WelfareCase.member_id == member_id)
+            .order_by(WelfareCase.created_at.desc())
+        )
+        count_query = (
+            select(func.count())
+            .select_from(WelfareCase)
+            .where(WelfareCase.member_id == member_id)
+        )
+        total = await db.scalar(count_query) or 0
+        cases = (
+            await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+        ).scalars().all()
+        items = [welfare_case_to_dict(c) for c in cases]
         return {
             "items": items,
             "total": total,
@@ -762,6 +798,54 @@ class PlatformService:
         )
         return vote_to_dict(vote)
 
+    async def publish_vote_results(
+        self, db: AsyncSession, vote_id: UUID, actor_id: UUID | None = None
+    ) -> dict:
+        result = await db.execute(
+            select(Vote).options(selectinload(Vote.options)).where(Vote.id == vote_id)
+        )
+        vote = result.scalar_one_or_none()
+        if not vote:
+            raise ValueError("Vote not found")
+        if vote.status not in (VoteLifecycle.CLOSED.value, VoteLifecycle.RESULT_PUBLISHED.value):
+            raise ValueError("Vote must be closed before publishing results")
+        vote.results_published = True
+        vote.status = VoteLifecycle.RESULT_PUBLISHED.value
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="vote_results_published",
+            entity_type="vote",
+            entity_id=vote.id,
+        )
+        return vote_to_dict(vote)
+
+    async def list_published_vote_results(self, db: AsyncSession, member_id: UUID) -> list[dict]:
+        result = await db.execute(
+            select(Vote)
+            .options(selectinload(Vote.options))
+            .where(Vote.results_published.is_(True))
+            .order_by(Vote.closes_at.desc())
+            .limit(20)
+        )
+        votes = result.scalars().all()
+        submissions = (
+            await db.execute(select(VoteSubmission).where(VoteSubmission.member_id == member_id))
+        ).scalars().all()
+        voted_map = {str(s.vote_id): str(s.option_id) for s in submissions}
+
+        items: list[dict] = []
+        for vote in votes:
+            summary = await self.get_vote_results(db, vote.id, allow_member=True)
+            vid = str(vote.id)
+            option_labels = {str(o.id): o.label for o in vote.options}
+            summary["has_voted"] = vid in voted_map
+            summary["voted_option_id"] = voted_map.get(vid)
+            summary["voted_option_label"] = option_labels.get(voted_map.get(vid, ""), "")
+            items.append(summary)
+        return items
+
     async def list_all_votes(
         self,
         db: AsyncSession,
@@ -905,13 +989,17 @@ class PlatformService:
             items.append(data)
         return items
 
-    async def get_vote_results(self, db: AsyncSession, vote_id: UUID) -> dict:
+    async def get_vote_results(
+        self, db: AsyncSession, vote_id: UUID, *, allow_member: bool = False
+    ) -> dict:
         result = await db.execute(
             select(Vote).options(selectinload(Vote.options)).where(Vote.id == vote_id)
         )
         vote = result.scalar_one_or_none()
         if not vote:
             raise ValueError("Vote not found")
+        if allow_member and not vote.results_published:
+            raise ValueError("Results are not published yet")
 
         option_labels = {str(o.id): o.label for o in vote.options}
         option_ids = list(option_labels.keys())

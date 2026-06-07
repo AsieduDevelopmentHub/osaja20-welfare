@@ -88,10 +88,23 @@ export default function VotingPage() {
     setBusy(true);
     try {
       await apiFetch(`/voting/${id}/close`, { method: "PATCH" });
-      setMessage("Vote closed.");
+      setMessage("Vote closed. Publish results when ready for members to see them.");
       await load();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to close vote");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publishResults = async (id: string) => {
+    setBusy(true);
+    try {
+      await apiFetch(`/voting/${id}/publish-results`, { method: "PATCH" });
+      setMessage("Results published — members can view on dashboard and voting page.");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to publish results");
     } finally {
       setBusy(false);
     }
@@ -265,6 +278,19 @@ export default function VotingPage() {
                   >
                     Close vote
                   </button>
+                ) : null}
+                {(v.status === "closed" || v.status === "result_published") && !v.results_published ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => publishResults(v.id)}
+                    className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-300"
+                  >
+                    Publish results to members
+                  </button>
+                ) : null}
+                {v.results_published ? (
+                  <span className="rounded-lg bg-white/10 px-3 py-1.5 text-xs text-slate-300">Results live</span>
                 ) : null}
                 <button
                   type="button"

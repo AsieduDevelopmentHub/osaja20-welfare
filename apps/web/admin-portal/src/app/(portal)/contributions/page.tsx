@@ -1,7 +1,7 @@
 "use client";
 
 import { formatCurrency } from "@osaja/utils";
-import { ListRowsSkeleton } from "@osaja/ui";
+import { ContributionLedger, ListRowsSkeleton, type LedgerItem } from "@osaja/ui";
 import { Receipt, Search, Wallet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
@@ -252,47 +252,27 @@ export default function ContributionsPage() {
           </section>
         </div>
       ) : (
-        <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
-          <h2 className="mb-4 flex items-center gap-2 font-semibold text-white">
-            <Wallet className="h-5 w-5 text-brand-gold" />
-            Recent contributions
-          </h2>
+        <section className="p-0">
           {ledgerLoading ? (
             <ListRowsSkeleton rows={6} variant="dark" />
           ) : ledger.length === 0 ? (
             <p className="text-sm text-slate-400">No contributions recorded yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-xs text-slate-400">
-                    <th className="pb-3 pr-4 font-medium">Date</th>
-                    <th className="pb-3 pr-4 font-medium">Member</th>
-                    <th className="pb-3 pr-4 font-medium">Amount</th>
-                    <th className="pb-3 pr-4 font-medium">Type</th>
-                    <th className="pb-3 pr-4 font-medium">Period</th>
-                    <th className="pb-3 font-medium">Reference</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {ledger.map((c) => (
-                    <tr key={c.id}>
-                      <td className="py-3 pr-4 text-slate-300">{new Date(c.created_at).toLocaleDateString("en-GH")}</td>
-                      <td className="py-3 pr-4">
-                        <p className="text-white">{c.member_name}</p>
-                        <p className="text-xs text-slate-500">{c.membership_id}</p>
-                      </td>
-                      <td className="py-3 pr-4 font-medium text-brand-gold">{formatCurrency(c.amount)}</td>
-                      <td className="py-3 pr-4 capitalize text-slate-300">{c.type}</td>
-                      <td className="py-3 pr-4 text-slate-400">
-                        {c.period_month && c.period_year ? `${c.period_month}/${c.period_year}` : "—"}
-                      </td>
-                      <td className="py-3 text-slate-400">{c.reference || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ContributionLedger
+              variant="dark"
+              title="Contribution ledger"
+              items={ledger.map(
+                (c): LedgerItem => ({
+                  id: c.id,
+                  date: new Date(c.created_at).toLocaleDateString("en-GH"),
+                  amount: c.amount,
+                  type: c.type,
+                  reference: c.reference,
+                  period: c.period_month && c.period_year ? `${c.period_month}/${c.period_year}` : undefined,
+                  subtitle: c.member_name ? `${c.member_name} (${c.membership_id})` : c.membership_id,
+                })
+              )}
+            />
           )}
         </section>
       )}
