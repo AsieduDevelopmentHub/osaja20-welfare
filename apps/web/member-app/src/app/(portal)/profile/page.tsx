@@ -1,6 +1,6 @@
 "use client";
 
-import { DUES } from "@osaja/config";
+import { env } from "@/lib/env";
 import { formatCurrency } from "@osaja/utils";
 import { ChevronRight, Mail, Phone, Receipt, Settings, Shield, User } from "lucide-react";
 import Link from "next/link";
@@ -86,7 +86,7 @@ export default function ProfilePage() {
           <p className="font-semibold text-slate-900">Contributions & dues</p>
           <p className="text-sm text-slate-500">
             {dues
-              ? `${formatCurrency(DUES.MONTHLY_AMOUNT)}/month · Balance ${formatCurrency(dues.balance)}`
+              ? `${formatCurrency(env.monthlyDuesAmount)}/month · Balance ${formatCurrency(dues.balance)}`
               : "View payment history and dues status"}
           </p>
         </div>

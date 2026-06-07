@@ -1,6 +1,6 @@
 "use client";
 
-import { DUES } from "@osaja/config";
+import { env } from "@/lib/env";
 import { formatCurrency } from "@osaja/utils";
 import { Receipt, Search, Wallet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -51,14 +51,14 @@ export default function ContributionsPage() {
         method: "POST",
         body: JSON.stringify({
           member_id: selected.id,
-          amount: DUES.MONTHLY_AMOUNT,
+          amount: env.monthlyDuesAmount,
           type: "dues",
           reference: reference.trim() || `Dues ${periodMonth}/${periodYear}`,
           period_year: periodYear,
           period_month: periodMonth,
         }),
       });
-      setMessage(`Recorded ${formatCurrency(DUES.MONTHLY_AMOUNT)} dues for ${selected.fullName}`);
+      setMessage(`Recorded ${formatCurrency(env.monthlyDuesAmount)} dues for ${selected.fullName}`);
       setReference("");
       const summary = await apiFetch<{ total_contributions: number }>("/contributions/summary");
       setTotalFund(summary.data?.total_contributions ?? 0);
@@ -84,7 +84,7 @@ export default function ContributionsPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Contributions</h1>
             <p className="text-sm text-slate-400">
-              Record monthly dues ({formatCurrency(DUES.MONTHLY_AMOUNT)}/member)
+              Record monthly dues ({formatCurrency(env.monthlyDuesAmount)}/member)
               {totalFund != null ? ` · Fund total ${formatCurrency(totalFund)}` : ""}
             </p>
           </div>
@@ -187,7 +187,7 @@ export default function ContributionsPage() {
               <label className="mb-1 block text-xs text-slate-400">Amount (GHS)</label>
               <input
                 readOnly
-                value={DUES.MONTHLY_AMOUNT}
+                value={env.monthlyDuesAmount}
                 className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-slate-300"
               />
             </div>
@@ -207,7 +207,7 @@ export default function ContributionsPage() {
               disabled={!selected || loading}
               className="w-full rounded-xl bg-brand-gold py-3 text-sm font-semibold text-brand-navy-dark disabled:opacity-40"
             >
-              {loading ? "Recording..." : `Record ${formatCurrency(DUES.MONTHLY_AMOUNT)} dues`}
+              {loading ? "Recording..." : `Record ${formatCurrency(env.monthlyDuesAmount)} dues`}
             </button>
           </form>
         </section>

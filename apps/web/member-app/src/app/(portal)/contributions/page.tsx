@@ -1,7 +1,7 @@
 "use client";
 
 import { ContributionCardSkeleton, ListRowsSkeleton } from "@osaja/ui";
-import { DUES } from "@osaja/config";
+import { env } from "@/lib/env";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ContributionHistory } from "@/components/ContributionHistory";
@@ -43,7 +43,7 @@ export default function ContributionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Contributions"
-        description={`Monthly welfare dues of ${formatCurrency(DUES.MONTHLY_AMOUNT)} keep our fund running for every member.`}
+        description={`Monthly welfare dues of ${formatCurrency(env.monthlyDuesAmount)} keep our fund running for every member.`}
       />
 
       {error ? (

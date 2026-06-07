@@ -1,4 +1,5 @@
 import type { MemberPreferences } from "@osaja/types";
+import { getApiOrigin } from "./env";
 
 export const DEFAULT_MEMBER_PREFERENCES: MemberPreferences = {
   notifyDues: true,
@@ -55,11 +56,6 @@ export function preferencesToApi(prefs: Partial<MemberPreferences>): Record<stri
     if (val !== undefined) out[snake] = val;
   }
   return out;
-}
-
-export function getApiOrigin(): string {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-  return base.replace(/\/api\/v1\/?$/, "");
 }
 
 export function resolveAvatarUrl(avatarUrl?: string | null): string | null {

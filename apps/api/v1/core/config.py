@@ -27,6 +27,15 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:3001",
     ]
+    # Matches any Cloudflare quick-tunnel host when the browser calls the API directly
+    cors_allow_origin_regex: str = r"https://.*\.trycloudflare\.com"
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
     default_batch: int = 2020
     uploads_dir: str = "uploads"

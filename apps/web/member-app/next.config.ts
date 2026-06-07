@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const apiProxyTarget = process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8000";
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@osaja/types", "@osaja/utils", "@osaja/config", "@osaja/ui"],
   images: {
@@ -7,6 +9,18 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost", port: "8000", pathname: "/uploads/**" },
       { protocol: "https", hostname: "**", pathname: "/uploads/**" },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${apiProxyTarget}/api/v1/:path*`,
+      },
+      {
+        source: "/uploads/:path*",
+        destination: `${apiProxyTarget}/uploads/:path*`,
+      },
+    ];
   },
 };
 

@@ -97,10 +97,54 @@ API docs: http://localhost:8000/docs
 
 ## 8. Run web apps
 
+### Web environment (`.env.local`)
+
+Copy the example files and edit payment details, API URL, etc.:
+
+```bash
+cp apps/web/member-app/.env.local.example apps/web/member-app/.env.local
+cp apps/web/admin-portal/.env.local.example apps/web/admin-portal/.env.local
+```
+
+Key variables (all `NEXT_PUBLIC_*` are exposed to the browser):
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_API_URL` | API base (leave empty for auto-detect + tunnel proxy) |
+| `NEXT_PUBLIC_MONTHLY_DUES_AMOUNT` | Displayed dues amount (default `30`) |
+| `NEXT_PUBLIC_MOMO_NUMBER` | MoMo payment number |
+| `NEXT_PUBLIC_MOMO_ACCOUNT_NAME` | MoMo account display name |
+| `NEXT_PUBLIC_BANK_NAME` | Bank name |
+| `NEXT_PUBLIC_BANK_ACCOUNT_NAME` | Bank account holder |
+| `NEXT_PUBLIC_BANK_ACCOUNT_NUMBER` | Bank account number |
+
+Restart the dev server after editing `.env.local`.
+
 ```bash
 npx pnpm dev:member   # http://localhost:3000
 npx pnpm dev:admin    # http://localhost:3001
 ```
+
+### Cloudflare tunnel (share dev build publicly)
+
+Tunnel the **Next.js** port only (e.g. `cloudflared tunnel --url http://localhost:3000`). The member app proxies `/api/v1` and `/uploads` to your local API on port 8000, so you do **not** need a separate API tunnel.
+
+**Required:** API and member app must both be running on the same machine:
+
+```bash
+# Terminal 1 — API on :8000
+cd apps/api && uvicorn v1.main:app --reload
+
+# Terminal 2 — member app on :3000
+npx pnpm dev:member
+
+# Terminal 3 — tunnel to Next.js
+cloudflared tunnel --url http://localhost:3000
+```
+
+Do **not** set `NEXT_PUBLIC_API_URL=http://localhost:8000/...` when using a tunnel — the browser cannot reach your machine’s localhost. Leave it unset so the app uses same-origin `/api/v1`.
+
+After changing `next.config.ts`, restart the Next.js dev server.
 
 ## Run tests (inside venv)
 

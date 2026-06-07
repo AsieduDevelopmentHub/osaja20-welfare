@@ -1,5 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-const TOKEN_KEY = "osaja_admin_token";
+import { getApiBase } from "./env";
+
+export { getApiBase };
 
 export interface ApiResult<T> {
   success: boolean;
@@ -10,13 +11,13 @@ export interface ApiResult<T> {
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem("osaja_admin_token");
 }
 
 export function setToken(token: string | null) {
   if (typeof window === "undefined") return;
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  if (token) localStorage.setItem("osaja_admin_token", token);
+  else localStorage.removeItem("osaja_admin_token");
 }
 
 function parseApiError(json: unknown, status: number): string {
@@ -44,13 +45,16 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const json = (await res.json()) as ApiResult<T> & { detail?: unknown };
-
+  const res = await fetch(`${getApiBase()}${path}`, { ...options, headers });
+  let json: ApiResult<T> & { detail?: unknown };
+  try {
+    json = (await res.json()) as ApiResult<T> & { detail?: unknown };
+  } catch {
+    throw new Error(res.ok ? "Invalid server response" : `Request failed (${res.status})`);
+  }
   if (!res.ok) {
     if (res.status === 401 && token) setToken(null);
     throw new Error(parseApiError(json, res.status));
   }
-
   return json;
 }

@@ -19,6 +19,8 @@ build/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.*.production
 *.pem
 
 # IDE
