@@ -9,7 +9,7 @@
     "dev:web": "pnpm run dev:member & pnpm run dev:admin",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @osaja/types build && pnpm -r typecheck",
     "test": "pnpm --filter @osaja/utils test && node scripts/run-api-tests.mjs",
     "setup:api": "node scripts/run-api-tests.mjs --setup-only",
     "setup:e2e": "playwright install chromium",
