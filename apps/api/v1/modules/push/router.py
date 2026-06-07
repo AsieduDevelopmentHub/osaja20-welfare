@@ -1,15 +1,24 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.auth.dependencies import get_current_member
 from v1.core.database import get_db
 from v1.core.models import Member
+from v1.core.push_service import get_vapid_public_key, is_push_configured
 from v1.core.schemas import ApiResponse, PushSubscribe
 from v1.core.services import platform_service
 
 router = APIRouter(prefix="/push", tags=["Push Notifications"])
+
+
+@router.get("/vapid-public-key", response_model=ApiResponse)
+async def vapid_public_key():
+    key = get_vapid_public_key()
+    if not key:
+        raise HTTPException(status_code=503, detail="Web Push is not configured on the server")
+    return ApiResponse(success=True, data={"public_key": key, "configured": is_push_configured()})
 
 
 @router.post("/subscribe", response_model=ApiResponse)
@@ -18,7 +27,10 @@ async def subscribe_push(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: Annotated[Member, Depends(get_current_member)],
 ):
-    """Store Web Push subscription for future push delivery (no Celery required)."""
+    """Store Web Push subscription for delivery (no background workers required)."""
+    if not is_push_configured():
+        raise HTTPException(status_code=503, detail="Web Push is not configured on the server")
+
     sub = await platform_service.register_push_subscription(
         db,
         member_id=current.id,
@@ -40,3 +52,16 @@ async def unsubscribe_push(
         db, member_id=current.id, endpoint=payload.endpoint
     )
     return ApiResponse(success=True, data={"removed": removed})
+
+
+@router.post("/test", response_model=ApiResponse)
+async def test_push(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    """Send a test notification to the current member's registered devices."""
+    try:
+        result = await platform_service.send_test_push(db, current)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ApiResponse(success=True, data=result, message="Test push sent")

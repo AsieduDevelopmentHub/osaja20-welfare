@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from pywebpush import WebPushException
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +47,13 @@ from v1.core.member_identity import (
 )
 from v1.core.member_preferences import PREFERENCE_KEYS, merge_preferences
 from v1.core.password import hash_password, verify_password
+from v1.core.push_service import (
+    build_payload,
+    is_push_configured,
+    is_subscription_gone,
+    member_allows_push_type,
+    send_web_push,
+)
 from v1.core.serializers import (
     contribution_to_dict,
     member_to_dict,
@@ -819,6 +828,20 @@ class PlatformService:
             entity_type="notification",
             entity_id=notification.id,
         )
+
+        if push_pending:
+            delivered = await self.deliver_push_notification(
+                db,
+                member_id=member_id,
+                notification_id=notification.id,
+                notification_type=type,
+                title=title,
+                message=message,
+            )
+            if delivered:
+                notification.push_pending = False
+                await db.flush()
+
         return {
             "id": str(notification.id),
             "member_id": str(member_id),
@@ -826,9 +849,94 @@ class PlatformService:
             "title": title,
             "message": message,
             "read": False,
-            "push_pending": push_pending,
+            "push_pending": notification.push_pending,
             "created_at": notification.created_at.isoformat(),
         }
+
+    async def deliver_push_notification(
+        self,
+        db: AsyncSession,
+        *,
+        member_id: UUID,
+        notification_id: UUID,
+        notification_type: str,
+        title: str,
+        message: str,
+        url: str = "/notifications",
+    ) -> bool:
+        if not is_push_configured():
+            return False
+
+        member = await self.get_member(db, member_id)
+        if not member or not member_allows_push_type(member.preferences_json, notification_type):
+            return False
+
+        subs = (
+            await db.execute(select(PushSubscription).where(PushSubscription.member_id == member_id))
+        ).scalars().all()
+        if not subs:
+            return False
+
+        payload = build_payload(
+            title=title,
+            message=message,
+            notification_type=notification_type,
+            url=url,
+        )
+        delivered = False
+        for sub in subs:
+            try:
+                send_web_push(
+                    endpoint=sub.endpoint,
+                    p256dh_key=sub.p256dh_key,
+                    auth_key=sub.auth_key,
+                    payload=payload,
+                )
+                delivered = True
+            except WebPushException as exc:
+                if is_subscription_gone(exc):
+                    await self.remove_push_subscription(db, member_id=member_id, endpoint=sub.endpoint)
+                continue
+            except Exception:
+                continue
+
+        return delivered
+
+    async def send_test_push(self, db: AsyncSession, member: Member) -> dict:
+        if not is_push_configured():
+            raise ValueError("VAPID keys are not configured on the server")
+
+        subs = (
+            await db.execute(select(PushSubscription).where(PushSubscription.member_id == member.id))
+        ).scalars().all()
+        if not subs:
+            raise ValueError("No push subscription found — enable push in Settings first")
+
+        payload = build_payload(
+            title="OSAJA'20 Welfare",
+            message="Push notifications are working!",
+            notification_type="announcement",
+            url="/notifications",
+        )
+        sent = 0
+        for sub in subs:
+            try:
+                send_web_push(
+                    endpoint=sub.endpoint,
+                    p256dh_key=sub.p256dh_key,
+                    auth_key=sub.auth_key,
+                    payload=payload,
+                )
+                sent += 1
+            except WebPushException as exc:
+                if is_subscription_gone(exc):
+                    await self.remove_push_subscription(db, member_id=member.id, endpoint=sub.endpoint)
+            except Exception:
+                continue
+
+        if sent == 0:
+            raise ValueError("Could not deliver test push to any device")
+        return {"delivered": sent, "subscriptions": len(subs)}
 
     async def scan_birthday_notifications(self, db: AsyncSession, actor_id: UUID | None = None) -> int:
         if not registry._loaded:

@@ -6,6 +6,7 @@ import { Loader2, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { PushSettings } from "@/components/PushSettings";
 import { SettingsToggle } from "@/components/SettingsToggle";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -179,9 +180,12 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="glass-card divide-y divide-slate-100 px-5 sm:px-6">
+        <PushSettings />
+
+        <section className="glass-card divide-y divide-slate-100 px-5 sm:p-6">
           <div className="py-2">
-            <h3 className="py-2 font-semibold text-slate-900">Notifications</h3>
+            <h3 className="py-2 font-semibold text-slate-900">Notification preferences</h3>
+            <p className="pb-2 text-xs text-slate-500">Control which types of alerts you receive when push is enabled.</p>
           </div>
           <SettingsToggle
             label="Dues reminders"

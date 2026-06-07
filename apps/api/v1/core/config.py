@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     uploads_dir: str = "uploads"
     max_avatar_bytes: int = 2 * 1024 * 1024
 
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_contact_email: str = "admin@osaja.com"
+
     @field_validator("database_url")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:

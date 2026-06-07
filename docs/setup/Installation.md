@@ -182,3 +182,29 @@ The API automatically:
 On first run, tables are created via SQLAlchemy. For production, prefer running `docs/architecture/schema.sql` in the Supabase SQL editor.
 
 All protected routes require `Authorization: Bearer <token>`.
+
+## Web Push (VAPID)
+
+Generate keys:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Add to `apps/api/.env`:
+
+```env
+VAPID_PUBLIC_KEY=your_public_key
+VAPID_PRIVATE_KEY=your_private_key
+VAPID_CONTACT_EMAIL=admin@osaja.com
+```
+
+Install the Python dependency and restart the API:
+
+```bash
+cd apps/api
+pip install pywebpush
+uvicorn v1.main:app --reload
+```
+
+Members enable push under **Settings → Browser push notifications**, then use **Send test** to verify delivery.
