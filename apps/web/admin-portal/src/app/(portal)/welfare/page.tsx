@@ -3,6 +3,7 @@
 import type { Member } from "@osaja/types";
 import { ListRowsSkeleton } from "@osaja/ui";
 import { HeartHandshake, Plus } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { MemberSearchInput } from "@/components/MemberSearchInput";
@@ -17,7 +18,8 @@ export default function WelfarePage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<WelfareCaseItem | null>(null);
-  const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [createMember, setCreateMember] = useState<Member | null>(null);
@@ -31,7 +33,7 @@ export default function WelfarePage() {
       const res = await apiFetch<PaginatedResponse<WelfareCaseItem>>(`/welfare/cases?page=1&page_size=50${q}`);
       setCases(res.data?.items ?? []);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to load cases");
+      setError(err instanceof Error ? err.message : "Failed to load cases");
     } finally {
       setLoading(false);
     }
@@ -43,17 +45,18 @@ export default function WelfarePage() {
 
   const transition = async (caseId: string, target: string) => {
     setBusy(true);
-    setMessage("");
+    setSuccess("");
+    setError("");
     try {
       await apiFetch(`/welfare/cases/${caseId}/transition`, {
         method: "PATCH",
         body: JSON.stringify({ target_status: target }),
       });
-      setMessage("Case status updated.");
+      setSuccess("Case status updated.");
       setSelected(null);
       await load();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Transition failed");
+      setError(err instanceof Error ? err.message : "Transition failed");
     } finally {
       setBusy(false);
     }
@@ -61,9 +64,13 @@ export default function WelfarePage() {
 
   const createCase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createMember) return;
+    if (!createMember) {
+      setError("Select a member from the search results before creating a case.");
+      return;
+    }
     setBusy(true);
-    setMessage("");
+    setSuccess("");
+    setError("");
     try {
       await apiFetch("/welfare/cases", {
         method: "POST",
@@ -73,14 +80,14 @@ export default function WelfarePage() {
           description: createDesc.trim(),
         }),
       });
-      setMessage("Welfare case created.");
+      setSuccess("Welfare case created.");
       setShowCreate(false);
       setCreateMember(null);
       setCreateTitle("");
       setCreateDesc("");
       await load();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to create case");
+      setError(err instanceof Error ? err.message : "Failed to create case");
     } finally {
       setBusy(false);
     }
@@ -94,7 +101,11 @@ export default function WelfarePage() {
         action={
           <button
             type="button"
-            onClick={() => setShowCreate((v) => !v)}
+            onClick={() => {
+              setShowCreate((v) => !v);
+              setError("");
+              setSuccess("");
+            }}
             className="flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark"
           >
             <Plus className="h-4 w-4" />
@@ -103,38 +114,40 @@ export default function WelfarePage() {
         }
       />
 
-      {message ? <p className="rounded-xl bg-brand-gold/10 px-4 py-3 text-sm text-brand-gold">{message}</p> : null}
+      {success ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{success}</p> : null}
+      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
 
       {showCreate ? (
-        <form onSubmit={createCase} className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
+        <div className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
           <h2 className="font-semibold text-white">Create case for member</h2>
-          <MemberSearchInput onSelect={setCreateMember} />
-          {createMember ? (
-            <p className="text-sm text-brand-gold">Selected: {createMember.fullName}</p>
-          ) : null}
-          <input
-            value={createTitle}
-            onChange={(e) => setCreateTitle(e.target.value)}
-            required
-            placeholder="Case title"
-            className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
-          />
-          <textarea
-            value={createDesc}
-            onChange={(e) => setCreateDesc(e.target.value)}
-            required
-            rows={4}
-            placeholder="Describe the welfare need..."
-            className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
-          />
-          <button
-            type="submit"
-            disabled={busy || !createMember}
-            className="rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-          >
-            {busy ? "Creating..." : "Create case"}
-          </button>
-        </form>
+          <MemberSearchInput onSelect={setCreateMember} selected={createMember} />
+          <form onSubmit={createCase} className="space-y-4">
+            <input
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              required
+              minLength={3}
+              placeholder="Case title"
+              className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
+            />
+            <textarea
+              value={createDesc}
+              onChange={(e) => setCreateDesc(e.target.value)}
+              required
+              minLength={10}
+              rows={4}
+              placeholder="Describe the welfare need..."
+              className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
+            />
+            <button
+              type="submit"
+              disabled={busy || !createMember}
+              className="rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
+            >
+              {busy ? "Creating..." : "Create case"}
+            </button>
+          </form>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -167,7 +180,11 @@ export default function WelfarePage() {
                 <div className="min-w-0">
                   <p className="font-semibold text-white">{c.title}</p>
                   <p className="mt-1 text-sm text-slate-400">
-                    {c.member_name} · {c.membership_id}
+                    <Link href={`/profile/${c.member_id}`} className="text-brand-gold hover:underline">
+                      {c.member_name}
+                    </Link>
+                    {" · "}
+                    {c.membership_id}
                   </p>
                   <p className="mt-2 line-clamp-2 text-sm text-slate-300">{c.description}</p>
                 </div>

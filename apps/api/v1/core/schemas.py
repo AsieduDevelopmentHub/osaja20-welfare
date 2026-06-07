@@ -75,8 +75,8 @@ class TokenResponse(BaseModel):
 
 class WelfareCaseCreate(BaseModel):
     member_id: str
-    title: str
-    description: str
+    title: str = Field(min_length=3, max_length=300)
+    description: str = Field(min_length=10)
 
 
 class WelfareTransition(BaseModel):

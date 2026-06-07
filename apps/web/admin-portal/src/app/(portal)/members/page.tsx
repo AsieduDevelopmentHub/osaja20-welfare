@@ -4,7 +4,7 @@ import type { Member, UserRole } from "@osaja/types";
 import { MemberListSkeleton } from "@osaja/ui";
 import { RefreshCw, Search, User, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { MemberProfilePanel } from "@/components/MemberProfilePanel";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { resolveAvatarUrl } from "@/lib/avatars";
 import { useAuth } from "@/lib/auth";
@@ -23,8 +23,6 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
   const loadMembers = useCallback(async () => {
     if (!admin) return;
     setLoading(true);
@@ -116,7 +114,6 @@ export default function MembersPage() {
               setSearchInput("");
               setQuery("");
               setPage(1);
-              setSelectedId(null);
             }}
             className="flex items-center gap-1 rounded-xl border border-slate-600 px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800"
           >
@@ -127,16 +124,6 @@ export default function MembersPage() {
       </form>
 
       {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
-
-      {selectedId ? (
-        <MemberProfilePanel
-          memberId={selectedId}
-          adminId={admin?.id}
-          adminRole={admin?.role}
-          onClose={() => setSelectedId(null)}
-          onUpdated={loadMembers}
-        />
-      ) : null}
 
       {loading ? (
         <MemberListSkeleton variant="dark" />
@@ -164,13 +151,12 @@ export default function MembersPage() {
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedId(m.id)}
-                            className="truncate text-left font-semibold text-white hover:text-brand-gold"
+                          <Link
+                            href={`/profile/${m.id}`}
+                            className="truncate font-semibold text-white hover:text-brand-gold"
                           >
                             {m.fullName}
-                          </button>
+                          </Link>
                           <p className="truncate text-sm text-slate-400">{m.email}</p>
                           <div className="mt-2 flex flex-wrap gap-2 text-xs">
                             <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">@{m.username}</span>
@@ -194,13 +180,12 @@ export default function MembersPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedId(m.id)}
+                        <Link
+                          href={`/profile/${m.id}`}
                           className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/5"
                         >
                           View profile
-                        </button>
+                        </Link>
                         {admin?.role === "administrator" && m.id !== admin.id ? (
                           <select
                             id={`role-${m.id}`}

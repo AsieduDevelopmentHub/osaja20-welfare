@@ -35,7 +35,8 @@ async def create_case(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    if current.role == "member" and current.id != member.id:
+    is_executive = current.role in ("executive", "administrator")
+    if not is_executive and current.id != member.id:
         raise HTTPException(status_code=403, detail="Cannot create case for another member")
 
     case = await platform_service.create_welfare_case(db, payload.model_dump(), actor_id=current.id)
