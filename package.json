@@ -11,7 +11,8 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm --filter @osaja/utils test && cd apps/api && python -m pytest tests/ -q",
-    "test:e2e": "playwright test --config e2e/playwright.config.ts"
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "icons:pwa": "python scripts/generate_pwa_icons.py"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1"

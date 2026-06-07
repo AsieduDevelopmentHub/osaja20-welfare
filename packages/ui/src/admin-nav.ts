@@ -5,6 +5,7 @@ import {
   HeartHandshake,
   Megaphone,
   Settings,
+  User,
   Users,
   Vote,
   Wallet,
@@ -20,6 +21,7 @@ export const adminNavItems: NavItem[] = [
   { href: "/announcements", label: "Announcements", icon: Megaphone },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/activity", label: "Activity", icon: ClipboardList },
+  { href: "/profile", label: "My profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

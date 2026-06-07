@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
@@ -11,8 +12,16 @@ export const metadata: Metadata = {
   description: "Asuofua D/A JHS Block A Batch 2020 Welfare Platform",
   manifest: "/manifest.json",
   icons: {
-    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "OSAJA'20",
+    statusBarStyle: "default",
   },
 };
 
@@ -29,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <ServiceWorkerInit />
           {children}
+          <PwaInstallBanner />
         </AuthProvider>
       </body>
     </html>

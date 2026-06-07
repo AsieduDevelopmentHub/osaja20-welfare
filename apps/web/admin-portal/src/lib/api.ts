@@ -58,3 +58,22 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
   return json;
 }
+
+export async function apiUpload<T>(path: string, formData: FormData): Promise<ApiResult<T>> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${getApiBase()}${path}`, { method: "POST", headers, body: formData });
+  let json: ApiResult<T> & { detail?: unknown };
+  try {
+    json = (await res.json()) as ApiResult<T> & { detail?: unknown };
+  } catch {
+    throw new Error(res.ok ? "Invalid server response" : `Request failed (${res.status})`);
+  }
+  if (!res.ok) {
+    if (res.status === 401 && token) setToken(null);
+    throw new Error(parseApiError(json, res.status));
+  }
+  return json;
+}

@@ -46,8 +46,9 @@
 |----|-----|-------|
 | G01 | CI/CD pipeline | Explicitly deferred |
 | G17 | Duplicate utils in API | Maintainability — not started |
-| — | Admin self-profile page | Not implemented |
-| — | Raster PNG maskable icons | SVG used; optional for legacy Android |
+| — | Admin self-profile page | `/profile` in admin portal — edit details + avatar |
+| — | Raster PNG maskable icons | `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` |
+| — | PWA install banner | `PwaInstallBanner` — `beforeinstallprompt` + iOS/manual fallback |
 
 ## New environment variables
 
