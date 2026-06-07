@@ -4,8 +4,10 @@
   "private": true,
   "description": "OSAJA'20 Welfare Platform — Asuofua D/A JHS Block A Batch 2020",
   "scripts": {
-    "dev:member": "pnpm --filter @osaja/member-app dev",
-    "dev:admin": "pnpm --filter @osaja/admin-portal dev",
+    "dev:member": "node scripts/ensure-packages-built.mjs && pnpm --filter @osaja/member-app dev",
+    "dev:admin": "node scripts/ensure-packages-built.mjs && pnpm --filter @osaja/admin-portal dev",
+    "dev:clean:member": "node scripts/dev-clean.mjs member",
+    "dev:clean:admin": "node scripts/dev-clean.mjs admin",
     "dev:web": "pnpm run dev:member & pnpm run dev:admin",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
