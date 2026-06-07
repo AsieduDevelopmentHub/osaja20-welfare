@@ -5,7 +5,7 @@ System reviews and gap analyses for the OSAJA'20 Welfare Platform.
 | Document | Description |
 |----------|-------------|
 | [SYSTEM_AUDIT.md](./SYSTEM_AUDIT.md) | **Full system audit** — security, tests, functionality, theming, a11y, DevOps, migrations, and prioritized roadmap (June 2026) |
-| [GAP_FIXES.md](./GAP_FIXES.md) | **Gap remediation log** — what was fixed after the audit (CI/CD still pending) |
+| [GAP_FIXES.md](./GAP_FIXES.md) | **Gap remediation log** — what was fixed after the audit |
 
 ## How to use
 

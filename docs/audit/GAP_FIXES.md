@@ -1,7 +1,7 @@
 # Audit Gap Remediation Log
 
 **Date:** June 2026  
-**Scope:** All audit gaps except **G01 CI/CD pipeline** (deferred per request)
+**Scope:** All audit gaps including **G01 CI/CD pipeline** (added June 2026)
 
 ## Resolved
 
@@ -39,12 +39,12 @@
 | — | Email digest | SMTP config + weekly digest for `emailDigest` pref |
 | — | Playwright E2E | `e2e/` smoke tests — `pnpm test:e2e` |
 | — | WCAG pass | SkipLink, `aria-current`, nav labels, form labels, `aria-live` |
+| G01 | CI/CD pipeline | `.github/workflows/ci.yml` + local `pnpm ci:local` / `pnpm ci:fast` |
 
 ## Still pending
 
 | ID | Gap | Notes |
 |----|-----|-------|
-| G01 | CI/CD pipeline | Explicitly deferred |
 | G17 | Duplicate utils in API | Maintainability — not started |
 | — | Admin self-profile page | `/profile` in admin portal — edit details + avatar |
 | — | Raster PNG maskable icons | `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` |

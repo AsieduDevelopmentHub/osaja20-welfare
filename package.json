@@ -10,8 +10,11 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @osaja/utils test && cd apps/api && python -m pytest tests/ -q",
+    "test": "pnpm --filter @osaja/utils test && node scripts/run-api-tests.mjs",
+    "setup:api": "node scripts/run-api-tests.mjs --setup-only",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "ci:local": "node scripts/ci.mjs",
+    "ci:fast": "node scripts/ci.mjs --fast",
     "icons:pwa": "python scripts/generate_pwa_icons.py"
   },
   "devDependencies": {

@@ -53,7 +53,7 @@ Contact the platform administrator directly. Do not open public issues for undis
 
 ## Remaining recommendations
 
-- Add GitHub Actions CI with `pip audit` / `npm audit`
+- GitHub Actions CI runs `pnpm audit` and `pip-audit` (non-blocking audit job)
 - Consider WAF or reverse-proxy rate limiting for DDoS
 - Enable Supabase JWT audience verification
 - Penetration test before public launch

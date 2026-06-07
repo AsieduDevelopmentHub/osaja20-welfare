@@ -81,13 +81,34 @@ Deploy each Next.js app separately on Vercel with root directory set to the app 
 
 ## CI/CD
 
-GitHub Actions workflow is **not yet configured** — run locally before release:
+GitHub Actions runs on every push/PR to `main` (`.github/workflows/ci.yml`):
+
+| Job | Checks |
+|-----|--------|
+| **quality** | `pnpm lint`, `typecheck`, `build` |
+| **test** | Utils unit tests + API `pytest` |
+| **e2e** | Playwright smoke tests (member + admin auth pages) |
+| **audit** | `pnpm audit` + `pip-audit` (non-blocking) |
+
+### Run the same checks locally before pushing
 
 ```bash
-pnpm typecheck
-pnpm test
-cd apps/api && python -m pytest tests/ -q
+# Full pipeline (mirrors GitHub Actions)
+pnpm ci:local
+
+# Quick check — lint, typecheck, unit/API tests only
+pnpm ci:fast
 ```
+
+Options for `ci:local`:
+
+```bash
+pnpm ci:local -- --skip-e2e      # skip Playwright
+pnpm ci:local -- --skip-build    # skip Next.js production build
+pnpm ci:local -- --only=lint,typecheck,test
+```
+
+**Prerequisites:** Node 20+, pnpm 9+, Python 3.11+ with API deps (`pip install -r apps/api/requirements.txt`). For E2E locally, Playwright installs browsers on first run (`npx playwright install chromium`).
 
 ## Related
 

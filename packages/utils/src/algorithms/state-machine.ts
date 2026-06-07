@@ -1,5 +1,6 @@
 /**
  * Finite state machine for welfare case workflow transitions.
+ * Mirrors apps/api/v1/core/algorithms/state_machine.py
  */
 
 import type { WelfareStatus } from "@osaja/types";
@@ -7,12 +8,10 @@ import type { WelfareStatus } from "@osaja/types";
 type TransitionMap = Record<WelfareStatus, WelfareStatus[]>;
 
 const WELFARE_TRANSITIONS: TransitionMap = {
-  created: ["executive_review", "archived"],
-  executive_review: ["approved", "created", "archived"],
-  approved: ["support_allocated", "executive_review"],
-  support_allocated: ["resolved", "approved"],
-  resolved: ["archived"],
-  archived: [],
+  pending: ["approved"],
+  approved: ["allocated"],
+  allocated: ["resolved"],
+  resolved: [],
 };
 
 export class WelfareStateMachine {

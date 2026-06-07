@@ -146,7 +146,16 @@ Do **not** set `NEXT_PUBLIC_API_URL=http://localhost:8000/...` when using a tunn
 
 After changing `next.config.ts`, restart the Next.js dev server.
 
-## Run tests (inside venv)
+## Run tests
+
+From the repo root (auto-uses `apps/api/.venv`, creates it on first run):
+
+```bash
+pnpm test          # utils + API tests
+pnpm ci:fast       # lint, typecheck, tests
+```
+
+Or manually inside the API venv:
 
 ```bash
 cd apps/api
