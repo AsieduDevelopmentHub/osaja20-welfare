@@ -12,9 +12,9 @@
   "categories": ["business", "finance"],
   "icons": [
     {
-      "src": "/brand/batch-logo.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg",
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any"
     },
     {

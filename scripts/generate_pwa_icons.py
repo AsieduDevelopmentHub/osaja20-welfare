@@ -1,58 +1,74 @@
 #!/usr/bin/env python3
-"""Generate raster PWA icons (192/512) for older Android and install prompts."""
+"""Generate PWA install icons from brand logo JPEGs (192/512/maskable/apple-touch)."""
+
+from __future__ import annotations
 
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image
 except ImportError as exc:
     raise SystemExit("Install Pillow first: pip install pillow") from exc
 
-NAVY = (10, 45, 110, 255)
-GOLD = (201, 162, 39, 255)
-WHITE = (255, 255, 255, 255)
-
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "apps" / "web" / "member-app" / "public" / "icons"
+
+APPS = (
+    {
+        "name": "member",
+        "logo": ROOT / "apps/web/member-app/public/brand/welfare-logo.jpg",
+        "out": ROOT / "apps/web/member-app/public/icons",
+        "bg": (250, 248, 245, 255),  # brand cream
+    },
+    {
+        "name": "admin",
+        "logo": ROOT / "apps/web/admin-portal/public/brand/batch-logo.jpg",
+        "out": ROOT / "apps/web/admin-portal/public/icons",
+        "bg": (6, 29, 71, 255),  # brand navy dark
+    },
+)
 
 
-def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    for name in ("arial.ttf", "Arial.ttf", "segoeui.ttf"):
-        try:
-            return ImageFont.truetype(name, size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
+def _fit_logo(logo: Image.Image, canvas_size: int, *, maskable: bool) -> Image.Image:
+    pad_ratio = 0.2 if maskable else 0.1
+    pad = int(canvas_size * pad_ratio)
+    inner = canvas_size - 2 * pad
+    logo = logo.convert("RGBA")
+    logo.thumbnail((inner, inner), Image.Resampling.LANCZOS)
+    return logo
 
 
-def draw_icon(size: int, *, maskable: bool = False) -> Image.Image:
-    img = Image.new("RGBA", (size, size), NAVY)
-    draw = ImageDraw.Draw(img)
-    pad = int(size * 0.12) if maskable else int(size * 0.06)
-    inner = size - 2 * pad
-    cx = size // 2
-    cy = size // 2
-    stroke = max(3, size // 48)
-    head_r = int(inner * 0.17)
-    head_cy = cy - int(inner * 0.1)
-    draw.ellipse(
-        [cx - head_r, head_cy - head_r, cx + head_r, head_cy + head_r],
-        outline=GOLD,
-        width=stroke,
+def _compose(logo_path: Path, size: int, bg: tuple[int, int, int, int], *, maskable: bool) -> Image.Image:
+    canvas = Image.new("RGBA", (size, size), bg)
+    logo = Image.open(logo_path)
+    fitted = _fit_logo(logo, size, maskable=maskable)
+    x = (size - fitted.width) // 2
+    y = (size - fitted.height) // 2
+    canvas.paste(fitted, (x, y), fitted)
+    return canvas
+
+
+def generate_set(logo_path: Path, out_dir: Path, bg: tuple[int, int, int, int]) -> None:
+    if not logo_path.is_file():
+        raise FileNotFoundError(f"Logo not found: {logo_path}")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sizes = (
+        (192, "icon-192.png", False),
+        (512, "icon-512.png", False),
+        (512, "icon-maskable-512.png", True),
+        (180, "apple-touch-icon.png", False),
     )
-    body_box = [cx - int(inner * 0.32), head_cy + head_r, cx + int(inner * 0.32), cy + int(inner * 0.42)]
-    draw.arc(body_box, 200, 340, fill=GOLD, width=stroke)
-    font = _font(max(14, int(size * 0.11)))
-    draw.text((cx, cy + int(inner * 0.28)), "20", fill=WHITE, font=font, anchor="mm")
-    return img
+    for size, filename, maskable in sizes:
+        img = _compose(logo_path, size, bg, maskable=maskable)
+        img.convert("RGB").save(out_dir / filename, optimize=True)
+        print(f"  {out_dir / filename}")
 
 
 def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
-    draw_icon(192).convert("RGB").save(OUT / "icon-192.png", optimize=True)
-    draw_icon(512).convert("RGB").save(OUT / "icon-512.png", optimize=True)
-    draw_icon(512, maskable=True).convert("RGB").save(OUT / "icon-maskable-512.png", optimize=True)
-    print(f"Wrote PNG icons to {OUT}")
+    for app in APPS:
+        print(f"Generating {app['name']} PWA icons from {app['logo'].name} …")
+        generate_set(app["logo"], app["out"], app["bg"])
+    print("Done.")
 
 
 if __name__ == "__main__":

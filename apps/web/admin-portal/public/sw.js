@@ -1,6 +1,6 @@
 /* OSAJA'20 Admin service worker — offline shell */
 
-const CACHE_VERSION = "osaja-admin-v1";
+const CACHE_VERSION = "osaja-admin-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
@@ -8,7 +8,7 @@ const PRECACHE_URLS = [
   "/",
   "/offline.html",
   "/manifest.json",
-  "/icons/icon.svg",
+  "/icons/apple-touch-icon.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/icon-maskable-512.png",
