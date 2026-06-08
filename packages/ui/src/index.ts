@@ -26,3 +26,5 @@ export { memberNavItems } from "./nav-config.js";
 export type { NavItem } from "./nav-config.js";
 export { adminNavItems, adminModules } from "./admin-nav.js";
 export type { AdminModule } from "./admin-nav.js";
+export { FloatingContact } from "./components/FloatingContact.js";
+export type { FloatingContactProps } from "./components/FloatingContact.js";

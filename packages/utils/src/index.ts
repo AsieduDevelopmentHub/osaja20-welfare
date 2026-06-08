@@ -36,3 +36,5 @@ export function paginate<T>(items: T[], page: number, pageSize: number) {
 
 export { computeDuesSummary, periodLabel } from "./dues.js";
 export type { DuesSummary, DuesPeriod, DuesPeriodStatus, PaidPeriodInput } from "./dues.js";
+
+export { parseWhatsAppNumbers, formatPhoneDisplay, whatsAppUrl } from "./contact.js";

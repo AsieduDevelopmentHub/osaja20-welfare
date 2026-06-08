@@ -1,12 +1,13 @@
 "use client";
 
-import { MobileShell, memberNavItems, PortalShellSkeleton } from "@osaja/ui";
+import { FloatingContact, MobileShell, memberNavItems, PortalShellSkeleton } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth";
 import { getToken } from "@/lib/api";
+import { env } from "@/lib/env";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const { member, loading, logout } = useAuth();
@@ -56,6 +57,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       }
     >
       {children}
+      <FloatingContact
+        variant="light"
+        title={env.contact.title}
+        note={env.contact.note}
+        email={env.contact.email}
+        phone={env.contact.phone}
+        whatsappNumbers={env.contact.whatsappNumbers}
+        whatsappMessage={env.contact.whatsappMessage}
+      />
     </MobileShell>
   );
 }

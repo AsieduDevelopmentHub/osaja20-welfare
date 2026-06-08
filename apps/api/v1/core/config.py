@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_contact_email: str = "admin@osaja.com"
 
+    # Welfare contact (slash-separated); mirrored as NEXT_PUBLIC_WHATSAPP_NUMBER on web apps
+    whatsapp_number: str = ""
+
     # Member portal base URL (password reset redirect fallback)
     member_portal_url: str = "http://localhost:3000"
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { MobileShell, adminNavItems, PortalShellSkeleton } from "@osaja/ui";
+import { FloatingContact, MobileShell, adminNavItems, PortalShellSkeleton } from "@osaja/ui";
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { env } from "@/lib/env";
 
 export default function AdminPortalLayout({ children }: { children: React.ReactNode }) {
   const { member, loading, logout } = useAuth();
@@ -61,6 +62,15 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
       }
     >
       {children}
+      <FloatingContact
+        variant="dark"
+        title={env.contact.title}
+        note={env.contact.note}
+        email={env.contact.email}
+        phone={env.contact.phone}
+        whatsappNumbers={env.contact.whatsappNumbers}
+        whatsappMessage={env.contact.whatsappMessage}
+      />
     </MobileShell>
   );
 }
