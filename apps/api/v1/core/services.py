@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from v1.core.config import settings
 from v1.core.algorithms import (
     BirthdayIndex,
     BirthdayMember,
@@ -495,6 +496,9 @@ class PlatformService:
         if status:
             query = query.where(WelfareCase.status == status)
             count_query = count_query.where(WelfareCase.status == status)
+        else:
+            query = query.where(WelfareCase.status != WelfareStatus.ARCHIVED.value)
+            count_query = count_query.where(WelfareCase.status != WelfareStatus.ARCHIVED.value)
 
         total = await db.scalar(count_query) or 0
         result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
@@ -526,13 +530,19 @@ class PlatformService:
         page_size = min(max(page_size, 1), 100)
         query = (
             select(WelfareCase)
-            .where(WelfareCase.member_id == member_id)
+            .where(
+                WelfareCase.member_id == member_id,
+                WelfareCase.status != WelfareStatus.ARCHIVED.value,
+            )
             .order_by(WelfareCase.created_at.desc())
         )
         count_query = (
             select(func.count())
             .select_from(WelfareCase)
-            .where(WelfareCase.member_id == member_id)
+            .where(
+                WelfareCase.member_id == member_id,
+                WelfareCase.status != WelfareStatus.ARCHIVED.value,
+            )
         )
         total = await db.scalar(count_query) or 0
         cases = (
@@ -614,7 +624,7 @@ class PlatformService:
 
         member_uuid = UUID(data["member_id"])
         ref = contribution.reference or ""
-        is_online = ref.startswith("PSK-")
+        is_online = ref.lower().startswith("osaja") or ref.startswith("PSK-")
         await self.create_notification(
             db,
             member_id=member_uuid,
@@ -871,6 +881,35 @@ class PlatformService:
         )
         return vote_to_dict(vote)
 
+    async def archive_vote(self, db: AsyncSession, vote_id: UUID, actor_id: UUID | None = None) -> dict:
+        result = await db.execute(
+            select(Vote).options(selectinload(Vote.options)).where(Vote.id == vote_id)
+        )
+        vote = result.scalar_one_or_none()
+        if not vote:
+            raise ValueError("Vote not found")
+        if vote.status == VoteLifecycle.ARCHIVED.value:
+            raise ValueError("Vote is already archived")
+        if vote.status not in (
+            VoteLifecycle.CLOSED.value,
+            VoteLifecycle.RESULT_PUBLISHED.value,
+            VoteLifecycle.VERIFIED.value,
+        ):
+            raise ValueError("Only closed or completed votes can be archived")
+
+        vote.status = VoteLifecycle.ARCHIVED.value
+        vote.results_published = False
+        vote.results_published_at = None
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="vote_archived",
+            entity_type="vote",
+            entity_id=vote.id,
+        )
+        return vote_to_dict(vote)
+
     async def unpublish_stale_vote_results(self, db: AsyncSession, max_age_days: int = 7) -> int:
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
         result = await db.execute(
@@ -894,7 +933,10 @@ class PlatformService:
         result = await db.execute(
             select(Vote)
             .options(selectinload(Vote.options))
-            .where(Vote.results_published.is_(True))
+            .where(
+                Vote.results_published.is_(True),
+                Vote.status != VoteLifecycle.ARCHIVED.value,
+            )
             .order_by(Vote.closes_at.desc())
             .limit(20)
         )
@@ -930,6 +972,9 @@ class PlatformService:
         if status:
             query = query.where(Vote.status == status)
             count_query = count_query.where(Vote.status == status)
+        else:
+            query = query.where(Vote.status != VoteLifecycle.ARCHIVED.value)
+            count_query = count_query.where(Vote.status != VoteLifecycle.ARCHIVED.value)
 
         total = await db.scalar(count_query) or 0
         votes = (await db.execute(query.offset((page - 1) * page_size).limit(page_size))).scalars().all()
@@ -1159,27 +1204,27 @@ class PlatformService:
         )
 
         if push_pending:
-            push_payload = {
-                "member_id": str(member_id),
-                "notification_id": str(notification.id),
-                "notification_type": type,
-                "title": title,
-                "message": message,
-                "url": "/notifications",
-            }
-            queued = await job_queue.enqueue("push_notification", push_payload)
-            if not queued:
-                delivered = await self.deliver_push_notification(
-                    db,
-                    member_id=member_id,
-                    notification_id=notification.id,
-                    notification_type=type,
-                    title=title,
-                    message=message,
-                )
-                if delivered:
-                    notification.push_pending = False
-                    await db.flush()
+            delivered = await self.deliver_push_notification(
+                db,
+                member_id=member_id,
+                notification_id=notification.id,
+                notification_type=type,
+                title=title,
+                message=message,
+            )
+            if delivered:
+                notification.push_pending = False
+                await db.flush()
+            elif settings.job_worker_enabled:
+                push_payload = {
+                    "member_id": str(member_id),
+                    "notification_id": str(notification.id),
+                    "notification_type": type,
+                    "title": title,
+                    "message": message,
+                    "url": "/notifications",
+                }
+                await job_queue.enqueue("push_notification", push_payload)
 
         return {
             "id": str(notification.id),

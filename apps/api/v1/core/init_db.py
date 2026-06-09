@@ -82,9 +82,6 @@ async def _apply_migrations(conn) -> None:
                     "WHERE status = 'support_allocated'"
                 )
             )
-            sync_conn.execute(
-                text("UPDATE welfare_cases SET status = 'resolved' WHERE status = 'archived'")
-            )
 
     await conn.run_sync(migrate)
 

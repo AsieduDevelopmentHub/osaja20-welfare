@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -34,6 +35,35 @@ def _unpaid_periods(dues_summary: dict) -> list[dict]:
 
 def _period_key(year: int, month: int) -> str:
     return f"{year}-{month:02d}"
+
+
+def _member_ref_suffix(membership_id: str) -> str:
+    digits = re.sub(r"\D", "", membership_id or "")
+    if not digits:
+        return "000"
+    return digits[-3:].zfill(3)
+
+
+async def _build_paystack_reference(
+    db: AsyncSession,
+    member: Member,
+    periods: list[dict],
+) -> str:
+    """osaja{member3}{MM}{YYYY} — e.g. osaja001062026"""
+    primary = sorted(periods, key=lambda p: (p["year"], p["month"]))[0]
+    base = (
+        f"osaja{_member_ref_suffix(member.membership_id)}"
+        f"{primary['month']:02d}{primary['year']}"
+    )
+    reference = base
+    for attempt in range(1, 20):
+        existing = await db.execute(
+            select(PaymentTransaction.id).where(PaymentTransaction.reference == reference)
+        )
+        if not existing.scalar_one_or_none():
+            return reference
+        reference = f"{base}{attempt}"
+    return f"{base}{uuid4().hex[:4]}"
 
 
 async def _validate_periods(
@@ -95,7 +125,7 @@ async def initialize_dues_payment(
         raise ValueError("Paystack is not configured on the server")
 
     normalized, amount = await _validate_periods(db, member, periods)
-    reference = f"OSAJA_{uuid4().hex[:16].upper()}"
+    reference = await _build_paystack_reference(db, member, normalized)
     amount_pesewas = int(round(amount * 100))
 
     tx = PaymentTransaction(
@@ -184,7 +214,7 @@ async def complete_payment_if_successful(
         raise ValueError("Member not found for payment")
 
     for period in periods:
-        period_ref = f"PSK-{reference}-{period['year']}{period['month']:02d}"
+        period_ref = f"{reference}-{period['month']:02d}"
         try:
             record = await platform_service.record_contribution(
                 db,

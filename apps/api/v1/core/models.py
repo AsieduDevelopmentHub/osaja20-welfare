@@ -40,6 +40,7 @@ class WelfareStatus(str, enum.Enum):
     APPROVED = "approved"
     ALLOCATED = "allocated"
     RESOLVED = "resolved"
+    ARCHIVED = "archived"
 
 
 class VoteType(str, enum.Enum):

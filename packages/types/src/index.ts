@@ -32,7 +32,7 @@ export interface Member {
   preferences?: MemberPreferences;
 }
 
-export type WelfareStatus = "pending" | "approved" | "allocated" | "resolved";
+export type WelfareStatus = "pending" | "approved" | "allocated" | "resolved" | "archived";
 
 export interface WelfareCase {
   id: string;

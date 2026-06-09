@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api";
 import type { PaginatedResponse, WelfareCaseItem } from "@/lib/types";
 import { WELFARE_STATUS_LABELS } from "@/lib/types";
 
-const STATUS_FILTERS = ["", "pending", "approved", "allocated", "resolved"];
+const STATUS_FILTERS = ["", "pending", "approved", "allocated", "resolved", "archived"];
 
 export default function WelfarePage() {
   const [cases, setCases] = useState<WelfareCaseItem[]>([]);

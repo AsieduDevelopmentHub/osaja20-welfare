@@ -110,6 +110,19 @@ export default function VotingPage() {
     }
   };
 
+  const archiveVote = async (id: string) => {
+    setBusy(true);
+    try {
+      await apiFetch(`/voting/${id}/archive`, { method: "PATCH" });
+      setMessage("Vote archived and removed from member views.");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to archive vote");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const unpublishResults = async (id: string) => {
     setBusy(true);
     try {
@@ -316,6 +329,16 @@ export default function VotingPage() {
                       Unpublish
                     </button>
                   </>
+                ) : null}
+                {v.status === "closed" || v.status === "result_published" ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => archiveVote(v.id)}
+                    className="rounded-lg bg-slate-600/30 px-3 py-1.5 text-xs font-medium text-slate-300"
+                  >
+                    Archive
+                  </button>
                 ) : null}
                 <button
                   type="button"

@@ -3,21 +3,20 @@
 # Simplified: pending → approved → allocated → resolved
 WELFARE_TRANSITIONS: dict[str, list[str]] = {
     "pending": ["approved"],
-    "approved": ["allocated"],
-    "allocated": ["resolved"],
-    "resolved": [],
+    "approved": ["allocated", "archived"],
+    "allocated": ["resolved", "archived"],
+    "resolved": ["archived"],
+    "archived": [],
     # Legacy statuses (existing rows) — same forward paths after normalization
     "created": ["approved"],
     "executive_review": ["approved"],
-    "support_allocated": ["resolved"],
-    "archived": [],
+    "support_allocated": ["resolved", "archived"],
 }
 
 WELFARE_STATUS_ALIASES: dict[str, str] = {
     "created": "pending",
     "executive_review": "pending",
     "support_allocated": "allocated",
-    "archived": "resolved",
 }
 
 

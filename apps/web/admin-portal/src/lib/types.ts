@@ -134,6 +134,7 @@ export const WELFARE_STATUS_LABELS: Record<string, string> = {
   approved: "Approved",
   allocated: "Support allocated",
   resolved: "Resolved",
+  archived: "Archived",
 };
 
 export const VOTE_STATUS_LABELS: Record<string, string> = {
