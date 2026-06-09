@@ -1216,39 +1216,41 @@ class PlatformService:
         )
 
         today = datetime.now(timezone.utc).date()
-        birthdays_today = registry.birthday_index.get_birthdays_for_date(today.month, today.day)
+        birthdays_today = await db.scalar(
+            select(func.count())
+            .select_from(Member)
+            .where(
+                func.extract("month", Member.date_of_birth) == today.month,
+                func.extract("day", Member.date_of_birth) == today.day,
+            )
+        )
 
         return {
             "total_members": total_members or 0,
             "active_members": active_members or 0,
             "pending_welfare_cases": pending_welfare or 0,
             "total_contributions": registry.ledger.get_total_contributions(),
-            "upcoming_birthdays_today": len(birthdays_today),
+            "upcoming_birthdays_today": birthdays_today or 0,
             "active_votes": active_votes or 0,
         }
 
     async def monthly_birthdays(self, db: AsyncSession, month: int) -> list[dict]:
-        if not registry._loaded:
-            await registry.rebuild(db)
-        birthdays = registry.birthday_index.get_birthdays_for_month(month)
-        if not birthdays:
-            return []
-
-        member_ids = [UUID(b.member_id) for b in birthdays]
+        """Birthdays for a calendar month — always read from Postgres, not the in-memory index."""
         rows = await db.execute(
-            select(Member.id, Member.avatar_url, Member.membership_id).where(Member.id.in_(member_ids))
+            select(Member)
+            .where(func.extract("month", Member.date_of_birth) == month)
+            .order_by(func.extract("day", Member.date_of_birth), Member.full_name)
         )
-        meta = {str(r.id): {"avatar_url": r.avatar_url, "membership_id": r.membership_id} for r in rows.all()}
-
+        members = rows.scalars().all()
         return [
             {
-                "member_id": b.member_id,
-                "full_name": b.full_name,
-                "day": b.day,
-                "avatar_url": meta.get(b.member_id, {}).get("avatar_url"),
-                "membership_id": meta.get(b.member_id, {}).get("membership_id"),
+                "member_id": str(m.id),
+                "full_name": m.full_name,
+                "day": m.date_of_birth.day,
+                "avatar_url": m.avatar_url,
+                "membership_id": m.membership_id,
             }
-            for b in birthdays
+            for m in members
         ]
 
     BIRTHDAY_WISH_TTL_DAYS = 7

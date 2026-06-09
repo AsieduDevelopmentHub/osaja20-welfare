@@ -144,6 +144,7 @@ async def purge_database(*, admin_email: str) -> None:
     print(f"  Kept administrator: {admin_email} ({admin_id})")
     print(f"  Storage objects removed: {storage_removed}")
     print(f"  Supabase Auth users removed: {auth_removed}")
+    print("  Redeploy or restart the API on Render so in-memory search/vote indexes reload.")
 
 
 def main() -> None:

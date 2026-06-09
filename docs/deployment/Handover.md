@@ -41,6 +41,8 @@ python scripts/purge_database.py --confirm PURGE --email admin@osaja.com
 
 This deletes contributions, votes, inquiries, notifications, etc., and removes other Supabase Auth users / storage avatars when configured. **Irreversible.**
 
+After purging, **redeploy or restart the API on Render** so in-memory member search / vote indexes reload (birthday listings now read directly from Postgres).
+
 ## 3. Production settings verification
 
 ### API (Render)
