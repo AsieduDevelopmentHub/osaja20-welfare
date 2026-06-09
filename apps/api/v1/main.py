@@ -37,8 +37,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_settings()
-    Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
-    (Path(settings.uploads_dir) / "avatars").mkdir(parents=True, exist_ok=True)
+    if not settings.uses_supabase_storage:
+        Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
+        (Path(settings.uploads_dir) / "avatars").mkdir(parents=True, exist_ok=True)
     await init_database()
     async with async_session() as session:
         await warm_indexes(session)

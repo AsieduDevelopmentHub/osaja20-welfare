@@ -67,6 +67,12 @@ def validate_settings() -> None:
     if not (settings.vapid_public_key and settings.vapid_private_key):
         warnings.append("VAPID keys missing — browser push notifications will not work")
 
+    if not settings.database_url.startswith("sqlite") and not settings.uses_supabase_storage:
+        warnings.append(
+            "SUPABASE_URL + SUPABASE_SERVICE_KEY not set — avatars use local disk and are lost on Render redeploy; "
+            "use a public Supabase Storage bucket instead of a Render persistent disk"
+        )
+
     for message in warnings:
         logger.warning("Production config: %s", message)
 

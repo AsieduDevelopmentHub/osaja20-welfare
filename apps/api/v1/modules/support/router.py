@@ -26,15 +26,13 @@ async def submit_inquiry(
         subject=payload.subject,
     )
     if data["notified"] == 0:
-        raise HTTPException(
-            status_code=503,
-            detail="No executives are available to receive your message. Try WhatsApp or email instead.",
+        message = (
+            "Your message was saved. No executive is set up to receive alerts yet — "
+            "try WhatsApp or email if you need an urgent reply."
         )
-    return ApiResponse(
-        success=True,
-        data=data,
-        message="Your message was sent to the executive team.",
-    )
+    else:
+        message = "Your message was sent to the executive team."
+    return ApiResponse(success=True, data=data, message=message)
 
 
 @router.get("/inquiries", response_model=ApiResponse)

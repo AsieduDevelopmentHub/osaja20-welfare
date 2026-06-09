@@ -4,6 +4,7 @@ import re
 from sqlalchemy import inspect, text
 
 from v1.core.database import Base, engine
+from v1.core import models  # noqa: F401 — register all tables before create_all
 from v1.core.services import registry
 
 

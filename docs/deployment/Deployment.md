@@ -62,8 +62,18 @@ Copy from `apps/api/.env.example`. Minimum for production:
 | `VAPID_CONTACT_EMAIL` | `admin@osaja.com` |
 | `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` | If online dues enabled |
 | `JOB_WORKER_ENABLED` | `false` on free tier (push still works inline) |
+| `SUPABASE_URL` | `https://YOUR-PROJECT.supabase.co` |
+| `SUPABASE_SERVICE_KEY` | Service role key (Storage uploads + optional auth admin) |
+| `SUPABASE_STORAGE_BUCKET` | `avatars` (default) — public bucket for profile photos |
 
-**Disk:** Mount a persistent disk at `uploads` (1 GB) so member avatars survive redeploys — included in `render.yaml`.
+**Avatars (Supabase Storage):** Render’s persistent disk requires a paid plan. Profile photos are stored in a **public Supabase Storage bucket** instead (free tier includes storage).
+
+1. Supabase dashboard → **Storage** → **New bucket**
+2. Name: `avatars` (or match `SUPABASE_STORAGE_BUCKET`)
+3. Enable **Public bucket** (profile photos are shown in the member/admin portals)
+4. On Render, set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` — the API uploads via the service role (no extra RLS policies needed for server-side uploads)
+
+Members who uploaded avatars before this change may need to re-upload once (old files were on ephemeral Render disk).
 
 **Migrations:** `render.yaml` runs `alembic upgrade head` before each deploy (`preDeployCommand`).
 

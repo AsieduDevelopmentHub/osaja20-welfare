@@ -9,10 +9,6 @@ services:
     preDeployCommand: alembic upgrade head
     startCommand: uvicorn v1.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
-    disk:
-      name: osaja-uploads
-      mountPath: uploads
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
@@ -25,4 +21,4 @@ services:
       - key: JOB_WORKER_ENABLED
         value: "false"
       # Set in Render dashboard: DATABASE_URL, JWT_SECRET, CORS_ORIGINS,
-      # MEMBER_PORTAL_URL, VAPID_*, PAYSTACK_*, WHATSAPP_NUMBER, etc.
+      # SUPABASE_URL, SUPABASE_SERVICE_KEY, MEMBER_PORTAL_URL, VAPID_*, etc.

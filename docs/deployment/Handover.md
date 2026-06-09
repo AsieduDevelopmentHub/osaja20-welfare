@@ -45,7 +45,7 @@ Share credentials securely (not over WhatsApp in plain text). Client should chan
 | `WHATSAPP_NUMBER` | Executive WhatsApp(s), slash-separated |
 | VAPID keys | Set (push notifications) |
 | Paystack keys | Live keys when going live with real payments |
-| Persistent disk | Mounted at `uploads` (avatars survive redeploy) |
+| Supabase Storage | Public `avatars` bucket; `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` on Render |
 
 ### Member app (Vercel)
 

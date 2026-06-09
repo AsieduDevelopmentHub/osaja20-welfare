@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
     supabase_jwt_secret: str = ""
+    # Public bucket for member avatars (create in Supabase → Storage)
+    supabase_storage_bucket: str = "avatars"
 
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
@@ -88,6 +90,10 @@ class Settings(BaseSettings):
     @property
     def uses_supabase_auth(self) -> bool:
         return bool(self.supabase_url and self.supabase_anon_key and not self.use_local_auth)
+
+    @property
+    def uses_supabase_storage(self) -> bool:
+        return bool(self.supabase_url.strip() and self.supabase_service_key.strip())
 
     @property
     def database_requires_ssl(self) -> bool:

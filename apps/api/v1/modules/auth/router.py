@@ -332,7 +332,7 @@ async def remove_avatar(
     current: Annotated[Member, Depends(get_current_member)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    delete_member_avatar_files(current.id)
+    await delete_member_avatar_files(current.id)
     member = await platform_service.clear_member_avatar(db, current, actor_id=current.id)
     return ApiResponse(success=True, data=member_to_dict(member), message="Profile photo removed")
 
