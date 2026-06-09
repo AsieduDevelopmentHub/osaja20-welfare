@@ -10,6 +10,7 @@
     "dev:clean:admin": "node scripts/dev-clean.mjs admin",
     "dev:web": "pnpm run dev:member & pnpm run dev:admin",
     "build": "pnpm -r build",
+    "build:verify": "pnpm --filter \"./packages/*\" build && pnpm --filter @osaja/member-app build && pnpm --filter @osaja/admin-portal build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm --filter \"./packages/*\" build && pnpm -r typecheck",
     "audit": "pnpm audit --audit-level moderate && node scripts/run-pip-audit.mjs",

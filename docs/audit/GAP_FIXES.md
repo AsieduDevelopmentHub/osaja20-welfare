@@ -45,10 +45,17 @@
 
 | ID | Gap | Notes |
 |----|-----|-------|
-| G17 | Duplicate utils in API | Maintainability — not started |
-| — | Admin self-profile page | `/profile` in admin portal — edit details + avatar |
-| — | Raster PNG maskable icons | `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` |
-| — | PWA install banner | `PwaInstallBanner` — `beforeinstallprompt` + iOS/manual fallback |
+| G17 | Duplicate utils in API | Maintainability — low priority |
+
+## Resolved (post-audit, June 2026)
+
+| Item | Fix |
+|------|-----|
+| Admin self-profile | `admin-portal` `/profile` |
+| PWA icons + install banner | PNG icons + `PwaInstallBanner` |
+| Production hardening | Security headers, `/health` DB check, `requirements-dev.txt`, `Handover.md` |
+| Render deploy | `render.yaml` disk, alembic preDeploy, Python 3.12 |
+| CORS env parsing | Comma-separated `CORS_ORIGINS` on Render |
 
 ## New environment variables
 

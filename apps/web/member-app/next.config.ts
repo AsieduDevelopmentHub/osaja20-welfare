@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { nextSecurityHeaders } from "@osaja/config";
 
 const apiProxyTarget = process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8000";
 
@@ -37,6 +38,14 @@ const nextConfig: NextConfig = {
       {
         source: "/uploads/:path*",
         destination: `${apiProxyTarget}/uploads/:path*`,
+      },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [...nextSecurityHeaders],
       },
     ];
   },

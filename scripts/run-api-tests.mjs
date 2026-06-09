@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const apiDir = path.join(root, "apps", "api");
 const isWin = process.platform === "win32";
 const venvPython = path.join(apiDir, ".venv", isWin ? "Scripts/python.exe" : "bin/python");
-const requirements = path.join(apiDir, "requirements.txt");
+const requirements = path.join(apiDir, "requirements-dev.txt");
 
 const testEnv = {
   DATABASE_URL: "sqlite+aiosqlite:///:memory:",

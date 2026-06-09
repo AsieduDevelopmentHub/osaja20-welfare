@@ -6,9 +6,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from v1.core.config import settings
-from v1.core.database import async_session
+from v1.core.database import async_session, engine
+from v1.core.security_headers import SecurityHeadersMiddleware
 from v1.core.init_db import init_database, warm_indexes
 from v1.core.schemas import ApiResponse
 from v1.core.jobs.worker import run_job_worker
@@ -75,6 +77,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -105,10 +108,20 @@ app.include_router(uploads_router)
 
 @app.get("/health")
 async def health():
-    return {
-        "status": "healthy",
+    db_ok = True
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("Health check: database unreachable")
+        db_ok = False
+
+    payload = {
+        "status": "healthy" if db_ok else "degraded",
         "app": settings.app_name,
         "version": settings.api_version,
         "database": "sqlite" if settings.database_url.startswith("sqlite") else "postgresql",
+        "database_ok": db_ok,
         "auth_mode": "supabase" if settings.uses_supabase_auth else "local",
     }
+    return JSONResponse(status_code=200 if db_ok else 503, content=payload)

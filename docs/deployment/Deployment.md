@@ -63,7 +63,9 @@ Copy from `apps/api/.env.example`. Minimum for production:
 | `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` | If online dues enabled |
 | `JOB_WORKER_ENABLED` | `false` on free tier (push still works inline) |
 
-**Disk:** Add a persistent disk mounted at `uploads` if you need avatars to survive redeploys.
+**Disk:** Mount a persistent disk at `uploads` (1 GB) so member avatars survive redeploys — included in `render.yaml`.
+
+**Migrations:** `render.yaml` runs `alembic upgrade head` before each deploy (`preDeployCommand`).
 
 ### Verify API
 
@@ -286,8 +288,13 @@ pnpm ci:local   # full (includes build + e2e)
 
 ---
 
+## Client handover
+
+After all three services are live, complete [Handover.md](./Handover.md) with the welfare executives (admin account, smoke tests, Paystack, ongoing ops).
+
 ## Related
 
+- [Handover checklist](./Handover.md)
 - [Installation](../setup/Installation.md) — local dev setup
 - [Security](../security/Security.md)
 - [System audit](../audit/SYSTEM_AUDIT.md)
