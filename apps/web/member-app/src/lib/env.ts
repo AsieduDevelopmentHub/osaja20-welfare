@@ -37,7 +37,7 @@ export const env = {
     title: read("NEXT_PUBLIC_PAYMENT_TITLE", "How to pay your dues"),
     note: read(
       "NEXT_PUBLIC_PAYMENT_NOTE",
-      "After payment, the executive team will record it in the system within 24–48 hours. Contact the treasurer if your payment is not reflected."
+      "Pay securely with card or mobile money via Paystack. Your dues update instantly after payment."
     ),
     momo: {
       enabled: readBool("NEXT_PUBLIC_MOMO_ENABLED", true),

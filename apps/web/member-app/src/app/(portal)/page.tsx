@@ -198,7 +198,7 @@ export default function DashboardPage() {
             </div>
             {recentPayments.length === 0 ? (
               <p className="text-sm text-slate-500">
-                No payments recorded yet. Pay GHS 30 monthly dues via MoMo — see Contributions for details.
+                No payments recorded yet. Pay your monthly dues online on the Contributions page.
               </p>
             ) : (
               <ul className="space-y-3">

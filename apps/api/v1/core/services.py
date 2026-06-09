@@ -613,12 +613,18 @@ class PlatformService:
         )
 
         member_uuid = UUID(data["member_id"])
+        ref = contribution.reference or ""
+        is_online = ref.startswith("PSK-")
         await self.create_notification(
             db,
             member_id=member_uuid,
             type="contribution",
-            title="Contribution recorded",
-            message=f"GHS {float(contribution.amount):.2f} {contrib_type} payment recorded. Ref: {contribution.reference or '—'}",
+            title="Payment received" if is_online else "Contribution recorded",
+            message=(
+                f"GHS {float(contribution.amount):.2f} {contrib_type} paid online. Ref: {ref}"
+                if is_online
+                else f"GHS {float(contribution.amount):.2f} {contrib_type} payment recorded. Ref: {ref or '—'}"
+            ),
             actor_id=actor_id,
         )
 

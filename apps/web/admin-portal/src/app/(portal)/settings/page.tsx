@@ -37,7 +37,7 @@ export default function SettingsPage() {
         body: JSON.stringify(settings),
       });
       setSettings(res.data as PaymentSettings);
-      setMessage("Payment settings saved. Members will see updated MoMo and bank details.");
+      setMessage("Payment settings saved. Members will see updated payment options.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -67,13 +67,40 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <AdminHeader
         title="Platform settings"
-        description="Payment instructions shown to members on the Contributions page."
+        description="Paystack online payments and optional manual MoMo/bank instructions."
       />
 
       {message ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{message}</p> : null}
       {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
 
       <form onSubmit={save} className="space-y-6">
+        <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-semibold text-white">Paystack (online payments)</h2>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={settings.paystack_enabled}
+                onChange={(e) => update("paystack_enabled", e.target.checked)}
+              />
+              Enabled for members
+            </label>
+          </div>
+          <p className="mb-4 text-sm text-slate-400">
+            {settings.paystack_configured
+              ? "Paystack keys are configured on the API server. Members can pay dues online."
+              : "Add PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY to apps/api/.env to enable online payments."}
+          </p>
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={settings.manual_payment_enabled}
+              onChange={(e) => update("manual_payment_enabled", e.target.checked)}
+            />
+            Also show manual MoMo / bank instructions (fallback)
+          </label>
+        </section>
+
         <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 font-semibold text-white">
             <Settings className="h-5 w-5 text-brand-gold" />

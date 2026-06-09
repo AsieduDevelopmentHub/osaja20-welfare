@@ -13,10 +13,12 @@ PAYMENT_SETTINGS_KEY = "payment"
 DEFAULT_PAYMENT_SETTINGS: dict = {
     "monthly_amount": MONTHLY_DUES_AMOUNT,
     "currency": "GHS",
-    "title": "How to pay your dues",
+    "paystack_enabled": True,
+    "manual_payment_enabled": False,
+    "title": "Pay your dues",
     "note": (
-        "After payment, the executive team will record it in the system within 24–48 hours. "
-        "Contact the treasurer if your payment is not reflected."
+        "Pay securely with card or mobile money via Paystack. "
+        "Your dues are updated instantly after a successful payment."
     ),
     "momo_enabled": True,
     "momo_label": "Mobile Money (MTN)",
@@ -33,10 +35,16 @@ DEFAULT_PAYMENT_SETTINGS: dict = {
 
 
 async def get_payment_settings(db: AsyncSession) -> dict:
+    from v1.core.config import settings as app_settings
+
     row = await db.get(PlatformSetting, PAYMENT_SETTINGS_KEY)
     merged = dict(DEFAULT_PAYMENT_SETTINGS)
     if row and row.value:
         merged.update(row.value)
+    merged["paystack_configured"] = app_settings.paystack_enabled
+    merged["paystack_public_key"] = (
+        app_settings.paystack_public_key if app_settings.paystack_enabled else ""
+    )
     return merged
 
 

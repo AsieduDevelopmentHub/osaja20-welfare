@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { ContributionHistory } from "@/components/ContributionHistory";
 import { DuesStatusBanner } from "@/components/DuesStatusBanner";
 import { MonthDuesGrid } from "@/components/MonthDuesGrid";
+import { PayDuesPanel } from "@/components/PayDuesPanel";
 import { PaymentInstructions } from "@/components/PaymentInstructions";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +21,13 @@ export default function ContributionsPage() {
   const [loading, setLoading] = useState(true);
   const [dues, setDues] = useState<DuesSummary | null>(null);
   const [history, setHistory] = useState<Contribution[]>([]);
+  const [paymentConfig, setPaymentConfig] = useState({
+    paystackEnabled: true,
+    paystackConfigured: false,
+    manualEnabled: false,
+    title: env.payment.title,
+    note: env.payment.note,
+  });
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -30,10 +38,19 @@ export default function ContributionsPage() {
     Promise.all([
       apiFetch<Record<string, unknown>>("/members/me/dues"),
       apiFetch<Record<string, unknown>>("/members/me/contributions?page=1&page_size=20"),
+      apiFetch<Record<string, unknown>>("/settings/payment"),
     ])
-      .then(([duesRes, histRes]) => {
+      .then(([duesRes, histRes, payRes]) => {
         setDues(mapDuesSummary(duesRes.data as Record<string, unknown>));
         setHistory(mapContributionList(histRes.data as Record<string, unknown>).items);
+        const raw = (payRes.data || {}) as Record<string, unknown>;
+        setPaymentConfig({
+          paystackEnabled: Boolean(raw.paystack_enabled ?? true),
+          paystackConfigured: Boolean(raw.paystack_configured),
+          manualEnabled: Boolean(raw.manual_payment_enabled),
+          title: String(raw.title ?? env.payment.title),
+          note: String(raw.note ?? env.payment.note),
+        });
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load contributions"))
       .finally(() => setLoading(false));
@@ -67,7 +84,10 @@ export default function ContributionsPage() {
                   You have {dues.arrearsCount} unpaid month{dues.arrearsCount === 1 ? "" : "s"}
                 </p>
                 <p className="mt-1 text-sm text-red-700">
-                  Total outstanding: {formatCurrency(dues.totalOwed)}. Please pay via MoMo and share your receipt with the treasurer.
+                  Total outstanding: {formatCurrency(dues.totalOwed)}.
+                  {paymentConfig.paystackEnabled && paymentConfig.paystackConfigured
+                    ? " Pay online below to clear your arrears instantly."
+                    : " Please pay via the instructions below."}
                 </p>
               </div>
             </div>
@@ -75,7 +95,11 @@ export default function ContributionsPage() {
 
           <MonthDuesGrid periods={dues.periods} />
 
-          {member ? <PaymentInstructions membershipId={member.membershipId} /> : null}
+          <PayDuesPanel dues={dues} payment={paymentConfig} />
+
+          {member && paymentConfig.manualEnabled ? (
+            <PaymentInstructions membershipId={member.membershipId} />
+          ) : null}
 
           <ContributionHistory items={history} />
         </>

@@ -100,6 +100,10 @@ export interface AnnouncementItem {
 export interface PaymentSettings {
   monthly_amount: number;
   currency: string;
+  paystack_enabled: boolean;
+  manual_payment_enabled: boolean;
+  paystack_configured?: boolean;
+  paystack_public_key?: string;
   title: string;
   note: string;
   momo_enabled: boolean;

@@ -67,6 +67,14 @@ class Settings(BaseSettings):
     # Member portal base URL (password reset redirect fallback)
     member_portal_url: str = "http://localhost:3000"
 
+    # Paystack (online dues payments)
+    paystack_secret_key: str = ""
+    paystack_public_key: str = ""
+
+    @property
+    def paystack_enabled(self) -> bool:
+        return bool(self.paystack_secret_key.strip())
+
     @field_validator("database_url")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:

@@ -152,9 +152,20 @@ class PushKeys(BaseModel):
     auth: str
 
 
+class PaymentPeriod(BaseModel):
+    year: int = Field(ge=2020, le=2100)
+    month: int = Field(ge=1, le=12)
+
+
+class PaymentInitialize(BaseModel):
+    periods: list[PaymentPeriod] = Field(min_length=1, max_length=24)
+
+
 class PaymentSettingsUpdate(BaseModel):
     monthly_amount: float | None = Field(default=None, gt=0)
     currency: str | None = None
+    paystack_enabled: bool | None = None
+    manual_payment_enabled: bool | None = None
     title: str | None = None
     note: str | None = None
     momo_enabled: bool | None = None

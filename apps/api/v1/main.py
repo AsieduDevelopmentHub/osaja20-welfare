@@ -20,6 +20,7 @@ from v1.modules.activity.router import router as activity_router
 from v1.modules.dashboard.router import router as dashboard_router
 from v1.modules.members.router import router as members_router
 from v1.modules.notifications.router import router as notifications_router
+from v1.modules.payments.router import router as payments_router
 from v1.modules.push.router import router as push_router
 from v1.modules.settings.router import router as settings_router
 from v1.modules.uploads.router import router as uploads_router
@@ -87,6 +88,7 @@ app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(members_router, prefix=API_PREFIX)
 app.include_router(welfare_router, prefix=API_PREFIX)
 app.include_router(contributions_router, prefix=API_PREFIX)
+app.include_router(payments_router, prefix=API_PREFIX)
 app.include_router(voting_router, prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
 app.include_router(notifications_router, prefix=API_PREFIX)
