@@ -2,6 +2,7 @@
 /** Mirrors the pip-audit step in .github/workflows/ci.yml */
 
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,8 +16,6 @@ const IGNORE = [
   "CVE-2025-62727",
   "CVE-2025-71176",
   "PYSEC-2025-185",
-  // python-jose 3.4.0 pins pyasn1<0.5; fixed pyasn1 needs a jose release
-  "CVE-2026-30922",
 ];
 
 function run(cmd, argv) {
@@ -24,6 +23,9 @@ function run(cmd, argv) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-const py = isWin ? "python" : "python3";
+const venvPy = isWin
+  ? path.join(root, "apps", "api", ".venv", "Scripts", "python.exe")
+  : path.join(root, "apps", "api", ".venv", "bin", "python");
+const py = fs.existsSync(venvPy) ? venvPy : isWin ? "python" : "python3";
 run(py, ["-m", "pip", "install", "pip-audit"]);
 run(py, ["-m", "pip_audit", "-r", requirements, ...IGNORE.flatMap((id) => ["--ignore-vuln", id])]);

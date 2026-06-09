@@ -80,5 +80,24 @@ class SupabaseStorageClient:
         object_path = path.lstrip("/")
         return f"{self.base_url}/storage/v1/object/public/{bucket}/{object_path}"
 
+    async def list_objects(self, bucket: str, *, prefix: str = "", limit: int = 1000) -> list[str]:
+        url = f"{self.base_url}/storage/v1/object/list/{bucket}"
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                url,
+                headers={**self._service_headers(), "Content-Type": "application/json"},
+                json={"prefix": prefix, "limit": limit, "offset": 0},
+            )
+        if response.status_code >= 400:
+            raise SupabaseStorageError(self._parse_error(response), response.status_code)
+        rows = response.json()
+        if not isinstance(rows, list):
+            return []
+        names: list[str] = []
+        for row in rows:
+            if isinstance(row, dict) and row.get("name"):
+                names.append(str(row["name"]))
+        return names
+
 
 supabase_storage = SupabaseStorageClient()

@@ -29,6 +29,18 @@ Share credentials securely (not over WhatsApp in plain text). Client should chan
 
 **Do not** run `seed_admin.py` in production — it is blocked when `DEBUG=false`.
 
+### Fresh start (remove test data)
+
+After testing, wipe all member data and keep only `admin@osaja.com`:
+
+```bash
+cd apps/api
+# DATABASE_URL must point at production Supabase
+python scripts/purge_database.py --confirm PURGE --email admin@osaja.com
+```
+
+This deletes contributions, votes, inquiries, notifications, etc., and removes other Supabase Auth users / storage avatars when configured. **Irreversible.**
+
 ## 3. Production settings verification
 
 ### API (Render)

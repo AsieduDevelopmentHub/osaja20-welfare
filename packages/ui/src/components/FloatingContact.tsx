@@ -2,7 +2,7 @@
 
 import { formatPhoneDisplay, whatsAppUrl } from "@osaja/utils";
 import { Headphones, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { InquiryChatPanel, type InquiryChatMessage } from "./InquiryChatPanel.js";
 
@@ -29,7 +29,48 @@ export type FloatingContactProps = {
   chatLoading?: boolean;
   onChatOpen?: () => void | Promise<void>;
   chatMinLength?: number;
+  /** Allow drag-to-reposition the support button (position is saved in localStorage) */
+  draggable?: boolean;
 };
+
+const FAB_POSITION_KEY = "osaja-contact-fab-position";
+const FAB_SIZE = 56;
+
+type FabPosition = { bottom: number; right: number };
+
+function defaultFabPosition(): FabPosition {
+  if (typeof window === "undefined") return { bottom: 76, right: 16 };
+  const safe = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue("--sat-bottom") || "0"
+  );
+  const mobileNav = window.innerWidth < 1024 ? 76 : 24;
+  return { bottom: mobileNav + safe, right: 16 };
+}
+
+function loadFabPosition(): FabPosition {
+  if (typeof window === "undefined") return defaultFabPosition();
+  try {
+    const raw = localStorage.getItem(FAB_POSITION_KEY);
+    if (!raw) return defaultFabPosition();
+    const parsed = JSON.parse(raw) as FabPosition;
+    if (typeof parsed.bottom === "number" && typeof parsed.right === "number") {
+      return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return defaultFabPosition();
+}
+
+function clampFabPosition(pos: FabPosition): FabPosition {
+  if (typeof window === "undefined") return pos;
+  const maxBottom = Math.max(8, window.innerHeight - FAB_SIZE - 8);
+  const maxRight = Math.max(8, window.innerWidth - FAB_SIZE - 8);
+  return {
+    bottom: Math.min(Math.max(8, pos.bottom), maxBottom),
+    right: Math.min(Math.max(8, pos.right), maxRight),
+  };
+}
 
 export function FloatingContact({
   title = "Contact us",
@@ -50,9 +91,21 @@ export function FloatingContact({
   chatLoading = false,
   onChatOpen,
   chatMinLength = 5,
+  draggable = true,
 }: FloatingContactProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [fabPos, setFabPos] = useState<FabPosition>(defaultFabPosition);
+  const dragRef = useRef({
+    active: false,
+    moved: false,
+    startX: 0,
+    startY: 0,
+    startBottom: 0,
+    startRight: 0,
+  });
+  const fabPosRef = useRef(fabPos);
+  fabPosRef.current = fabPos;
   const [legacyDraft, setLegacyDraft] = useState("");
   const [legacySending, setLegacySending] = useState(false);
   const [legacySent, setLegacySent] = useState(false);
@@ -71,7 +124,15 @@ export function FloatingContact({
 
   useEffect(() => {
     setMounted(true);
+    setFabPos(loadFabPosition());
   }, []);
+
+  useEffect(() => {
+    if (!draggable) return;
+    const onResize = () => setFabPos((pos) => clampFabPosition(pos));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [draggable]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +155,55 @@ export function FloatingContact({
   }, [open, hasChat, onChatOpen]);
 
   if (!visible) return null;
+
+  const saveFabPosition = useCallback((pos: FabPosition) => {
+    try {
+      localStorage.setItem(FAB_POSITION_KEY, JSON.stringify(pos));
+    } catch {
+      // ignore quota / private mode
+    }
+  }, []);
+
+  const onFabPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggable || e.button !== 0) return;
+    dragRef.current = {
+      active: true,
+      moved: false,
+      startX: e.clientX,
+      startY: e.clientY,
+      startBottom: fabPos.bottom,
+      startRight: fabPos.right,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onFabPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current.active) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragRef.current.moved = true;
+    const next = clampFabPosition({
+      bottom: dragRef.current.startBottom - dy,
+      right: dragRef.current.startRight - dx,
+    });
+    setFabPos(next);
+  };
+
+  const onFabPointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current.active) return;
+    const wasDrag = dragRef.current.moved;
+    dragRef.current.active = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (wasDrag) {
+      saveFabPosition(fabPosRef.current);
+      return;
+    }
+    if (draggable) {
+      setOpen((v) => !v);
+    }
+  };
 
   async function handleLegacySend() {
     if (!onSendMessage || legacyDraft.trim().length < 5) return;
@@ -122,7 +232,8 @@ export function FloatingContact({
       ) : null}
 
       <div
-        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-[100] flex flex-col items-end gap-3 lg:bottom-6"
+        className="fixed z-[100] flex flex-col items-end gap-3"
+        style={{ bottom: fabPos.bottom, right: fabPos.right }}
         role="complementary"
         aria-label="Contact support"
       >
@@ -272,15 +383,28 @@ export function FloatingContact({
 
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onPointerDown={onFabPointerDown}
+          onPointerMove={onFabPointerMove}
+          onPointerUp={onFabPointerUp}
+          onPointerCancel={onFabPointerUp}
+          onClick={draggable ? (e) => e.preventDefault() : () => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls={panelId}
-          className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg ring-2 transition hover:scale-105 focus:outline-none focus-visible:ring-4 ${
+          style={{ touchAction: draggable ? "none" : undefined }}
+          className={`flex h-14 w-14 cursor-grab items-center justify-center rounded-full shadow-lg ring-2 transition hover:scale-105 focus:outline-none focus-visible:ring-4 active:cursor-grabbing ${
             isDark
               ? "bg-brand-gold text-brand-navy-dark ring-brand-gold/30 focus-visible:ring-brand-gold/50"
               : "bg-brand-navy text-white ring-brand-navy/20 focus-visible:ring-brand-navy/40"
           }`}
-          aria-label={open ? "Hide contact details" : "Show contact details"}
+          aria-label={
+            draggable
+              ? open
+                ? "Hide contact details (drag to move)"
+                : "Show contact details (drag to move)"
+              : open
+                ? "Hide contact details"
+                : "Show contact details"
+          }
         >
           {open ? <X className="h-6 w-6" /> : <Headphones className="h-6 w-6" />}
         </button>

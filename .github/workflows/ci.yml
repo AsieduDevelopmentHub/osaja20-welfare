@@ -137,12 +137,4 @@ jobs:
         run: pnpm audit --audit-level moderate
 
       - name: pip audit
-        run: |
-          pip install pip-audit
-          pip-audit -r apps/api/requirements.txt \
-            --ignore-vuln PYSEC-2026-161 \
-            --ignore-vuln CVE-2025-54121 \
-            --ignore-vuln CVE-2025-62727 \
-            --ignore-vuln CVE-2025-71176 \
-            --ignore-vuln PYSEC-2025-185 \
-            --ignore-vuln CVE-2026-30922
+        run: node scripts/run-pip-audit.mjs

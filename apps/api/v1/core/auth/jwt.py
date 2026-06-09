@@ -2,7 +2,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from v1.core.config import settings
 
@@ -10,10 +11,6 @@ from v1.core.config import settings
 def _api_jwt_secret() -> str:
     """Secret used for API-issued member tokens."""
     return settings.jwt_secret
-
-
-def _jwt_secret() -> str:
-    return settings.supabase_jwt_secret or settings.jwt_secret
 
 
 def create_access_token(
@@ -45,7 +42,7 @@ def decode_token(token: str) -> dict[str, Any]:
         if secret and secret not in secrets:
             secrets.append(secret)
 
-    last_error: JWTError | None = None
+    last_error: PyJWTError | None = None
     for secret in secrets:
         try:
             return jwt.decode(
@@ -54,12 +51,12 @@ def decode_token(token: str) -> dict[str, Any]:
                 algorithms=[settings.jwt_algorithm],
                 options={"verify_aud": False},
             )
-        except JWTError as exc:
+        except PyJWTError as exc:
             last_error = exc
 
     if last_error:
         raise last_error
-    raise JWTError("No JWT secret configured")
+    raise PyJWTError("No JWT secret configured")
 
 
 def extract_member_id(payload: dict[str, Any]) -> UUID | None:
@@ -81,5 +78,5 @@ def extract_role(payload: dict[str, Any]) -> str:
 def safe_decode(token: str) -> dict[str, Any] | None:
     try:
         return decode_token(token)
-    except JWTError:
+    except PyJWTError:
         return None

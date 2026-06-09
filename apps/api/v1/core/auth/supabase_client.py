@@ -133,5 +133,32 @@ class SupabaseAuthClient:
             raise SupabaseAuthError(self._parse_error(response), response.status_code)
         return response.json()
 
+    async def admin_list_users(self, *, page: int = 1, per_page: int = 200) -> list[dict]:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{self.base_url}/auth/v1/admin/users",
+                headers=self._service_headers(),
+                params={"page": page, "per_page": per_page},
+            )
+        if response.status_code >= 400:
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
+        body = response.json()
+        if isinstance(body, dict):
+            users = body.get("users")
+            if isinstance(users, list):
+                return users
+        if isinstance(body, list):
+            return body
+        return []
+
+    async def admin_delete_user(self, user_id: str) -> None:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.delete(
+                f"{self.base_url}/auth/v1/admin/users/{user_id}",
+                headers=self._service_headers(),
+            )
+        if response.status_code >= 400 and response.status_code != 404:
+            raise SupabaseAuthError(self._parse_error(response), response.status_code)
+
 
 supabase_auth = SupabaseAuthClient()
