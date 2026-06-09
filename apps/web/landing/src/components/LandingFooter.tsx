@@ -45,16 +45,11 @@ export function LandingFooter() {
           </div>
 
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-brand-gold">Portals</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-brand-gold">Members</p>
             <ul className="mt-4 space-y-2 text-sm">
               <li>
                 <Link href={portalUrls.member} className="transition hover:text-white">
                   Member portal
-                </Link>
-              </li>
-              <li>
-                <Link href={portalUrls.admin} className="transition hover:text-white">
-                  Admin portal
                 </Link>
               </li>
             </ul>

@@ -7,5 +7,4 @@ function trimUrl(value: string | undefined, fallback: string): string {
 
 export const portalUrls = {
   member: trimUrl(process.env.NEXT_PUBLIC_MEMBER_URL, LANDING_PORTAL_URLS.member),
-  admin: trimUrl(process.env.NEXT_PUBLIC_ADMIN_URL, LANDING_PORTAL_URLS.admin),
 };

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.auth.supabase_client import SupabaseAuthError
+from v1.core.config import settings
 from v1.core.models import Member, MemberStatus
 from v1.core.services import platform_service
 
@@ -67,7 +68,6 @@ async def link_or_create_member_from_supabase(
     if existing:
         if not existing.email_verified and user.get("email_confirmed_at"):
             existing.email_verified = True
-            existing.status = MemberStatus.ACTIVE.value
         await db.flush()
         return existing
 
@@ -91,7 +91,8 @@ async def link_or_create_member_from_supabase(
         auth_user_id=UUID(auth_user_id),
         email_verified=bool(user.get("email_confirmed_at")),
     )
-    member.status = MemberStatus.ACTIVE.value
+    if settings.registration_auto_approve:
+        member.status = MemberStatus.ACTIVE.value
     await db.flush()
     return member
 

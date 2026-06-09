@@ -66,15 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(data),
     });
 
+    const requiresApproval = Boolean(res.data?.requires_approval);
     const token = res.data?.token?.access_token;
-    if (token) {
+    if (token && !requiresApproval) {
       setToken(token);
       setMember(res.data?.member ? mapMember(res.data.member) : null);
     }
 
-    const requiresApproval = Boolean(res.data?.requires_approval);
     return {
-      requiresEmailConfirmation: Boolean(res.data?.requires_email_confirmation ?? (!token && !requiresApproval)),
+      requiresEmailConfirmation: Boolean(
+        res.data?.requires_email_confirmation ?? (!token && !requiresApproval)
+      ),
       requiresApproval,
       message: res.message,
     };

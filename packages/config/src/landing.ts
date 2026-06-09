@@ -93,9 +93,8 @@ export const LANDING_COPY = {
   ] satisfies LandingPillar[],
   join: {
     title: "Ready to connect?",
-    body: "Active members sign in to the member portal for contributions, welfare requests, voting, announcements, and more. Executives use the admin portal for operations.",
+    body: "Active members sign in to the member portal for contributions, welfare requests, voting, announcements, and more.",
     memberLabel: "Member sign in",
-    adminLabel: "Executive admin",
   },
   gallery: {
     title: "Gallery",

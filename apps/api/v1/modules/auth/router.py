@@ -132,14 +132,22 @@ async def register(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
-        if sb.get("access_token"):
+        pending = member.status == MemberStatus.PENDING.value
+        token = None
+        if sb.get("access_token") and member.status == MemberStatus.ACTIVE.value:
             token = member_token_response(member)
+
+        if pending:
+            message = (
+                f"Registration received — an executive will approve your account shortly. "
+                f"Your member ID is {member.membership_id} and username is {member.username}."
+            )
+        elif token:
             message = (
                 f"Registration successful. Your member ID is {member.membership_id} "
                 f"and username is {member.username}."
             )
         else:
-            token = None
             message = (
                 f"Account created — confirm your email, then sign in. "
                 f"Your member ID is {member.membership_id} and username is {member.username}."
@@ -150,7 +158,8 @@ async def register(
             data={
                 "member": member_to_dict(member),
                 "token": token,
-                "requires_email_confirmation": token is None,
+                "requires_email_confirmation": not token and not pending and not sb.get("access_token"),
+                "requires_approval": pending,
             },
             message=message,
         )

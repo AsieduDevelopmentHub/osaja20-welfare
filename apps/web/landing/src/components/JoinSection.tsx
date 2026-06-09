@@ -1,5 +1,5 @@
 import { BRAND_COPY, LANDING_COPY } from "@osaja/config";
-import { ArrowRight, Shield } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { portalUrls } from "@/lib/env";
 
@@ -15,14 +15,10 @@ export function JoinSection() {
             <h2 className="section-title">{join.title}</h2>
             <p className="mt-4 text-slate-600">{join.body}</p>
 
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <div className="mt-8 flex justify-center">
               <Link href={portalUrls.member} className="btn-primary">
                 {join.memberLabel}
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href={portalUrls.admin} className="btn-outline">
-                <Shield className="h-4 w-4" />
-                {join.adminLabel}
               </Link>
             </div>
           </div>
