@@ -34,6 +34,7 @@ export default function DashboardPage() {
     approved: "Approved",
     allocated: "Support allocated",
     resolved: "Resolved",
+    archived: "Archived",
   };
 
   const loadDashboard = () => {

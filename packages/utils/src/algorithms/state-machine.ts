@@ -9,9 +9,10 @@ type TransitionMap = Record<WelfareStatus, WelfareStatus[]>;
 
 const WELFARE_TRANSITIONS: TransitionMap = {
   pending: ["approved"],
-  approved: ["allocated"],
-  allocated: ["resolved"],
-  resolved: [],
+  approved: ["allocated", "archived"],
+  allocated: ["resolved", "archived"],
+  resolved: ["archived"],
+  archived: [],
 };
 
 export class WelfareStateMachine {

@@ -14,6 +14,7 @@ from v1.core.schemas import ApiResponse
 from v1.core.jobs.worker import run_job_worker
 from v1.core.startup import validate_settings
 from v1.modules.auth.router import router as auth_router
+from v1.modules.birthdays.router import router as birthdays_router
 from v1.modules.contributions.router import router as contributions_router
 from v1.modules.announcements.router import router as announcements_router
 from v1.modules.activity.router import router as activity_router
@@ -91,6 +92,7 @@ app.include_router(contributions_router, prefix=API_PREFIX)
 app.include_router(payments_router, prefix=API_PREFIX)
 app.include_router(voting_router, prefix=API_PREFIX)
 app.include_router(dashboard_router, prefix=API_PREFIX)
+app.include_router(birthdays_router, prefix=API_PREFIX)
 app.include_router(notifications_router, prefix=API_PREFIX)
 app.include_router(announcements_router, prefix=API_PREFIX)
 app.include_router(activity_router, prefix=API_PREFIX)

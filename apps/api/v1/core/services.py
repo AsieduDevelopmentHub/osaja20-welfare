@@ -1,6 +1,6 @@
 """Database-backed service layer with in-memory algorithm indexes."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -26,6 +26,7 @@ from v1.core.algorithms import (
 from v1.core.models import (
     ActivityLog,
     Announcement,
+    BirthdayWish,
     Contribution,
     Member,
     MemberStatus,
@@ -465,6 +466,27 @@ class PlatformService:
             entity_type="welfare_case",
             entity_id=case.id,
             metadata={"from": old_status, "to": new_status},
+        )
+        return welfare_case_to_dict(case)
+
+    async def unarchive_welfare_case(
+        self, db: AsyncSession, case_id: UUID, actor_id: UUID | None = None
+    ) -> dict:
+        result = await db.execute(select(WelfareCase).where(WelfareCase.id == case_id))
+        case = result.scalar_one_or_none()
+        if not case:
+            raise ValueError("Case not found")
+        if case.status != WelfareStatus.ARCHIVED.value:
+            raise ValueError("Case is not archived")
+        case.status = WelfareStatus.RESOLVED.value
+        case.updated_at = datetime.now(timezone.utc)
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="welfare_unarchived",
+            entity_type="welfare_case",
+            entity_id=case.id,
         )
         return welfare_case_to_dict(case)
 
@@ -910,6 +932,26 @@ class PlatformService:
         )
         return vote_to_dict(vote)
 
+    async def unarchive_vote(self, db: AsyncSession, vote_id: UUID, actor_id: UUID | None = None) -> dict:
+        result = await db.execute(
+            select(Vote).options(selectinload(Vote.options)).where(Vote.id == vote_id)
+        )
+        vote = result.scalar_one_or_none()
+        if not vote:
+            raise ValueError("Vote not found")
+        if vote.status != VoteLifecycle.ARCHIVED.value:
+            raise ValueError("Vote is not archived")
+        vote.status = VoteLifecycle.CLOSED.value
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="vote_unarchived",
+            entity_type="vote",
+            entity_id=vote.id,
+        )
+        return vote_to_dict(vote)
+
     async def unpublish_stale_vote_results(self, db: AsyncSession, max_age_days: int = 7) -> int:
         cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
         result = await db.execute(
@@ -1171,7 +1213,207 @@ class PlatformService:
         if not registry._loaded:
             await registry.rebuild(db)
         birthdays = registry.birthday_index.get_birthdays_for_month(month)
-        return [{"member_id": b.member_id, "full_name": b.full_name, "day": b.day} for b in birthdays]
+        if not birthdays:
+            return []
+
+        member_ids = [UUID(b.member_id) for b in birthdays]
+        rows = await db.execute(
+            select(Member.id, Member.avatar_url, Member.membership_id).where(Member.id.in_(member_ids))
+        )
+        meta = {str(r.id): {"avatar_url": r.avatar_url, "membership_id": r.membership_id} for r in rows.all()}
+
+        return [
+            {
+                "member_id": b.member_id,
+                "full_name": b.full_name,
+                "day": b.day,
+                "avatar_url": meta.get(b.member_id, {}).get("avatar_url"),
+                "membership_id": meta.get(b.member_id, {}).get("membership_id"),
+            }
+            for b in birthdays
+        ]
+
+    BIRTHDAY_WISH_TTL_DAYS = 7
+
+    def _member_birthday_on(self, member: Member, on: date) -> bool:
+        dob = member.date_of_birth
+        return dob.month == on.month and dob.day == on.day
+
+    def _wish_expires_at(self, birthday_on: date) -> datetime:
+        end = datetime.combine(birthday_on, time.max, tzinfo=timezone.utc)
+        return end + timedelta(days=self.BIRTHDAY_WISH_TTL_DAYS)
+
+    async def _author_brief(self, db: AsyncSession, member_id: UUID) -> dict:
+        member = await self.get_member(db, member_id)
+        if not member:
+            return {"id": str(member_id), "full_name": "Member", "avatar_url": None}
+        return {
+            "id": str(member.id),
+            "full_name": member.full_name,
+            "avatar_url": member.avatar_url,
+        }
+
+    def _wish_to_dict(self, wish: BirthdayWish, author: dict, replies: list[dict] | None = None) -> dict:
+        return {
+            "id": str(wish.id),
+            "message": wish.message,
+            "birthday_on": wish.birthday_on.isoformat(),
+            "expires_at": wish.expires_at.isoformat(),
+            "created_at": wish.created_at.isoformat(),
+            "author": author,
+            "replies": replies or [],
+        }
+
+    async def list_birthday_wishes(
+        self,
+        db: AsyncSession,
+        *,
+        recipient_id: UUID,
+        birthday_on: date | None = None,
+    ) -> dict:
+        now = datetime.now(timezone.utc)
+        target = birthday_on or date.today()
+
+        top_level = (
+            await db.execute(
+                select(BirthdayWish)
+                .where(
+                    BirthdayWish.recipient_id == recipient_id,
+                    BirthdayWish.parent_id.is_(None),
+                    BirthdayWish.birthday_on == target,
+                    BirthdayWish.expires_at > now,
+                )
+                .order_by(BirthdayWish.created_at.asc())
+            )
+        ).scalars().all()
+
+        if not top_level:
+            return {"items": [], "birthday_on": target.isoformat(), "can_post": False}
+
+        wish_ids = [w.id for w in top_level]
+        replies = (
+            await db.execute(
+                select(BirthdayWish)
+                .where(
+                    BirthdayWish.parent_id.in_(wish_ids),
+                    BirthdayWish.expires_at > now,
+                )
+                .order_by(BirthdayWish.created_at.asc())
+            )
+        ).scalars().all()
+
+        replies_by_parent: dict[UUID, list[BirthdayWish]] = {}
+        for r in replies:
+            replies_by_parent.setdefault(r.parent_id, []).append(r)
+
+        author_cache: dict[str, dict] = {}
+        items: list[dict] = []
+        for wish in top_level:
+            aid = str(wish.author_id)
+            if aid not in author_cache:
+                author_cache[aid] = await self._author_brief(db, wish.author_id)
+            reply_items: list[dict] = []
+            for rep in replies_by_parent.get(wish.id, []):
+                rid = str(rep.author_id)
+                if rid not in author_cache:
+                    author_cache[rid] = await self._author_brief(db, rep.author_id)
+                reply_items.append(self._wish_to_dict(rep, author_cache[rid]))
+            items.append(self._wish_to_dict(wish, author_cache[aid], reply_items))
+
+        recipient = await self.get_member(db, recipient_id)
+        can_post = bool(recipient and self._member_birthday_on(recipient, date.today()))
+
+        return {
+            "items": items,
+            "birthday_on": target.isoformat(),
+            "can_post": can_post,
+            "expires_note": f"Wishes disappear {self.BIRTHDAY_WISH_TTL_DAYS} days after the birthday.",
+        }
+
+    async def create_birthday_wish(
+        self,
+        db: AsyncSession,
+        *,
+        author_id: UUID,
+        recipient_id: UUID,
+        message: str,
+    ) -> dict:
+        recipient = await self.get_member(db, recipient_id)
+        if not recipient:
+            raise ValueError("Member not found")
+        if recipient.status != MemberStatus.ACTIVE.value:
+            raise ValueError("Cannot send wishes to this member")
+        if author_id == recipient_id:
+            raise ValueError("You cannot send a wish to yourself")
+
+        today = date.today()
+        if not self._member_birthday_on(recipient, today):
+            raise ValueError("Wishes can only be sent on the member's birthday")
+
+        author = await self.get_member(db, author_id)
+        if not author:
+            raise ValueError("Author not found")
+
+        wish = BirthdayWish(
+            recipient_id=recipient_id,
+            author_id=author_id,
+            message=message.strip(),
+            birthday_on=today,
+            expires_at=self._wish_expires_at(today),
+        )
+        db.add(wish)
+        await db.flush()
+
+        await self.create_notification(
+            db,
+            member_id=recipient_id,
+            type="celebration",
+            title="New birthday wish!",
+            message=f"{author.full_name} sent you a birthday wish.",
+            actor_id=author_id,
+        )
+
+        return self._wish_to_dict(wish, await self._author_brief(db, author_id))
+
+    async def reply_birthday_wish(
+        self,
+        db: AsyncSession,
+        *,
+        recipient_id: UUID,
+        parent_id: UUID,
+        message: str,
+    ) -> dict:
+        parent = await db.get(BirthdayWish, parent_id)
+        if not parent or parent.parent_id is not None:
+            raise ValueError("Wish not found")
+        if parent.recipient_id != recipient_id:
+            raise ValueError("Only the birthday member can reply")
+        now = datetime.now(timezone.utc)
+        if parent.expires_at <= now:
+            raise ValueError("This wish thread has expired")
+
+        reply = BirthdayWish(
+            recipient_id=recipient_id,
+            author_id=recipient_id,
+            parent_id=parent_id,
+            message=message.strip(),
+            birthday_on=parent.birthday_on,
+            expires_at=parent.expires_at,
+        )
+        db.add(reply)
+        await db.flush()
+
+        if parent.author_id != recipient_id:
+            await self.create_notification(
+                db,
+                member_id=parent.author_id,
+                type="celebration",
+                title="Birthday wish reply",
+                message=f"Your wish received a reply from the birthday celebrant.",
+                actor_id=recipient_id,
+            )
+
+        return self._wish_to_dict(reply, await self._author_brief(db, recipient_id))
 
     async def create_notification(
         self,

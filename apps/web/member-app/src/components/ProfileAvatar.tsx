@@ -8,13 +8,14 @@ import { resolveAvatarUrl } from "@/lib/profile";
 
 interface ProfileAvatarProps {
   member: Pick<Member, "fullName" | "avatarUrl">;
-  size?: "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl";
   editable?: boolean;
   uploading?: boolean;
   onUpload?: (file: File) => void;
 }
 
 const SIZES = {
+  sm: { box: "h-11 w-11", text: "text-base", icon: "h-4 w-4", cam: "h-6 w-6" },
   md: { box: "h-16 w-16", text: "text-xl", icon: "h-5 w-5", cam: "h-7 w-7" },
   lg: { box: "h-24 w-24", text: "text-3xl", icon: "h-8 w-8", cam: "h-8 w-8" },
   xl: { box: "h-28 w-28", text: "text-4xl", icon: "h-10 w-10", cam: "h-9 w-9" },
@@ -39,7 +40,7 @@ export function ProfileAvatar({ member, size = "lg", editable = false, uploading
   return (
     <div className="relative inline-flex shrink-0">
       <div
-        className={`${s.box} relative overflow-hidden rounded-2xl bg-brand-navy shadow-md ring-2 ring-white`}
+        className={`${s.box} relative overflow-hidden rounded-full bg-brand-navy shadow-md ring-2 ring-white`}
       >
         {src ? (
           <Image src={src} alt={member.fullName} fill className="object-cover" unoptimized />

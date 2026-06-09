@@ -141,5 +141,6 @@ export const VOTE_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   open: "Open",
   closed: "Closed",
+  result_published: "Results published",
   archived: "Archived",
 };

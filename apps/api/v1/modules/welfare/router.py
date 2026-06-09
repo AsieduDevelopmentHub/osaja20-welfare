@@ -72,6 +72,19 @@ async def transition_case(
     return ApiResponse(success=True, data=case, message="Status updated")
 
 
+@router.patch("/cases/{case_id}/unarchive", response_model=ApiResponse)
+async def unarchive_case(
+    case_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        case = await platform_service.unarchive_welfare_case(db, case_id, actor_id=executive.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ApiResponse(success=True, data=case, message="Case restored from archive")
+
+
 @router.get("/cases/{case_id}", response_model=ApiResponse)
 async def get_case(
     case_id: UUID,

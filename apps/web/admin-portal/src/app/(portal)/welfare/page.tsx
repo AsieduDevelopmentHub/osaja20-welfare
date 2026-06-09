@@ -43,6 +43,22 @@ export default function WelfarePage() {
     load();
   }, [load]);
 
+  const unarchive = async (caseId: string) => {
+    setBusy(true);
+    setSuccess("");
+    setError("");
+    try {
+      await apiFetch(`/welfare/cases/${caseId}/unarchive`, { method: "PATCH" });
+      setSuccess("Case restored from archive.");
+      setSelected(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unarchive failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const transition = async (caseId: string, target: string) => {
     setBusy(true);
     setSuccess("");
@@ -201,9 +217,9 @@ export default function WelfarePage() {
                   </button>
                 </div>
               </div>
-              {selected?.id === c.id && c.available_transitions?.length ? (
+              {selected?.id === c.id ? (
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-4">
-                  {c.available_transitions.map((t) => (
+                  {c.available_transitions?.map((t) => (
                     <button
                       key={t}
                       type="button"
@@ -214,6 +230,16 @@ export default function WelfarePage() {
                       → {WELFARE_STATUS_LABELS[t] ?? t}
                     </button>
                   ))}
+                  {c.status === "archived" ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => unarchive(c.id)}
+                      className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-300"
+                    >
+                      Unarchive
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </li>

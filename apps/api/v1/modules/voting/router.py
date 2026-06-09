@@ -101,6 +101,19 @@ async def archive_vote(
     return ApiResponse(success=True, data=vote, message="Vote archived and hidden from members")
 
 
+@router.patch("/{vote_id}/unarchive", response_model=ApiResponse)
+async def unarchive_vote(
+    vote_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        vote = await platform_service.unarchive_vote(db, vote_id, actor_id=executive.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ApiResponse(success=True, data=vote, message="Vote restored from archive")
+
+
 @router.patch("/{vote_id}/unpublish-results", response_model=ApiResponse)
 async def unpublish_vote_results(
     vote_id: UUID,

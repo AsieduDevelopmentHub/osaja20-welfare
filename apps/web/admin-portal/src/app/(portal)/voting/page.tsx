@@ -12,6 +12,7 @@ import { VOTE_STATUS_LABELS } from "@/lib/types";
 
 export default function VotingPage() {
   const [votes, setVotes] = useState<VoteItem[]>([]);
+  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,14 +30,15 @@ export default function VotingPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch<PaginatedResponse<VoteItem>>("/voting/manage?page=1&page_size=50");
+      const q = statusFilter ? `&status=${encodeURIComponent(statusFilter)}` : "";
+      const res = await apiFetch<PaginatedResponse<VoteItem>>(`/voting/manage?page=1&page_size=50${q}`);
       setVotes(res.data?.items ?? []);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to load votes");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     load();
@@ -110,6 +112,19 @@ export default function VotingPage() {
     }
   };
 
+  const unarchiveVote = async (id: string) => {
+    setBusy(true);
+    try {
+      await apiFetch(`/voting/${id}/unarchive`, { method: "PATCH" });
+      setMessage("Vote restored from archive.");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to unarchive vote");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const archiveVote = async (id: string) => {
     setBusy(true);
     try {
@@ -166,6 +181,21 @@ export default function VotingPage() {
       />
 
       {message ? <p className="rounded-xl bg-brand-gold/10 px-4 py-3 text-sm text-brand-gold">{message}</p> : null}
+
+      <div className="flex flex-wrap gap-2">
+        {["", "draft", "open", "closed", "result_published", "archived"].map((s) => (
+          <button
+            key={s || "all"}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              statusFilter === s ? "bg-brand-gold text-brand-navy-dark" : "bg-white/10 text-slate-300"
+            }`}
+          >
+            {s ? VOTE_STATUS_LABELS[s] ?? s : "Active"}
+          </button>
+        ))}
+      </div>
 
       {showForm ? (
         <form onSubmit={createVote} className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
@@ -338,6 +368,16 @@ export default function VotingPage() {
                     className="rounded-lg bg-slate-600/30 px-3 py-1.5 text-xs font-medium text-slate-300"
                   >
                     Archive
+                  </button>
+                ) : null}
+                {v.status === "archived" ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => unarchiveVote(v.id)}
+                    className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-300"
+                  >
+                    Unarchive
                   </button>
                 ) : null}
                 <button

@@ -181,6 +181,15 @@ class PaymentSettingsUpdate(BaseModel):
     bank_account_number: str | None = None
 
 
+class BirthdayWishCreate(BaseModel):
+    recipient_id: str
+    message: str = Field(min_length=1, max_length=500)
+
+
+class BirthdayWishReply(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+
+
 class PushSubscribe(BaseModel):
     endpoint: str
     keys: PushKeys

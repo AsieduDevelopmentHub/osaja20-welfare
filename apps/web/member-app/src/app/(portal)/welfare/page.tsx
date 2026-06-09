@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<WelfareStatus, string> = {
   approved: "Approved",
   allocated: "Support allocated",
   resolved: "Resolved",
+  archived: "Archived",
 };
 
 const STATUS_COLORS: Record<WelfareStatus, string> = {
@@ -22,6 +23,7 @@ const STATUS_COLORS: Record<WelfareStatus, string> = {
   approved: "bg-blue-50 text-blue-800 ring-blue-200",
   allocated: "bg-purple-50 text-purple-800 ring-purple-200",
   resolved: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  archived: "bg-slate-100 text-slate-600 ring-slate-200",
 };
 
 function mapCase(raw: Record<string, unknown>): WelfareCase {
