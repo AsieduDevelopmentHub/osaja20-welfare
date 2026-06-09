@@ -1,9 +1,10 @@
 "use client";
 
 import { formatPhoneDisplay, whatsAppUrl } from "@osaja/utils";
-import { Headphones, Loader2, Mail, MessageCircle, Phone, Send, X } from "lucide-react";
+import { Headphones, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { InquiryChatPanel, type InquiryChatMessage } from "./InquiryChatPanel.js";
 
 export type FloatingContactProps = {
   title?: string;
@@ -16,8 +17,18 @@ export type FloatingContactProps = {
   variant?: "light" | "dark";
   /** Show the FAB even when no phone/email/WhatsApp is configured */
   alwaysShow?: boolean;
-  /** In-app message to executives (member portal) */
+  /** @deprecated Use chat props for threaded conversations */
   onSendMessage?: (message: string) => Promise<void>;
+  /** Threaded inquiry chat */
+  chatMessages?: InquiryChatMessage[];
+  chatStatus?: string;
+  chatDraft?: string;
+  onChatDraftChange?: (value: string) => void;
+  onChatSend?: () => void | Promise<void>;
+  chatSending?: boolean;
+  chatLoading?: boolean;
+  onChatOpen?: () => void | Promise<void>;
+  chatMinLength?: number;
 };
 
 export function FloatingContact({
@@ -30,21 +41,31 @@ export function FloatingContact({
   variant = "light",
   alwaysShow = false,
   onSendMessage,
+  chatMessages,
+  chatStatus,
+  chatDraft = "",
+  onChatDraftChange,
+  onChatSend,
+  chatSending = false,
+  chatLoading = false,
+  onChatOpen,
+  chatMinLength = 5,
 }: FloatingContactProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [legacyDraft, setLegacyDraft] = useState("");
+  const [legacySending, setLegacySending] = useState(false);
+  const [legacySent, setLegacySent] = useState(false);
+  const [legacySendError, setLegacySendError] = useState<string | null>(null);
   const panelId = useId();
   const isDark = variant === "dark";
 
+  const hasChat = Boolean(onChatSend && onChatDraftChange);
   const hasWhatsApp = whatsappNumbers.length > 0;
   const hasEmail = Boolean(email?.trim());
   const hasPhone = Boolean(phone?.trim());
   const hasDirectContact = hasWhatsApp || hasEmail || hasPhone;
-  const visible = hasDirectContact || alwaysShow || Boolean(onSendMessage);
+  const visible = hasDirectContact || alwaysShow || hasChat || Boolean(onSendMessage);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -63,25 +84,29 @@ export function FloatingContact({
 
   useEffect(() => {
     if (!open) {
-      setSendError(null);
-      setSent(false);
+      setLegacySendError(null);
+      setLegacySent(false);
+      return;
     }
-  }, [open]);
+    if (hasChat) {
+      void onChatOpen?.();
+    }
+  }, [open, hasChat, onChatOpen]);
 
   if (!visible) return null;
 
-  async function handleSend() {
-    if (!onSendMessage || draft.trim().length < 5) return;
-    setSending(true);
-    setSendError(null);
+  async function handleLegacySend() {
+    if (!onSendMessage || legacyDraft.trim().length < 5) return;
+    setLegacySending(true);
+    setLegacySendError(null);
     try {
-      await onSendMessage(draft.trim());
-      setSent(true);
-      setDraft("");
+      await onSendMessage(legacyDraft.trim());
+      setLegacySent(true);
+      setLegacyDraft("");
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : "Could not send message");
+      setLegacySendError(err instanceof Error ? err.message : "Could not send message");
     } finally {
-      setSending(false);
+      setLegacySending(false);
     }
   }
 
@@ -104,7 +129,7 @@ export function FloatingContact({
         {open ? (
           <div
             id={panelId}
-            className={`w-[min(100vw-2rem,20rem)] rounded-2xl border p-4 shadow-xl ${
+            className={`w-[min(100vw-2rem,22rem)] rounded-2xl border p-4 shadow-xl ${
               isDark
                 ? "border-white/10 bg-brand-navy-dark text-white"
                 : "border-brand-navy/10 bg-white text-brand-navy"
@@ -137,7 +162,6 @@ export function FloatingContact({
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 rounded-xl bg-[#25D366] px-3 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe57]"
                     >
-                      <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
                       WhatsApp {formatPhoneDisplay(num)}
                     </a>
                   </li>
@@ -150,7 +174,6 @@ export function FloatingContact({
                         isDark ? "bg-white/10 hover:bg-white/15" : "bg-brand-navy/5 hover:bg-brand-navy/10"
                       }`}
                     >
-                      <Phone className="h-4 w-4 shrink-0 text-brand-gold" aria-hidden />
                       {formatPhoneDisplay(phone!)}
                     </a>
                   </li>
@@ -163,7 +186,6 @@ export function FloatingContact({
                         isDark ? "bg-white/10 hover:bg-white/15" : "bg-brand-navy/5 hover:bg-brand-navy/10"
                       }`}
                     >
-                      <Mail className="h-4 w-4 shrink-0 text-brand-gold" aria-hidden />
                       {email}
                     </a>
                   </li>
@@ -171,20 +193,53 @@ export function FloatingContact({
               </ul>
             ) : null}
 
-            {onSendMessage ? (
+            {hasChat ? (
               <div className={hasDirectContact ? "mt-4 border-t border-black/5 pt-4" : "mt-4"}>
-                <p className={`text-xs font-semibold uppercase tracking-wide ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  Chat with the admin team
+                </p>
+                {chatLoading ? (
+                  <div className="mt-3 flex justify-center py-6">
+                    <Loader2 className={`h-6 w-6 animate-spin ${isDark ? "text-slate-400" : "text-slate-400"}`} />
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <InquiryChatPanel
+                      messages={chatMessages ?? []}
+                      draft={chatDraft}
+                      onDraftChange={onChatDraftChange!}
+                      onSend={() => void onChatSend?.()}
+                      sending={chatSending}
+                      variant={variant}
+                      status={chatStatus}
+                      minLength={chatMinLength}
+                      placeholder="Type your question or follow-up…"
+                    />
+                  </div>
+                )}
+              </div>
+            ) : onSendMessage ? (
+              <div className={hasDirectContact ? "mt-4 border-t border-black/5 pt-4" : "mt-4"}>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
                   Ask the admin team
                 </p>
-                {sent ? (
+                {legacySent ? (
                   <p className={`mt-2 text-sm ${isDark ? "text-emerald-300" : "text-emerald-700"}`}>
                     Message sent. An executive will get back to you soon.
                   </p>
                 ) : (
                   <>
                     <textarea
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
+                      value={legacyDraft}
+                      onChange={(e) => setLegacyDraft(e.target.value)}
                       rows={3}
                       maxLength={2000}
                       placeholder="Type your question or request…"
@@ -194,20 +249,18 @@ export function FloatingContact({
                           : "border-brand-navy/15 bg-white text-brand-navy placeholder:text-slate-400"
                       }`}
                     />
-                    {sendError ? (
-                      <p className="mt-1 text-xs text-red-500">{sendError}</p>
-                    ) : null}
+                    {legacySendError ? <p className="mt-1 text-xs text-red-500">{legacySendError}</p> : null}
                     <button
                       type="button"
-                      disabled={sending || draft.trim().length < 5}
-                      onClick={handleSend}
+                      disabled={legacySending || legacyDraft.trim().length < 5}
+                      onClick={handleLegacySend}
                       className={`mt-2 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold disabled:opacity-50 ${
                         isDark
                           ? "bg-brand-gold text-brand-navy-dark hover:bg-brand-gold/90"
                           : "bg-brand-navy text-white hover:bg-brand-navy/90"
                       }`}
                     >
-                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      {legacySending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                       Send message
                     </button>
                   </>

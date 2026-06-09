@@ -48,18 +48,27 @@ def validate_settings() -> None:
             "MEMBER_PORTAL_URL must be the live member portal URL (Paystack + password reset)"
         )
 
-    if all(_looks_local(origin) for origin in settings.cors_origins_list):
+    origins = settings.cors_origins_list
+    if not origins:
+        errors.append(
+            "CORS_ORIGINS must list your member and admin portal URLs when DEBUG=false "
+            "(comma-separated HTTPS origins)"
+        )
+    elif all(_looks_local(origin) for origin in origins):
+        errors.append(
+            "CORS_ORIGINS must include production HTTPS origins when DEBUG=false — "
+            "localhost-only is not allowed"
+        )
+
+    if settings.allow_tunnel_cors:
         warnings.append(
-            "CORS_ORIGINS only lists localhost — add production member/admin URLs if browsers call the API directly"
+            "ALLOW_TUNNEL_CORS=true — any *.trycloudflare.com origin can call the API; disable in production"
         )
 
     if settings.registration_auto_approve:
         warnings.append(
             "REGISTRATION_AUTO_APPROVE=true — new signups are active immediately; set false for executive approval"
         )
-
-    if settings.allow_tunnel_cors:
-        warnings.append("ALLOW_TUNNEL_CORS=true — set false in production unless using dev tunnels")
 
     if not settings.whatsapp_number.strip():
         warnings.append("WHATSAPP_NUMBER is empty — member contact FAB will rely on web env vars only")

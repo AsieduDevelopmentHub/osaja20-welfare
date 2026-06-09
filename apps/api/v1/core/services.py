@@ -33,6 +33,7 @@ from v1.core.models import (
     Notification,
     PushSubscription,
     SupportInquiry,
+    SupportInquiryMessage,
     SupportInquiryStatus,
     UserRole,
     Vote,
@@ -2076,8 +2077,29 @@ class PlatformService:
         )
         return True
 
-    def _support_inquiry_dict(self, inquiry: SupportInquiry, member: Member | None = None) -> dict:
+    def _is_executive(self, member: Member) -> bool:
+        return member.role in (UserRole.EXECUTIVE.value, UserRole.ADMINISTRATOR.value)
+
+    def _support_message_dict(self, message: SupportInquiryMessage, sender: Member | None) -> dict:
         return {
+            "id": str(message.id),
+            "inquiry_id": str(message.inquiry_id),
+            "sender_id": str(message.sender_id),
+            "sender_role": message.sender_role,
+            "sender_name": sender.full_name if sender else None,
+            "body": message.body,
+            "created_at": message.created_at.isoformat(),
+        }
+
+    def _support_inquiry_dict(
+        self,
+        inquiry: SupportInquiry,
+        member: Member | None = None,
+        *,
+        messages: list[dict] | None = None,
+        message_count: int | None = None,
+    ) -> dict:
+        data = {
             "id": str(inquiry.id),
             "member_id": str(inquiry.member_id),
             "member_name": member.full_name if member else None,
@@ -2088,7 +2110,68 @@ class PlatformService:
             "admin_reply": inquiry.admin_reply,
             "replied_at": inquiry.replied_at.isoformat() if inquiry.replied_at else None,
             "created_at": inquiry.created_at.isoformat(),
+            "updated_at": inquiry.updated_at.isoformat() if inquiry.updated_at else inquiry.created_at.isoformat(),
         }
+        if message_count is not None:
+            data["message_count"] = message_count
+        if messages is not None:
+            data["messages"] = messages
+        return data
+
+    async def _load_inquiry_messages(self, db: AsyncSession, inquiry_id: UUID) -> list[dict]:
+        result = await db.execute(
+            select(SupportInquiryMessage, Member)
+            .join(Member, SupportInquiryMessage.sender_id == Member.id)
+            .where(SupportInquiryMessage.inquiry_id == inquiry_id)
+            .order_by(SupportInquiryMessage.created_at.asc())
+        )
+        return [
+            self._support_message_dict(message, sender) for message, sender in result.all()
+        ]
+
+    async def _message_count(self, db: AsyncSession, inquiry_id: UUID) -> int:
+        count = await db.scalar(
+            select(func.count())
+            .select_from(SupportInquiryMessage)
+            .where(SupportInquiryMessage.inquiry_id == inquiry_id)
+        )
+        return int(count or 0)
+
+    async def _get_latest_inquiry_for_member(self, db: AsyncSession, member_id: UUID) -> SupportInquiry | None:
+        result = await db.execute(
+            select(SupportInquiry)
+            .where(SupportInquiry.member_id == member_id)
+            .order_by(SupportInquiry.updated_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def _append_inquiry_message(
+        self,
+        db: AsyncSession,
+        *,
+        inquiry: SupportInquiry,
+        sender: Member,
+        body: str,
+        sender_role: str,
+    ) -> SupportInquiryMessage:
+        now = datetime.now(timezone.utc)
+        trimmed = body.strip()
+        message = SupportInquiryMessage(
+            inquiry_id=inquiry.id,
+            sender_id=sender.id,
+            sender_role=sender_role,
+            body=trimmed,
+        )
+        db.add(message)
+        inquiry.message = trimmed
+        inquiry.updated_at = now
+        if sender_role == "executive":
+            inquiry.admin_reply = trimmed
+            inquiry.replied_by = sender.id
+            inquiry.replied_at = now
+        await db.flush()
+        return message
 
     async def submit_support_inquiry(
         self,
@@ -2098,17 +2181,32 @@ class PlatformService:
         message: str,
         subject: str | None = None,
     ) -> dict:
+        existing = await self._get_latest_inquiry_for_member(db, member.id)
+        if existing:
+            if existing.status == SupportInquiryStatus.RESOLVED.value:
+                existing.status = SupportInquiryStatus.OPEN.value
+            return await self.add_inquiry_message(
+                db,
+                inquiry_id=existing.id,
+                sender=member,
+                body=message,
+            )
+
         title = subject.strip() if subject and subject.strip() else "Member inquiry"
-        body = f"{member.full_name} ({member.membership_id}): {message.strip()}"
+        preview = message.strip()
+        body = f"{member.full_name} ({member.membership_id}): {preview}"
 
         inquiry = SupportInquiry(
             member_id=member.id,
             subject=title if subject and subject.strip() else None,
-            message=message.strip(),
+            message=preview,
             status=SupportInquiryStatus.OPEN.value,
         )
         db.add(inquiry)
         await db.flush()
+        await self._append_inquiry_message(
+            db, inquiry=inquiry, sender=member, body=preview, sender_role="member"
+        )
 
         notified = await self.notify_executives(
             db,
@@ -2127,9 +2225,134 @@ class PlatformService:
             entity_id=inquiry.id,
             metadata={"executive_count": notified},
         )
-        data = self._support_inquiry_dict(inquiry, member)
+        messages = await self._load_inquiry_messages(db, inquiry.id)
+        data = self._support_inquiry_dict(
+            inquiry, member, messages=messages, message_count=len(messages)
+        )
         data["notified"] = notified
         return data
+
+    async def get_member_active_inquiry(self, db: AsyncSession, *, member: Member) -> dict | None:
+        inquiry = await self._get_latest_inquiry_for_member(db, member.id)
+        if not inquiry:
+            return None
+        messages = await self._load_inquiry_messages(db, inquiry.id)
+        return self._support_inquiry_dict(
+            inquiry, member, messages=messages, message_count=len(messages)
+        )
+
+    async def get_support_inquiry(
+        self,
+        db: AsyncSession,
+        *,
+        inquiry_id: UUID,
+        viewer: Member,
+    ) -> dict:
+        inquiry = await db.get(SupportInquiry, inquiry_id)
+        if not inquiry:
+            raise ValueError("Inquiry not found")
+        if not self._is_executive(viewer) and inquiry.member_id != viewer.id:
+            raise PermissionError("Not allowed to view this inquiry")
+
+        member = await db.get(Member, inquiry.member_id)
+        messages = await self._load_inquiry_messages(db, inquiry.id)
+        return self._support_inquiry_dict(
+            inquiry,
+            member,
+            messages=messages,
+            message_count=len(messages),
+        )
+
+    async def add_inquiry_message(
+        self,
+        db: AsyncSession,
+        *,
+        inquiry_id: UUID,
+        sender: Member,
+        body: str,
+    ) -> dict:
+        inquiry = await db.get(SupportInquiry, inquiry_id)
+        if not inquiry:
+            raise ValueError("Inquiry not found")
+
+        is_exec = self._is_executive(sender)
+        if is_exec:
+            sender_role = "executive"
+        elif inquiry.member_id == sender.id:
+            sender_role = "member"
+        else:
+            raise PermissionError("Not allowed to post on this inquiry")
+
+        if inquiry.status == SupportInquiryStatus.RESOLVED.value and sender_role == "member":
+            inquiry.status = SupportInquiryStatus.OPEN.value
+
+        await self._append_inquiry_message(
+            db, inquiry=inquiry, sender=sender, body=body, sender_role=sender_role
+        )
+
+        member = await db.get(Member, inquiry.member_id)
+        trimmed = body.strip()
+
+        if sender_role == "executive":
+            await self.create_notification(
+                db,
+                member_id=inquiry.member_id,
+                type="support",
+                title="Reply from welfare team",
+                message=f"{sender.full_name}: {trimmed}",
+                actor_id=sender.id,
+                push_url="/notifications",
+            )
+            await self.log_activity(
+                db,
+                actor_id=sender.id,
+                action="support_inquiry_replied",
+                entity_type="support_inquiry",
+                entity_id=inquiry.id,
+                metadata={"member_name": member.full_name if member else None},
+            )
+        else:
+            title = inquiry.subject or "Member inquiry"
+            preview = f"{sender.full_name} ({sender.membership_id}): {trimmed}"
+            await self.notify_executives(
+                db,
+                notification_type="support",
+                title=title,
+                message=preview,
+                actor_id=sender.id,
+                exclude_member_ids={sender.id},
+            )
+            await self.log_activity(
+                db,
+                actor_id=sender.id,
+                action="support_inquiry_message",
+                entity_type="support_inquiry",
+                entity_id=inquiry.id,
+            )
+
+        messages = await self._load_inquiry_messages(db, inquiry.id)
+        return self._support_inquiry_dict(
+            inquiry, member, messages=messages, message_count=len(messages)
+        )
+
+    async def resolve_support_inquiry(
+        self,
+        db: AsyncSession,
+        *,
+        inquiry_id: UUID,
+        executive: Member,
+    ) -> dict:
+        inquiry = await db.get(SupportInquiry, inquiry_id)
+        if not inquiry:
+            raise ValueError("Inquiry not found")
+        inquiry.status = SupportInquiryStatus.RESOLVED.value
+        inquiry.updated_at = datetime.now(timezone.utc)
+        await db.flush()
+        member = await db.get(Member, inquiry.member_id)
+        messages = await self._load_inquiry_messages(db, inquiry.id)
+        return self._support_inquiry_dict(
+            inquiry, member, messages=messages, message_count=len(messages)
+        )
 
     async def list_support_inquiries(
         self,
@@ -2147,9 +2370,14 @@ class PlatformService:
         query = select(SupportInquiry, Member).join(Member, SupportInquiry.member_id == Member.id)
         if status:
             query = query.where(SupportInquiry.status == status)
-        query = query.order_by(SupportInquiry.created_at.desc())
+        query = query.order_by(SupportInquiry.updated_at.desc())
         result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
-        items = [self._support_inquiry_dict(inquiry, member) for inquiry, member in result.all()]
+        items = []
+        for inquiry, member in result.all():
+            count = await self._message_count(db, inquiry.id)
+            items.append(
+                self._support_inquiry_dict(inquiry, member, message_count=count)
+            )
         return {
             "items": items,
             "page": page,
@@ -2165,38 +2393,9 @@ class PlatformService:
         executive: Member,
         reply_message: str,
     ) -> dict:
-        inquiry = await db.get(SupportInquiry, inquiry_id)
-        if not inquiry:
-            raise ValueError("Inquiry not found")
-
-        member = await db.get(Member, inquiry.member_id)
-        now = datetime.now(timezone.utc)
-        inquiry.admin_reply = reply_message.strip()
-        inquiry.replied_by = executive.id
-        inquiry.replied_at = now
-        inquiry.status = SupportInquiryStatus.RESOLVED.value
-        await db.flush()
-
-        member_name = member.full_name if member else "Member"
-        await self.create_notification(
-            db,
-            member_id=inquiry.member_id,
-            type="support",
-            title="Reply from welfare team",
-            message=f"{executive.full_name} replied to your inquiry: {reply_message.strip()}",
-            actor_id=executive.id,
-            push_url="/notifications",
+        return await self.add_inquiry_message(
+            db, inquiry_id=inquiry_id, sender=executive, body=reply_message
         )
-
-        await self.log_activity(
-            db,
-            actor_id=executive.id,
-            action="support_inquiry_replied",
-            entity_type="support_inquiry",
-            entity_id=inquiry.id,
-            metadata={"member_name": member_name},
-        )
-        return self._support_inquiry_dict(inquiry, member)
 
 
 platform_service = PlatformService()

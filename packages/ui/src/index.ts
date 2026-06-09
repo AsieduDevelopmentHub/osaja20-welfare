@@ -28,3 +28,5 @@ export { adminNavItems, adminModules } from "./admin-nav.js";
 export type { AdminModule } from "./admin-nav.js";
 export { FloatingContact } from "./components/FloatingContact.js";
 export type { FloatingContactProps } from "./components/FloatingContact.js";
+export { InquiryChatPanel } from "./components/InquiryChatPanel.js";
+export type { InquiryChatMessage, InquiryChatPanelProps } from "./components/InquiryChatPanel.js";

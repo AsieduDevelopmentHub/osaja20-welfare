@@ -25,7 +25,7 @@ async def submit_inquiry(
         message=payload.message,
         subject=payload.subject,
     )
-    if data["notified"] == 0:
+    if data.get("notified") == 0:
         message = (
             "Your message was saved. No executive is set up to receive alerts yet — "
             "try WhatsApp or email if you need an urgent reply."
@@ -33,6 +33,15 @@ async def submit_inquiry(
     else:
         message = "Your message was sent to the executive team."
     return ApiResponse(success=True, data=data, message=message)
+
+
+@router.get("/inquiries/active", response_model=ApiResponse)
+async def active_inquiry(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    member: Annotated[Member, Depends(require_member)],
+):
+    data = await platform_service.get_member_active_inquiry(db, member=member)
+    return ApiResponse(success=True, data=data)
 
 
 @router.get("/inquiries", response_model=ApiResponse)
@@ -47,6 +56,44 @@ async def list_inquiries(
         db, page=page, page_size=page_size, status=status
     )
     return ApiResponse(success=True, data=data)
+
+
+@router.get("/inquiries/{inquiry_id}", response_model=ApiResponse)
+async def get_inquiry(
+    inquiry_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    viewer: Annotated[Member, Depends(require_member)],
+):
+    try:
+        data = await platform_service.get_support_inquiry(
+            db, inquiry_id=inquiry_id, viewer=viewer
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data)
+
+
+@router.post("/inquiries/{inquiry_id}/messages", response_model=ApiResponse)
+async def post_inquiry_message(
+    inquiry_id: UUID,
+    payload: SupportInquiryReply,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    sender: Annotated[Member, Depends(require_member)],
+):
+    try:
+        data = await platform_service.add_inquiry_message(
+            db,
+            inquiry_id=inquiry_id,
+            sender=sender,
+            body=payload.message,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Message sent.")
 
 
 @router.post("/inquiries/{inquiry_id}/reply", response_model=ApiResponse)
@@ -66,3 +113,18 @@ async def reply_to_inquiry(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return ApiResponse(success=True, data=data, message="Reply sent to member.")
+
+
+@router.post("/inquiries/{inquiry_id}/resolve", response_model=ApiResponse)
+async def resolve_inquiry(
+    inquiry_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await platform_service.resolve_support_inquiry(
+            db, inquiry_id=inquiry_id, executive=executive
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Conversation marked as resolved.")

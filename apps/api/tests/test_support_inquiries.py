@@ -1,4 +1,4 @@
-"""Support inquiry flow: member submit → executive list → reply."""
+"""Support inquiry threaded chat flow."""
 
 import pytest
 
@@ -48,7 +48,7 @@ async def _promote_admin(email: str):
 
 
 @pytest.mark.asyncio
-async def test_member_inquiry_lists_for_executive(client):
+async def test_threaded_inquiry_chat(client):
     await client.post("/api/v1/auth/register", json=ADMIN_PAYLOAD)
     await _promote_admin(ADMIN_PAYLOAD["email"])
     admin_login = await client.post(
@@ -56,7 +56,6 @@ async def test_member_inquiry_lists_for_executive(client):
         json={"identifier": ADMIN_PAYLOAD["email"], "password": ADMIN_PAYLOAD["password"]},
     )
     admin_token = admin_login.json()["data"]["token"]["access_token"]
-
     member_token = await _register_and_token(client, MEMBER_PAYLOAD)
 
     submit = await client.post(
@@ -66,33 +65,52 @@ async def test_member_inquiry_lists_for_executive(client):
     )
     assert submit.status_code == 200
     inquiry_id = submit.json()["data"]["id"]
+    assert len(submit.json()["data"]["messages"]) == 1
 
-    listed = await client.get(
-        "/api/v1/support/inquiries?status=open",
+    reply1 = await client.post(
+        f"/api/v1/support/inquiries/{inquiry_id}/messages",
+        json={"message": "We will review your account today."},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    assert listed.status_code == 200
-    items = listed.json()["data"]["items"]
-    assert any(item["id"] == inquiry_id for item in items)
+    assert reply1.status_code == 200
+    assert reply1.json()["data"]["status"] == "open"
+    assert len(reply1.json()["data"]["messages"]) == 2
 
-    reply = await client.post(
-        f"/api/v1/support/inquiries/{inquiry_id}/reply",
-        json={"message": "We will look into this today."},
+    follow_up = await client.post(
+        f"/api/v1/support/inquiries/{inquiry_id}/messages",
+        json={"message": "Thank you — when should I expect an update?"},
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert follow_up.status_code == 200
+    assert len(follow_up.json()["data"]["messages"]) == 3
+
+    resolve = await client.post(
+        f"/api/v1/support/inquiries/{inquiry_id}/resolve",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    assert reply.status_code == 200
-    assert reply.json()["data"]["status"] == "resolved"
+    assert resolve.status_code == 200
+    assert resolve.json()["data"]["status"] == "resolved"
 
-    resolved = await client.get(
-        "/api/v1/support/inquiries?status=resolved",
-        headers={"Authorization": f"Bearer {admin_token}"},
+    reopen = await client.post(
+        "/api/v1/support/inquiries",
+        json={"message": "One more question about receipts."},
+        headers={"Authorization": f"Bearer {member_token}"},
     )
-    assert any(item["id"] == inquiry_id for item in resolved.json()["data"]["items"])
+    assert reopen.status_code == 200
+    assert reopen.json()["data"]["id"] == inquiry_id
+    assert reopen.json()["data"]["status"] == "open"
+    assert len(reopen.json()["data"]["messages"]) == 4
+
+    active = await client.get(
+        "/api/v1/support/inquiries/active",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert active.status_code == 200
+    assert active.json()["data"]["id"] == inquiry_id
 
 
 @pytest.mark.asyncio
-async def test_inquiry_saved_when_no_executives_to_notify(client, monkeypatch):
-    """Inquiry must persist even when notify_executives returns 0."""
+async def test_inquiry_saved_when_no_executives_to_notify(client):
     member_token = await _register_and_token(client, MEMBER_PAYLOAD)
 
     submit = await client.post(
@@ -116,4 +134,3 @@ async def test_inquiry_saved_when_no_executives_to_notify(client, monkeypatch):
 
         row = await db.get(SupportInquiry, UUID(inquiry_id))
         assert row is not None
-        assert row.message.startswith("Hello executives")

@@ -247,6 +247,22 @@ class SupportInquiry(Base):
     replied_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), index=True
+    )
+
+
+class SupportInquiryMessage(Base):
+    __tablename__ = "support_inquiry_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    inquiry_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("support_inquiries.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
+    sender_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class BirthdayWish(Base):

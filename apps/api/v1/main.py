@@ -78,14 +78,17 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = ["Authorization", "Content-Type", "Accept"]
+
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=CORS_ALLOW_METHODS,
+    allow_headers=CORS_ALLOW_HEADERS,
 )
 
 API_PREFIX = f"/api/{settings.api_version}"

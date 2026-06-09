@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     # Auth endpoints: max requests per IP per minute
     rate_limit_auth_per_minute: int = 10
     rate_limit_push_test_per_minute: int = 5
-    # Allow Cloudflare quick-tunnel origins in CORS (disable in production)
-    allow_tunnel_cors: bool = True
+    # Allow Cloudflare quick-tunnel origins via regex (dev tunnels only — keep false in production)
+    allow_tunnel_cors: bool = False
 
     database_url: str = "sqlite+aiosqlite:///./osaja_welfare.db"
     redis_url: str = "redis://localhost:6379/0"
@@ -106,7 +106,9 @@ class Settings(BaseSettings):
         """Parsed browser origins for CORS (comma-separated or JSON array in env)."""
         raw = self.cors_origins.strip()
         if not raw:
-            return ["http://localhost:3000", "http://localhost:3001"]
+            if self.debug:
+                return ["http://localhost:3000", "http://localhost:3001"]
+            return []
         if raw.startswith("["):
             try:
                 data = json.loads(raw)
@@ -118,7 +120,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_regex(self) -> str | None:
-        if self.allow_tunnel_cors and self.debug:
+        if self.allow_tunnel_cors:
             return self.cors_allow_origin_regex or None
         return None
 

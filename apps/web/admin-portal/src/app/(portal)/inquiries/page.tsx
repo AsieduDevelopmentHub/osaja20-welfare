@@ -1,7 +1,7 @@
 "use client";
 
-import { ListRowsSkeleton } from "@osaja/ui";
-import { MessageSquare, RefreshCw, Send } from "lucide-react";
+import { InquiryChatPanel, type InquiryChatMessage, ListRowsSkeleton } from "@osaja/ui";
+import { CheckCircle2, MessageSquare, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
@@ -16,9 +16,10 @@ interface SupportInquiry {
   subject: string | null;
   message: string;
   status: string;
-  admin_reply: string | null;
-  replied_at: string | null;
+  message_count?: number;
   created_at: string;
+  updated_at: string;
+  messages?: InquiryChatMessage[];
 }
 
 const STATUS_FILTERS = ["", "open", "resolved"];
@@ -28,7 +29,9 @@ export default function InquiriesPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
-  const [selected, setSelected] = useState<SupportInquiry | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [thread, setThread] = useState<SupportInquiry | null>(null);
+  const [threadLoading, setThreadLoading] = useState(false);
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -52,26 +55,59 @@ export default function InquiriesPage() {
     }
   }, [statusFilter]);
 
+  const loadThread = useCallback(async (inquiryId: string) => {
+    setThreadLoading(true);
+    setError("");
+    try {
+      const res = await apiFetch<SupportInquiry>(`/support/inquiries/${inquiryId}`);
+      setThread(res.data as SupportInquiry);
+      setSelectedId(inquiryId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load conversation");
+    } finally {
+      setThreadLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
 
   const sendReply = async () => {
-    if (!selected || reply.trim().length < 1) return;
+    if (!thread || reply.trim().length < 1) return;
     setBusy(true);
     setError("");
     setSuccess("");
     try {
-      await apiFetch(`/support/inquiries/${selected.id}/reply`, {
+      const res = await apiFetch<SupportInquiry>(`/support/inquiries/${thread.id}/messages`, {
         method: "POST",
         body: JSON.stringify({ message: reply.trim() }),
       });
-      setSuccess("Reply sent. The member was notified in-app.");
+      setThread(res.data as SupportInquiry);
       setReply("");
-      setSelected(null);
+      setSuccess("Reply sent.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reply failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveThread = async () => {
+    if (!thread) return;
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await apiFetch<SupportInquiry>(`/support/inquiries/${thread.id}/resolve`, {
+        method: "POST",
+      });
+      setThread(res.data as SupportInquiry);
+      setSuccess("Conversation marked as resolved.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resolve");
     } finally {
       setBusy(false);
     }
@@ -84,8 +120,8 @@ export default function InquiriesPage() {
           title="Member inquiries"
           description={
             total > 0
-              ? `${total} message${total === 1 ? "" : "s"} from the member portal contact button.`
-              : "Messages from the contact button on the member portal. Reply here to notify the member."
+              ? `${total} conversation${total === 1 ? "" : "s"} with members.`
+              : "Ongoing chat threads from the member portal contact button."
           }
         />
         <button
@@ -127,118 +163,108 @@ export default function InquiriesPage() {
         </div>
       ) : null}
 
-      {loading ? (
-        <ListRowsSkeleton rows={5} variant="dark" />
-      ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
-          <MessageSquare className="mx-auto h-10 w-10" strokeWidth={1.25} />
-          <p className="mt-2 text-sm">
-            No inquiries {statusFilter ? `with status “${statusFilter}”` : "yet"}.
-            {statusFilter ? (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("")}
-                  className="font-semibold text-brand-gold hover:underline"
-                >
-                  Show all
-                </button>
-              </>
-            ) : null}
-          </p>
-        </div>
-      ) : (
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={`rounded-2xl border p-4 sm:p-5 ${
-                selected?.id === item.id
-                  ? "border-brand-gold/40 bg-brand-navy/80"
-                  : "border-white/10 bg-brand-navy/60"
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
+          {loading ? (
+            <ListRowsSkeleton rows={5} variant="dark" />
+          ) : items.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
+              <MessageSquare className="mx-auto h-10 w-10" strokeWidth={1.25} />
+              <p className="mt-2 text-sm">No inquiries {statusFilter ? `with status “${statusFilter}”` : "yet"}.</p>
+            </div>
+          ) : (
+            items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => loadThread(item.id)}
+                className={`w-full rounded-2xl border p-4 text-left transition ${
+                  selectedId === item.id
+                    ? "border-brand-gold/40 bg-brand-navy/80"
+                    : "border-white/10 bg-brand-navy/60 hover:bg-brand-navy/70"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <p className="font-semibold text-white">{item.member_name}</p>
-                    <span className="text-xs text-slate-500">{item.membership_id}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                        item.status === "open"
-                          ? "bg-amber-500/20 text-amber-300"
-                          : "bg-emerald-500/20 text-emerald-300"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
+                    <p className="text-xs text-slate-500">{item.membership_id}</p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {new Date(item.created_at).toLocaleString("en-GH")}
-                  </p>
-                  {item.subject ? (
-                    <p className="mt-2 text-sm font-medium text-brand-gold">{item.subject}</p>
-                  ) : null}
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{item.message}</p>
-                  {item.admin_reply ? (
-                    <div className="mt-3 rounded-xl bg-white/5 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your reply</p>
-                      <p className="mt-1 text-sm text-slate-200">{item.admin_reply}</p>
-                    </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      item.status === "open"
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "bg-emerald-500/20 text-emerald-300"
+                    }`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
+                <p className="mt-2 line-clamp-2 text-sm text-slate-300">{item.message}</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {item.message_count ?? 0} message{(item.message_count ?? 0) === 1 ? "" : "s"} ·{" "}
+                  {new Date(item.updated_at || item.created_at).toLocaleString("en-GH")}
+                </p>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-5">
+          {!selectedId ? (
+            <div className="flex min-h-[20rem] flex-col items-center justify-center text-center text-slate-400">
+              <MessageSquare className="h-10 w-10" strokeWidth={1.25} />
+              <p className="mt-2 text-sm">Select a conversation to view the full thread.</p>
+            </div>
+          ) : threadLoading ? (
+            <ListRowsSkeleton rows={4} variant="dark" />
+          ) : thread ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
+                <div>
+                  <p className="font-semibold text-white">{thread.member_name}</p>
+                  <p className="text-xs text-slate-500">{thread.membership_id}</p>
+                  {thread.subject ? (
+                    <p className="mt-1 text-sm font-medium text-brand-gold">{thread.subject}</p>
                   ) : null}
                 </div>
-                <div className="flex shrink-0 flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Link
-                    href={`/profile/${item.member_id}`}
+                    href={`/profile/${thread.member_id}`}
                     className="text-xs font-semibold text-brand-gold hover:underline"
                   >
                     View profile
                   </Link>
-                  {item.status === "open" ? (
+                  {thread.status === "open" ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelected(selected?.id === item.id ? null : item);
-                        setReply("");
-                        setSuccess("");
-                      }}
-                      className="rounded-lg bg-brand-gold px-3 py-1.5 text-xs font-semibold text-brand-navy-dark hover:bg-brand-gold/90"
+                      disabled={busy}
+                      onClick={resolveThread}
+                      className="flex items-center gap-1 rounded-lg border border-emerald-500/30 px-2.5 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50"
                     >
-                      {selected?.id === item.id ? "Cancel" : "Reply"}
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Resolve
                     </button>
                   ) : null}
                 </div>
               </div>
 
-              {selected?.id === item.id ? (
-                <div className="mt-4 border-t border-white/10 pt-4">
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    Reply to member
-                  </label>
-                  <textarea
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    rows={4}
-                    maxLength={2000}
-                    placeholder="Type your response…"
-                    className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500"
-                  />
-                  <button
-                    type="button"
-                    disabled={busy || reply.trim().length < 1}
-                    onClick={sendReply}
-                    className="mt-3 flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-                  >
-                    <Send className="h-4 w-4" />
-                    Send reply
-                  </button>
-                </div>
-              ) : null}
+              <InquiryChatPanel
+                messages={thread.messages ?? []}
+                draft={reply}
+                onDraftChange={setReply}
+                onSend={sendReply}
+                sending={busy}
+                variant="dark"
+                viewerRole="executive"
+                status={thread.status}
+                minLength={1}
+                placeholder="Type your reply…"
+                emptyText="No messages in this thread yet."
+              />
             </div>
-          ))}
+          ) : null}
         </div>
-      )}
+      </div>
     </div>
   );
 }
