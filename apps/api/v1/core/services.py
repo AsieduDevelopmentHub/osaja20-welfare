@@ -2016,5 +2016,43 @@ class PlatformService:
         )
         return True
 
+    async def submit_support_inquiry(
+        self,
+        db: AsyncSession,
+        *,
+        member: Member,
+        message: str,
+        subject: str | None = None,
+    ) -> dict:
+        title = subject.strip() if subject and subject.strip() else "Member inquiry"
+        body = f"{member.full_name} ({member.membership_id}): {message.strip()}"
+
+        result = await db.execute(
+            select(Member).where(
+                Member.role.in_([UserRole.EXECUTIVE.value, UserRole.ADMINISTRATOR.value]),
+                Member.status == MemberStatus.ACTIVE.value,
+            )
+        )
+        executives = result.scalars().all()
+        for exec_member in executives:
+            await self.create_notification(
+                db,
+                member_id=exec_member.id,
+                type="support",
+                title=title,
+                message=body,
+                actor_id=member.id,
+            )
+
+        await self.log_activity(
+            db,
+            actor_id=member.id,
+            action="support_inquiry_sent",
+            entity_type="member",
+            entity_id=member.id,
+            metadata={"executive_count": len(executives)},
+        )
+        return {"notified": len(executives)}
+
 
 platform_service = PlatformService()

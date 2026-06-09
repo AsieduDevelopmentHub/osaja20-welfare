@@ -196,6 +196,11 @@ class PushSubscribe(BaseModel):
     user_agent: str | None = None
 
 
+class SupportInquiryCreate(BaseModel):
+    message: str = Field(min_length=5, max_length=2000)
+    subject: str | None = Field(default=None, max_length=120)
+
+
 class ApiResponse(BaseModel):
     success: bool
     data: dict | list | None = None
