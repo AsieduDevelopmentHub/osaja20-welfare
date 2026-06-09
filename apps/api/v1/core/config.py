@@ -1,3 +1,5 @@
+import json
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,19 +41,10 @@ class Settings(BaseSettings):
 
     use_local_auth: bool = True
 
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ]
+    # Comma-separated origins in .env / Render (JSON arrays also accepted via cors_origins_list)
+    cors_origins: str = "http://localhost:3000,http://localhost:3001"
     # Matches any Cloudflare quick-tunnel host when the browser calls the API directly
     cors_allow_origin_regex: str = r"https://.*\.trycloudflare\.com"
-
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
 
     default_batch: int = 2020
     uploads_dir: str = "uploads"
@@ -101,6 +94,21 @@ class Settings(BaseSettings):
         if self.database_url.startswith("sqlite"):
             return False
         return "localhost" not in self.database_url and "127.0.0.1" not in self.database_url
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parsed browser origins for CORS (comma-separated or JSON array in env)."""
+        raw = self.cors_origins.strip()
+        if not raw:
+            return ["http://localhost:3000", "http://localhost:3001"]
+        if raw.startswith("["):
+            try:
+                data = json.loads(raw)
+                if isinstance(data, list):
+                    return [str(origin).strip() for origin in data if str(origin).strip()]
+            except json.JSONDecodeError:
+                pass
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     @property
     def cors_origin_regex(self) -> str | None:

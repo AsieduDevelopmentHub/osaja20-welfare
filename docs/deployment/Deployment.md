@@ -1,99 +1,221 @@
 # Deployment Guide
 
-Production deployment checklist for the OSAJA'20 Welfare Platform.
+Production deployment for **OSAJA'20 Welfare**: API on Render, member + admin apps on Vercel, database on Supabase.
 
-## Architecture
+## Overview
 
-| Component | Suggested host | Port |
-|-----------|----------------|------|
-| API (FastAPI) | Render, Railway, Fly.io, VPS | 8000 |
-| Member app | Vercel | 3000 |
-| Admin portal | Vercel | 3001 |
-| Database | Supabase PostgreSQL | 5432 (session pooler) |
+| Component | Host | Repo path | Public URL (example) |
+|-----------|------|-----------|----------------------|
+| API (FastAPI) | Render | `apps/api` | `https://osaja-api.onrender.com` |
+| Member app | Vercel | `apps/web/member-app` | `https://osaja-members.vercel.app` |
+| Admin portal | Vercel | `apps/web/admin-portal` | `https://osaja-admin.vercel.app` |
+| Database | Supabase | — | PostgreSQL session pooler `:5432` |
 
-The Next.js apps proxy `/api/v1` and `/uploads` to the API — set `API_PROXY_TARGET` on Vercel to your API URL.
+**Deploy in this order:**
 
-## Pre-deploy checklist
+1. Supabase project + `DATABASE_URL`
+2. **API** on Render → note the API URL
+3. **Member app** on Vercel → note the member URL
+4. **Admin portal** on Vercel
+5. Update API env (`CORS_ORIGINS`, `MEMBER_PORTAL_URL`) and redeploy API
+6. Supabase auth redirect URLs + Paystack webhook (if used)
 
-### API (`apps/api/.env`)
+Both Next.js apps proxy `/api/v1` and `/uploads` to the API using `API_PROXY_TARGET` (server-side). The browser usually talks to the same origin as the app, not Render directly.
 
-- [ ] `DEBUG=false`
-- [ ] `JWT_SECRET` — at least 32 random characters (startup will fail if weak)
-- [ ] `DATABASE_URL` — PostgreSQL with SSL (Supabase session pooler on port **5432**)
-- [ ] `USE_LOCAL_AUTH=false` when using Supabase Auth
-- [ ] `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY` configured
-- [ ] `REGISTRATION_AUTO_APPROVE=false` for executive-approved signups
-- [ ] `ALLOW_TUNNEL_CORS=false` in production
-- [ ] `CORS_ORIGINS` — comma-separated member + admin portal URLs
-- [ ] VAPID keys for web push (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`)
-- [ ] `REDIS_URL` for async push/digest jobs (optional — sync fallback without Redis)
-- [ ] SMTP settings if email digest is required (`EMAIL_ENABLED=true`)
+---
 
-### Member app (`apps/web/member-app`)
+## 1. API on Render
 
-- [ ] `API_PROXY_TARGET=https://your-api.example.com`
-- [ ] `NEXT_PUBLIC_APP_NAME`, payment env vars as needed
+### Create the service
 
-### Admin portal (`apps/web/admin-portal`)
+1. [Render](https://render.com) → **New** → **Web Service** → connect `osaja20-welfare` repo.
+2. Use these settings:
 
-- [ ] `API_PROXY_TARGET` (same API)
-- [ ] `NEXT_PUBLIC_MEMBER_APP_URL=https://members.your-domain.com`
+| Field | Value |
+|-------|--------|
+| **Root directory** | `apps/api` |
+| **Runtime** | Python |
+| **Python version** | **3.12.8** (Dashboard → Environment → `PYTHON_VERSION=3.12.8`, or use repo `apps/api/.python-version`) |
+| **Build command** | `pip install -r requirements.txt` |
+| **Start command** | `uvicorn v1.main:app --host 0.0.0.0 --port $PORT` |
 
-## Database migrations
+> **Do not use Python 3.14.** The build will fail compiling `pydantic-core` (Rust/maturin on a read-only filesystem). Pin **3.12**.
 
-1. **New environment:** API startup runs `create_all` + incremental fixes via `init_db.py`.
-2. **Versioned upgrades:** From `apps/api`:
+Optional: import `render.yaml` from the repo root for the same defaults.
 
-```bash
-# After models change
-alembic upgrade head
+### Environment variables (Render dashboard)
+
+Copy from `apps/api/.env.example`. Minimum for production:
+
+| Variable | Example / notes |
+|----------|-----------------|
+| `DEBUG` | `false` |
+| `JWT_SECRET` | 32+ random characters (required when `DEBUG=false`) |
+| `DATABASE_URL` | Supabase session pooler `postgresql://...pooler.supabase.com:5432/postgres` |
+| `USE_LOCAL_AUTH` | `true` for bcrypt login, or `false` + Supabase keys |
+| `REGISTRATION_AUTO_APPROVE` | `false` if executives must approve signups |
+| `ALLOW_TUNNEL_CORS` | `false` |
+| `CORS_ORIGINS` | Comma-separated, no quotes: `https://member.vercel.app,https://admin.vercel.app`. **Do not leave blank** — delete the var until URLs exist, or the API will crash on startup. |
+| `MEMBER_PORTAL_URL` | `https://YOUR-MEMBER.vercel.app` (Paystack callback + password reset) |
+| `WHATSAPP_NUMBER` | e.g. `233531273626/233532918613` (contact FAB + `/settings/contact`) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` |
+| `VAPID_CONTACT_EMAIL` | `admin@osaja.com` |
+| `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` | If online dues enabled |
+| `JOB_WORKER_ENABLED` | `false` on free tier (push still works inline) |
+
+**Disk:** Add a persistent disk mounted at `uploads` if you need avatars to survive redeploys.
+
+### Verify API
+
+```text
+GET https://YOUR-API.onrender.com/health
 ```
 
-For databases created before Alembic was introduced, run `alembic upgrade head` once to apply `20260605_incremental`.
+Expect: `"status": "healthy"`.
 
-## API deploy steps (Render)
+### Create first admin (one-time)
 
-**Root directory:** `apps/api`
-
-| Setting | Value |
-|---------|--------|
-| Runtime | Python **3.12** (not 3.14 — `pydantic-core` has no wheel yet) |
-| Build command | `pip install -r requirements.txt` |
-| Start command | `uvicorn v1.main:app --host 0.0.0.0 --port $PORT` |
-
-Pin Python via `apps/api/.python-version` / `runtime.txt` (`3.12.8`) or Render env `PYTHON_VERSION=3.12.8`.
-
-If the build fails with `pydantic-core` / `maturin` / Rust errors, Render is on Python 3.14 and compiling from source — switch to 3.12.
+From your machine with production `DATABASE_URL` (or Render shell):
 
 ```bash
 cd apps/api
-pip install -r requirements.txt
-alembic upgrade head   # optional if schema already current
-uvicorn v1.main:app --host 0.0.0.0 --port 8000
+# set DATABASE_URL, JWT_SECRET, etc. in .env or env vars
+python scripts/create_admin.py
 ```
 
-Use a process manager (systemd, Docker, Render web service) and persist the `uploads/` volume for avatars.
+---
 
-## Web deploy steps (Vercel)
+## 2. Member app on Vercel
 
-Deploy **member** and **admin** as **two separate Vercel projects** from the same GitHub repo.
+### Create the project
 
-| Setting | Member app | Admin portal |
-|---------|------------|--------------|
-| Root directory | `apps/web/member-app` | `apps/web/admin-portal` |
-| Framework | Next.js | Next.js |
+1. [Vercel](https://vercel.com) → **Add New** → **Project** → import the same GitHub repo.
+2. **Project name:** e.g. `osaja-members`.
+3. **Root Directory:** click **Edit** → set to `apps/web/member-app`.
+4. **Framework Preset:** Next.js (auto-detected after correct install).
+5. **Build & Development Settings:**
+   - Leave **Install** and **Build** empty in the UI if `apps/web/member-app/vercel.json` is in the repo (recommended).
+   - Do **not** set Install to `npm install --prefix=../../..` — that skips workspace packages and breaks the build (`No Next.js version detected`).
 
-Each app includes a `vercel.json` that installs from the monorepo root with **pnpm** and builds shared packages first. Do **not** use `npm install --prefix=../../..` — that only installs the repo root and misses `next` and workspace packages.
+The repo `vercel.json` runs:
 
-**Required env (both apps):**
+```text
+install: pnpm install --frozen-lockfile   (from monorepo root)
+build:   pnpm --filter "./packages/*" build && pnpm --filter @osaja/member-app build
+```
 
-- `API_PROXY_TARGET=https://your-api.onrender.com`
+6. **Deploy**.
 
-**Admin only:**
+### Environment variables (Vercel → Project → Settings → Environment Variables)
 
-- `NEXT_PUBLIC_MEMBER_APP_URL=https://your-member-app.vercel.app`
+Apply to **Production** (and Preview if you want):
 
-Override install/build in the Vercel UI only if you remove `vercel.json`; otherwise leave them empty so the file is used.
+| Variable | Required | Value |
+|----------|----------|--------|
+| `API_PROXY_TARGET` | **Yes** | `https://YOUR-API.onrender.com` (no trailing slash) |
+| `NEXT_PUBLIC_SITE_URL` | Recommended | `https://YOUR-MEMBER.vercel.app` (OG / share links) |
+| `NEXT_PUBLIC_APP_NAME` | Optional | `OSAJA'20 Welfare` |
+| `NEXT_PUBLIC_CURRENCY` | Optional | `GHS` |
+| `NEXT_PUBLIC_MONTHLY_DUES_AMOUNT` | Optional | `30` |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Recommended | Same as API `WHATSAPP_NUMBER` |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Optional | `admin@osaja.com` |
+| `NEXT_PUBLIC_CONTACT_PHONE` | Optional | Treasurer phone |
+| `NEXT_PUBLIC_MOMO_*` / `NEXT_PUBLIC_BANK_*` | Optional | Manual payment fallback copy |
+
+You do **not** need `NEXT_PUBLIC_API_URL` in production if `API_PROXY_TARGET` is set — the app uses same-origin `/api/v1` via `next.config.ts` rewrites.
+
+Full list: `apps/web/member-app/.env.local.example`.
+
+### Supabase (password reset)
+
+If using Supabase Auth, in **Supabase → Authentication → URL Configuration**:
+
+- **Redirect URLs:** add `https://YOUR-MEMBER.vercel.app/reset-password`
+- **Site URL:** can be the member app URL
+
+### Verify member app
+
+1. Open `https://YOUR-MEMBER.vercel.app`
+2. Register or log in
+3. Confirm API calls work (dashboard loads, no network errors to `/api/v1/...`)
+4. Test contact FAB, contributions, notifications
+
+---
+
+## 3. Admin portal on Vercel
+
+### Create the project
+
+1. Vercel → **Add New** → **Project** → same repo (second project).
+2. **Project name:** e.g. `osaja-admin`.
+3. **Root Directory:** `apps/web/admin-portal`.
+4. Leave Install/Build empty (uses `apps/web/admin-portal/vercel.json`).
+5. **Deploy**.
+
+### Environment variables
+
+| Variable | Required | Value |
+|----------|----------|--------|
+| `API_PROXY_TARGET` | **Yes** | `https://YOUR-API.onrender.com` |
+| `NEXT_PUBLIC_SITE_URL` | Recommended | `https://YOUR-ADMIN.vercel.app` |
+| `NEXT_PUBLIC_MEMBER_APP_URL` | **Yes** | `https://YOUR-MEMBER.vercel.app` |
+| `NEXT_PUBLIC_APP_NAME` | Optional | `OSAJA'20 Welfare Admin` |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Optional | Same as API |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Optional | `admin@osaja.com` |
+
+Full list: `apps/web/admin-portal/.env.local.example`.
+
+### Verify admin portal
+
+1. Open `https://YOUR-ADMIN.vercel.app/login`
+2. Log in as executive/admin
+3. Check **Notifications** bell, **Inquiries**, **Birthdays**, **Contributions**
+
+---
+
+## 4. Wire URLs back to the API
+
+After both Vercel URLs exist, update **Render** env and redeploy API:
+
+```env
+CORS_ORIGINS=https://YOUR-MEMBER.vercel.app,https://YOUR-ADMIN.vercel.app
+MEMBER_PORTAL_URL=https://YOUR-MEMBER.vercel.app
+```
+
+Paystack (if used): webhook URL
+
+```text
+https://YOUR-API.onrender.com/api/v1/payments/webhook
+```
+
+---
+
+## 5. Custom domains (optional)
+
+| App | Suggested |
+|-----|-----------|
+| Member | `members.osaja20.org` |
+| Admin | `admin.osaja20.org` |
+| API | `api.osaja20.org` (CNAME to Render) |
+
+Update `CORS_ORIGINS`, `MEMBER_PORTAL_URL`, `NEXT_PUBLIC_SITE_URL`, and Supabase redirect URLs to match.
+
+---
+
+## Database migrations
+
+- **First deploy:** API runs `create_all` + incremental fixes in `init_db.py`.
+- **Schema updates:** from `apps/api`:
+
+```bash
+alembic upgrade head
+```
+
+Run once against production `DATABASE_URL` before or after deploy when models change.
+
+---
+
+## Local build (sanity check)
 
 ```bash
 pnpm install
@@ -102,46 +224,70 @@ pnpm --filter @osaja/member-app build
 pnpm --filter @osaja/admin-portal build
 ```
 
-## Health checks
+---
 
-- `GET https://api.example.com/health` — expect `status: healthy`
-- Verify login on member and admin portals after deploy
+## Troubleshooting
+
+### Render: `error parsing value for field "cors_origins"`
+
+Build succeeded but uvicorn exits immediately. Usually `CORS_ORIGINS` is **empty** or malformed on Render.
+
+**Fix (immediate, no code change):** In Render → Environment, either **delete** `CORS_ORIGINS` (uses localhost defaults until you add Vercel URLs) or set:
+
+```text
+https://YOUR-MEMBER.vercel.app,https://YOUR-ADMIN.vercel.app
+```
+
+Comma-separated — not JSON, no surrounding quotes. After the config fix is deployed, this format is fully supported.
+
+### Render: `pydantic-core` / `maturin` / Rust / read-only filesystem
+
+Render is using **Python 3.14**. Set `PYTHON_VERSION=3.12.8` and redeploy. Repo files: `apps/api/.python-version`, `apps/api/runtime.txt`.
+
+### Vercel: `No Next.js version detected`
+
+Wrong install command (`npm install --prefix=...`) or wrong root directory. Use root `apps/web/member-app` or `apps/web/admin-portal` and repo `vercel.json` with **pnpm**.
+
+### Member/admin: API 502 or login fails
+
+- Check `API_PROXY_TARGET` points to live Render URL (https, no typo).
+- Hit `https://YOUR-API.onrender.com/health` directly.
+- Free Render services sleep — first request may be slow.
+
+### CORS errors in browser
+
+Usually only if `NEXT_PUBLIC_API_URL` points at Render directly. Prefer proxy mode: leave `NEXT_PUBLIC_API_URL` unset and set `API_PROXY_TARGET` only.
+
+### Push notifications not working
+
+- VAPID keys on API
+- HTTPS required (Vercel provides this)
+- User must allow notifications in browser; admin/member portals auto-subscribe on load
+
+---
 
 ## CI/CD
 
-GitHub Actions runs on every push/PR to `main` (`.github/workflows/ci.yml`):
+GitHub Actions (`.github/workflows/ci.yml`) on push/PR to `main`:
 
 | Job | Checks |
 |-----|--------|
-| **quality** | `pnpm lint`, `typecheck`, `build` |
-| **test** | Utils unit tests + API `pytest` |
-| **e2e** | Playwright smoke tests (member + admin auth pages) |
-| **audit** | `pnpm audit` + `pip-audit` (non-blocking) |
+| **quality** | lint, typecheck, build |
+| **test** | utils + API pytest |
+| **e2e** | Playwright smoke |
+| **audit** | pnpm + pip audit (non-blocking) |
 
-### Run the same checks locally before pushing
-
-```bash
-# Full pipeline (mirrors GitHub Actions)
-pnpm ci:local
-
-# Quick check — lint, typecheck, unit/API tests only
-pnpm ci:fast
-```
-
-Options for `ci:local`:
+Before pushing:
 
 ```bash
-pnpm ci:local -- --skip-e2e      # skip Playwright
-pnpm ci:local -- --skip-build    # skip Next.js production build
-pnpm ci:local -- --only=lint,typecheck,test
+pnpm ci:fast    # quick
+pnpm ci:local   # full (includes build + e2e)
 ```
 
-**Prerequisites:** Node 20+, pnpm 9+, Python 3.11+ (`pnpm setup:api`). For E2E, install Chromium once with `pnpm setup:e2e`.
-
-**Tip:** Stop any running `dev:member` / `dev:admin` servers before `pnpm test:e2e` or `pnpm ci:local` — E2E starts its own dev servers on ports 3000/3001. Playwright artifacts (`test-results/`, `playwright-report/`) are gitignored.
+---
 
 ## Related
 
-- [Installation](../setup/Installation.md)
+- [Installation](../setup/Installation.md) — local dev setup
 - [Security](../security/Security.md)
 - [System audit](../audit/SYSTEM_AUDIT.md)
