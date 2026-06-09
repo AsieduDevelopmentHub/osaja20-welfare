@@ -1,14 +1,8 @@
 "use client";
 
-import { BellRing, BellOff, Loader2, Send } from "lucide-react";
+import { BellRing, BellOff, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  getPushSubscriptionState,
-  isPushSupported,
-  sendTestPush,
-  subscribeToPush,
-  unsubscribeFromPush,
-} from "@/lib/push";
+import { getPushSubscriptionState, isPushSupported, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 
 type PushState = "unsupported" | "denied" | "subscribed" | "prompt" | "loading";
 
@@ -65,25 +59,12 @@ export function PushSettings() {
     }
   };
 
-  const test = async () => {
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
-      await sendTestPush();
-      setMessage("Test notification sent — check your device.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Test push failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section className="glass-card p-5 sm:p-6">
-      <h3 className="font-semibold text-slate-900">Browser push notifications</h3>
+      <h3 className="font-semibold text-slate-900">Device notifications</h3>
       <p className="mt-1 text-sm text-slate-500">
-        Get instant alerts for dues, votes, announcements, and birthdays — even when the app is closed.
+        Push alerts are enabled by default. You&apos;ll get real-time device notifications for dues,
+        votes, announcements, and birthdays when this device is subscribed.
       </p>
 
       {state === "loading" ? (
@@ -95,22 +76,13 @@ export function PushSettings() {
           Notifications are blocked. Allow them in your browser site settings, then reload this page.
         </p>
       ) : (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {state === "subscribed" ? (
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
                 <BellRing className="h-3.5 w-3.5" />
                 Enabled on this device
               </span>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={test}
-                className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send test
-              </button>
               <button
                 type="button"
                 disabled={busy}
@@ -129,7 +101,7 @@ export function PushSettings() {
               className="btn-primary flex items-center gap-2"
             >
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <BellRing className="h-5 w-5" />}
-              Enable push notifications
+              Enable device notifications
             </button>
           )}
         </div>

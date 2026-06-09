@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 DIGEST_INTERVAL_DAYS = 7
 _last_digest_scan: datetime | None = None
+_last_daily_scan: datetime | None = None
 
 
 async def process_job(job: dict) -> None:
@@ -68,6 +69,33 @@ async def _handle_email_digest(payload: dict) -> None:
             logger.exception("Email digest failed for member %s", member_id)
 
 
+async def maybe_run_daily_scans() -> None:
+    """Birthday alerts, dues reminders, and auto-unpublish of stale vote results."""
+    global _last_daily_scan
+
+    now = datetime.now(timezone.utc)
+    if _last_daily_scan and (now - _last_daily_scan) < timedelta(hours=20):
+        return
+    _last_daily_scan = now
+
+    async with async_session() as db:
+        try:
+            birthdays = await platform_service.scan_birthday_notifications(db)
+            reminders = await platform_service.scan_dues_reminder_notifications(db)
+            unpublished = await platform_service.unpublish_stale_vote_results(db)
+            await db.commit()
+            if birthdays or reminders or unpublished:
+                logger.info(
+                    "Daily scan: %s birthday, %s dues reminders, %s vote results unpublished",
+                    birthdays,
+                    reminders,
+                    unpublished,
+                )
+        except Exception:
+            await db.rollback()
+            logger.exception("Daily scan failed")
+
+
 async def maybe_run_digest_scan() -> None:
     global _last_digest_scan
 
@@ -110,9 +138,25 @@ async def maybe_run_digest_scan() -> None:
             logger.info("Queued %s email digest jobs", queued)
 
 
+async def _daily_scan_loop(stop_event: asyncio.Event) -> None:
+    while not stop_event.is_set():
+        try:
+            await maybe_run_daily_scans()
+        except Exception:
+            logger.exception("Daily scan loop error")
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=3600)
+            break
+        except asyncio.TimeoutError:
+            pass
+
+
 async def run_job_worker(stop_event: asyncio.Event) -> None:
+    daily_task = asyncio.create_task(_daily_scan_loop(stop_event))
+
     if not settings.job_worker_enabled:
-        logger.info("Job worker disabled")
+        logger.info("Job worker disabled — daily scans still active")
+        await daily_task
         return
 
     logger.info("Job worker started (Redis queue)")
@@ -139,5 +183,10 @@ async def run_job_worker(stop_event: asyncio.Event) -> None:
             logger.exception("Job worker loop error")
             await asyncio.sleep(2)
 
+    daily_task.cancel()
+    try:
+        await daily_task
+    except asyncio.CancelledError:
+        pass
     await job_queue.close()
     logger.info("Job worker stopped")

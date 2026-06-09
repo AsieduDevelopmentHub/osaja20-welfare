@@ -19,6 +19,8 @@ export interface MobileShellProps {
   variant?: "light" | "dark";
   /** Items shown in mobile bottom bar before "More" */
   mobilePrimaryCount?: number;
+  /** Top-right header actions (e.g. notification bell) */
+  headerRight?: React.ReactNode;
 }
 
 export function MobileShell({
@@ -31,6 +33,7 @@ export function MobileShell({
   footer,
   variant = "light",
   mobilePrimaryCount = 4,
+  headerRight,
 }: MobileShellProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -122,6 +125,7 @@ export function MobileShell({
             size="sm"
             variant={variant}
           />
+          {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
         </div>
       </header>
 
@@ -160,6 +164,9 @@ export function MobileShell({
           tabIndex={-1}
           className="min-w-0 flex-1 px-4 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:px-0 lg:py-0 lg:pb-0"
         >
+          {headerRight ? (
+            <div className="mb-4 hidden justify-end lg:flex">{headerRight}</div>
+          ) : null}
           {children}
         </main>
       </div>

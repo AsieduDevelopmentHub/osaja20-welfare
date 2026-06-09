@@ -64,6 +64,10 @@ async def _apply_migrations(conn) -> None:
                 sync_conn.execute(
                     text("ALTER TABLE votes ADD COLUMN results_published BOOLEAN DEFAULT FALSE")
                 )
+            if "results_published_at" not in vote_cols:
+                sync_conn.execute(
+                    text("ALTER TABLE votes ADD COLUMN results_published_at TIMESTAMPTZ")
+                )
 
         if "welfare_cases" in insp.get_table_names():
             sync_conn.execute(

@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 MONTHLY_DUES_AMOUNT = 30.0
 DUES_CURRENCY = "GHS"
 DUES_EFFECTIVE_FROM = (2025, 1)
-DUES_DUE_DAY = 5
+DUES_REMINDER_DAYS_BEFORE_MONTH_END = 3
 
 MONTH_NAMES = [
     "January",
@@ -59,9 +59,12 @@ def compute_dues_summary(
     member_since: date | datetime,
     paid_periods: list[dict],
     as_of: datetime | None = None,
+    monthly_amount: float | None = None,
 ) -> dict:
     if as_of is None:
         as_of = datetime.now(timezone.utc)
+
+    monthly = float(monthly_amount if monthly_amount is not None else MONTHLY_DUES_AMOUNT)
 
     if isinstance(member_since, datetime):
         member_since = member_since.date()
@@ -77,7 +80,6 @@ def compute_dues_summary(
         paid_map[key] = paid_map.get(key, 0.0) + float(p["amount"])
 
     due_periods = _iter_due_periods(member_start, current)
-    is_overdue_month = as_of.day > DUES_DUE_DAY
 
     arrears_count = 0
     total_owed = 0.0
@@ -86,28 +88,30 @@ def compute_dues_summary(
 
     for year, month in due_periods:
         paid_amount = paid_map.get(_period_key(year, month), 0.0)
-        is_paid = paid_amount >= MONTHLY_DUES_AMOUNT
+        is_paid = paid_amount >= monthly
         is_current = year == current[0] and month == current[1]
         is_future = _compare_period((year, month), current) > 0
+        is_past = _compare_period((year, month), current) < 0
 
         if is_paid:
             status = "paid"
             total_paid_months += 1
         elif is_future:
             status = "upcoming"
-        elif is_current and not is_overdue_month:
+        elif is_current:
             status = "due"
         else:
             status = "overdue"
-            arrears_count += 1
-            total_owed += MONTHLY_DUES_AMOUNT - paid_amount
+            if is_past:
+                arrears_count += 1
+                total_owed += monthly - paid_amount
 
         periods.append(
             {
                 "year": year,
                 "month": month,
                 "label": period_label(year, month),
-                "amount": MONTHLY_DUES_AMOUNT,
+                "amount": monthly,
                 "status": status,
                 "paid_amount": round(paid_amount, 2),
             }
@@ -122,7 +126,7 @@ def compute_dues_summary(
             current_status = "overdue"
 
     return {
-        "monthly_amount": MONTHLY_DUES_AMOUNT,
+        "monthly_amount": monthly,
         "currency": DUES_CURRENCY,
         "current_month": {
             "year": current[0],

@@ -742,7 +742,8 @@ class PlatformService:
             paid_periods.append({"year": year, "month": month, "amount": float(c.amount)})
 
         since = member.registration_date or member.created_at
-        summary = compute_dues_summary(since, paid_periods)
+        monthly = await get_monthly_dues_amount(db)
+        summary = compute_dues_summary(since, paid_periods, monthly_amount=monthly)
         balance = registry.ledger.get_balance(str(member.id))
         summary["balance"] = balance
         return summary
@@ -817,9 +818,25 @@ class PlatformService:
             raise ValueError("Vote not found")
         if vote.status not in (VoteLifecycle.CLOSED.value, VoteLifecycle.RESULT_PUBLISHED.value):
             raise ValueError("Vote must be closed before publishing results")
+        now = datetime.now(timezone.utc)
         vote.results_published = True
+        vote.results_published_at = now
         vote.status = VoteLifecycle.RESULT_PUBLISHED.value
         await db.flush()
+
+        members = (
+            await db.execute(select(Member).where(Member.status == MemberStatus.ACTIVE.value))
+        ).scalars().all()
+        for member in members:
+            await self.create_notification(
+                db,
+                member_id=member.id,
+                type="voting",
+                title=f"Vote results: {vote.title}",
+                message="Results are now available. View them on the Voting page.",
+                actor_id=actor_id,
+            )
+
         await self.log_activity(
             db,
             actor_id=actor_id,
@@ -828,6 +845,50 @@ class PlatformService:
             entity_id=vote.id,
         )
         return vote_to_dict(vote)
+
+    async def unpublish_vote_results(
+        self, db: AsyncSession, vote_id: UUID, actor_id: UUID | None = None
+    ) -> dict:
+        result = await db.execute(
+            select(Vote).options(selectinload(Vote.options)).where(Vote.id == vote_id)
+        )
+        vote = result.scalar_one_or_none()
+        if not vote:
+            raise ValueError("Vote not found")
+        if not vote.results_published:
+            raise ValueError("Results are not published")
+        vote.results_published = False
+        vote.results_published_at = None
+        if vote.status == VoteLifecycle.RESULT_PUBLISHED.value:
+            vote.status = VoteLifecycle.CLOSED.value
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="vote_results_unpublished",
+            entity_type="vote",
+            entity_id=vote.id,
+        )
+        return vote_to_dict(vote)
+
+    async def unpublish_stale_vote_results(self, db: AsyncSession, max_age_days: int = 7) -> int:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        result = await db.execute(
+            select(Vote).where(
+                Vote.results_published.is_(True),
+                Vote.results_published_at.isnot(None),
+                Vote.results_published_at < cutoff,
+            )
+        )
+        votes = result.scalars().all()
+        for vote in votes:
+            vote.results_published = False
+            vote.results_published_at = None
+            if vote.status == VoteLifecycle.RESULT_PUBLISHED.value:
+                vote.status = VoteLifecycle.CLOSED.value
+        if votes:
+            await db.flush()
+        return len(votes)
 
     async def list_published_vote_results(self, db: AsyncSession, member_id: UUID) -> list[dict]:
         result = await db.execute(
@@ -1372,6 +1433,115 @@ class PlatformService:
             "created_at": announcement.created_at.isoformat(),
         }
 
+    async def delete_member_notification(
+        self, db: AsyncSession, notification_id: UUID, member_id: UUID
+    ) -> None:
+        result = await db.execute(
+            select(Notification).where(
+                Notification.id == notification_id,
+                Notification.member_id == member_id,
+            )
+        )
+        notification = result.scalar_one_or_none()
+        if not notification:
+            raise ValueError("Notification not found")
+        await db.delete(notification)
+        await db.flush()
+
+    async def delete_all_member_notifications(self, db: AsyncSession, member_id: UUID) -> int:
+        result = await db.execute(
+            select(Notification).where(Notification.member_id == member_id)
+        )
+        items = result.scalars().all()
+        for n in items:
+            await db.delete(n)
+        await db.flush()
+        return len(items)
+
+    async def delete_notification_by_id(
+        self, db: AsyncSession, notification_id: UUID, *, actor_id: UUID | None = None
+    ) -> None:
+        notification = await db.get(Notification, notification_id)
+        if not notification:
+            raise ValueError("Notification not found")
+        await db.delete(notification)
+        await db.flush()
+        await self.log_activity(
+            db,
+            actor_id=actor_id,
+            action="notification_deleted",
+            entity_type="notification",
+            entity_id=notification_id,
+        )
+
+    async def delete_announcement_notifications(
+        self, db: AsyncSession, *, title: str
+    ) -> int:
+        result = await db.execute(
+            select(Notification).where(
+                Notification.type == "announcement",
+                Notification.title == title,
+            )
+        )
+        items = result.scalars().all()
+        for n in items:
+            await db.delete(n)
+        await db.flush()
+        return len(items)
+
+    async def scan_dues_reminder_notifications(self, db: AsyncSession) -> int:
+        """Remind members with unpaid current-month dues in the last 3 days of the month."""
+        import calendar
+
+        from v1.core.dues import DUES_REMINDER_DAYS_BEFORE_MONTH_END, period_label
+
+        today = datetime.now(timezone.utc).date()
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        days_left = last_day - today.day
+        if days_left > DUES_REMINDER_DAYS_BEFORE_MONTH_END or days_left < 0:
+            return 0
+
+        day_start = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+        reminder_title = f"Dues reminder — {period_label(today.year, today.month)}"
+        created = 0
+
+        members = (
+            await db.execute(select(Member).where(Member.status == MemberStatus.ACTIVE.value))
+        ).scalars().all()
+
+        for member in members:
+            dues = await self.get_member_dues(db, member)
+            if dues.get("current_status") == "paid":
+                continue
+
+            existing = await db.scalar(
+                select(func.count())
+                .select_from(Notification)
+                .where(
+                    Notification.member_id == member.id,
+                    Notification.type == "contribution",
+                    Notification.title == reminder_title,
+                    Notification.created_at >= day_start,
+                )
+            )
+            if existing:
+                continue
+
+            amount = dues.get("monthly_amount", 30)
+            await self.create_notification(
+                db,
+                member_id=member.id,
+                type="contribution",
+                title=reminder_title,
+                message=(
+                    f"{days_left + 1} day(s) left in {period_label(today.year, today.month)}. "
+                    f"Pay your GHS {amount:.2f} dues on the Contributions page."
+                ),
+            )
+            created += 1
+
+        return created
+
     async def archive_announcement(
         self,
         db: AsyncSession,
@@ -1382,8 +1552,10 @@ class PlatformService:
         announcement = await db.get(Announcement, announcement_id)
         if not announcement or announcement.archived:
             raise ValueError("Announcement not found")
+        title = announcement.title
         announcement.archived = True
         await db.flush()
+        await self.delete_announcement_notifications(db, title=title)
         await self.log_activity(
             db,
             actor_id=actor_id,

@@ -20,12 +20,12 @@ DEFAULT_PAYMENT_SETTINGS: dict = {
         "Pay securely with card or mobile money via Paystack. "
         "Your dues are updated instantly after a successful payment."
     ),
-    "momo_enabled": True,
+    "momo_enabled": False,
     "momo_label": "Mobile Money (MTN)",
     "momo_detail": "Send your monthly dues to the welfare MoMo number below. Use your Member ID as the reference.",
     "momo_number": "024 XXX XXXX",
     "momo_account_name": "OSAJA'20 Welfare Fund",
-    "bank_enabled": True,
+    "bank_enabled": False,
     "bank_label": "Bank transfer",
     "bank_detail": "Transfer to the welfare account. Share your receipt with the treasurer on WhatsApp.",
     "bank_name": "GCB Bank",

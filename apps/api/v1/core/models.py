@@ -139,6 +139,7 @@ class Vote(Base):
     minimum_contribution: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     executive_only: Mapped[bool] = mapped_column(Boolean, default=False)
     results_published: Mapped[bool] = mapped_column(Boolean, default=False)
+    results_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

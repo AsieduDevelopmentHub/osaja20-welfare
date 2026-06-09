@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeaderSkeleton, Skeleton } from "@osaja/ui";
-import { Loader2, Save, Settings } from "lucide-react";
+import { CreditCard, Loader2, Save, Settings, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { apiFetch } from "@/lib/api";
@@ -37,7 +37,7 @@ export default function SettingsPage() {
         body: JSON.stringify(settings),
       });
       setSettings(res.data as PaymentSettings);
-      setMessage("Payment settings saved. Members will see updated payment options.");
+      setMessage("Settings saved. Members will see updated payment options on Contributions.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -53,7 +53,6 @@ export default function SettingsPage() {
           <Skeleton variant="dark" className="h-5 w-40" />
           <Skeleton variant="dark" className="h-10 w-full" />
           <Skeleton variant="dark" className="h-10 w-full" />
-          <Skeleton variant="dark" className="h-24 w-full" />
         </div>
       </div>
     );
@@ -66,8 +65,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
-        title="Platform settings"
-        description="Paystack online payments and optional manual MoMo/bank instructions."
+        title="Payment settings"
+        description="Configure what members see on the Contributions page — Paystack online pay is the default."
       />
 
       {message ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{message}</p> : null}
@@ -76,35 +75,30 @@ export default function SettingsPage() {
       <form onSubmit={save} className="space-y-6">
         <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold text-white">Paystack (online payments)</h2>
+            <h2 className="flex items-center gap-2 font-semibold text-white">
+              <CreditCard className="h-5 w-5 text-brand-gold" />
+              Paystack (primary)
+            </h2>
             <label className="flex items-center gap-2 text-sm text-slate-300">
               <input
                 type="checkbox"
                 checked={settings.paystack_enabled}
                 onChange={(e) => update("paystack_enabled", e.target.checked)}
               />
-              Enabled for members
+              Show Pay with Paystack
             </label>
           </div>
-          <p className="mb-4 text-sm text-slate-400">
+          <p className="text-sm text-slate-400">
             {settings.paystack_configured
-              ? "Paystack keys are configured on the API server. Members can pay dues online."
+              ? "Paystack keys are configured. Members pay dues online and balances update instantly."
               : "Add PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY to apps/api/.env to enable online payments."}
           </p>
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={settings.manual_payment_enabled}
-              onChange={(e) => update("manual_payment_enabled", e.target.checked)}
-            />
-            Also show manual MoMo / bank instructions (fallback)
-          </label>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 font-semibold text-white">
             <Settings className="h-5 w-5 text-brand-gold" />
-            Dues & general
+            Dues amount &amp; copy
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Monthly dues (GHS)">
@@ -120,96 +114,121 @@ export default function SettingsPage() {
             <Field label="Currency">
               <input value={settings.currency} onChange={(e) => update("currency", e.target.value)} className="input-dark" />
             </Field>
-            <Field label="Payment section title" className="sm:col-span-2">
+            <Field label="Payment panel title" className="sm:col-span-2">
               <input value={settings.title} onChange={(e) => update("title", e.target.value)} className="input-dark" />
             </Field>
-            <Field label="Footer note" className="sm:col-span-2">
+            <Field label="Payment panel note" className="sm:col-span-2">
               <textarea
                 value={settings.note}
                 onChange={(e) => update("note", e.target.value)}
                 rows={2}
                 className="input-dark"
+                placeholder="Pay securely with card or mobile money via Paystack…"
               />
             </Field>
           </div>
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Mobile Money</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 font-semibold text-white">
+              <Smartphone className="h-5 w-5 text-brand-gold" />
+              Manual fallback (MoMo / bank)
+            </h2>
             <label className="flex items-center gap-2 text-sm text-slate-300">
               <input
                 type="checkbox"
-                checked={settings.momo_enabled}
-                onChange={(e) => update("momo_enabled", e.target.checked)}
+                checked={settings.manual_payment_enabled}
+                onChange={(e) => update("manual_payment_enabled", e.target.checked)}
               />
-              Enabled
+              Show on member Contributions page
             </label>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Label">
-              <input value={settings.momo_label} onChange={(e) => update("momo_label", e.target.value)} className="input-dark" />
-            </Field>
-            <Field label="MoMo number">
-              <input value={settings.momo_number} onChange={(e) => update("momo_number", e.target.value)} className="input-dark" />
-            </Field>
-            <Field label="Account name">
-              <input
-                value={settings.momo_account_name}
-                onChange={(e) => update("momo_account_name", e.target.value)}
-                className="input-dark"
-              />
-            </Field>
-            <Field label="Instructions" className="sm:col-span-2">
-              <textarea
-                value={settings.momo_detail}
-                onChange={(e) => update("momo_detail", e.target.value)}
-                rows={2}
-                className="input-dark"
-              />
-            </Field>
-          </div>
-        </section>
+          <p className="mb-4 text-sm text-slate-400">
+            Off by default. Enable only if some members cannot use Paystack and need MoMo or bank details.
+          </p>
 
-        <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Bank transfer</h2>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={settings.bank_enabled}
-                onChange={(e) => update("bank_enabled", e.target.checked)}
-              />
-              Enabled
-            </label>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Bank name">
-              <input value={settings.bank_name} onChange={(e) => update("bank_name", e.target.value)} className="input-dark" />
-            </Field>
-            <Field label="Account number">
-              <input
-                value={settings.bank_account_number}
-                onChange={(e) => update("bank_account_number", e.target.value)}
-                className="input-dark"
-              />
-            </Field>
-            <Field label="Account name" className="sm:col-span-2">
-              <input
-                value={settings.bank_account_name}
-                onChange={(e) => update("bank_account_name", e.target.value)}
-                className="input-dark"
-              />
-            </Field>
-            <Field label="Instructions" className="sm:col-span-2">
-              <textarea
-                value={settings.bank_detail}
-                onChange={(e) => update("bank_detail", e.target.value)}
-                rows={2}
-                className="input-dark"
-              />
-            </Field>
-          </div>
+          {settings.manual_payment_enabled ? (
+            <>
+              <div className="mb-6 space-y-4 border-t border-white/10 pt-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-slate-300">Mobile Money</h3>
+                  <label className="flex items-center gap-2 text-xs text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={settings.momo_enabled}
+                      onChange={(e) => update("momo_enabled", e.target.checked)}
+                    />
+                    Enabled
+                  </label>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Label">
+                    <input value={settings.momo_label} onChange={(e) => update("momo_label", e.target.value)} className="input-dark" />
+                  </Field>
+                  <Field label="MoMo number">
+                    <input value={settings.momo_number} onChange={(e) => update("momo_number", e.target.value)} className="input-dark" />
+                  </Field>
+                  <Field label="Account name" className="sm:col-span-2">
+                    <input
+                      value={settings.momo_account_name}
+                      onChange={(e) => update("momo_account_name", e.target.value)}
+                      className="input-dark"
+                    />
+                  </Field>
+                  <Field label="Instructions" className="sm:col-span-2">
+                    <textarea
+                      value={settings.momo_detail}
+                      onChange={(e) => update("momo_detail", e.target.value)}
+                      rows={2}
+                      className="input-dark"
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              <div className="space-y-4 border-t border-white/10 pt-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-slate-300">Bank transfer</h3>
+                  <label className="flex items-center gap-2 text-xs text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={settings.bank_enabled}
+                      onChange={(e) => update("bank_enabled", e.target.checked)}
+                    />
+                    Enabled
+                  </label>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Bank name">
+                    <input value={settings.bank_name} onChange={(e) => update("bank_name", e.target.value)} className="input-dark" />
+                  </Field>
+                  <Field label="Account number">
+                    <input
+                      value={settings.bank_account_number}
+                      onChange={(e) => update("bank_account_number", e.target.value)}
+                      className="input-dark"
+                    />
+                  </Field>
+                  <Field label="Account name" className="sm:col-span-2">
+                    <input
+                      value={settings.bank_account_name}
+                      onChange={(e) => update("bank_account_name", e.target.value)}
+                      className="input-dark"
+                    />
+                  </Field>
+                  <Field label="Instructions" className="sm:col-span-2">
+                    <textarea
+                      value={settings.bank_detail}
+                      onChange={(e) => update("bank_detail", e.target.value)}
+                      rows={2}
+                      className="input-dark"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </>
+          ) : null}
         </section>
 
         <button
@@ -218,7 +237,7 @@ export default function SettingsPage() {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold py-3 text-sm font-semibold text-brand-navy-dark disabled:opacity-50 sm:w-auto sm:px-8"
         >
           {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-          {saving ? "Saving..." : "Save payment settings"}
+          {saving ? "Saving..." : "Save settings"}
         </button>
       </form>
     </div>

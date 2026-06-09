@@ -1,7 +1,7 @@
 "use client";
 
 import { NotificationListSkeleton } from "@osaja/ui";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
 import { PageHeader } from "@/components/PageHeader";
@@ -36,19 +36,46 @@ export default function NotificationsPage() {
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  const deleteOne = async (id: string) => {
+    await apiFetch(`/notifications/${id}`, { method: "DELETE" });
+    setItems((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const deleteAll = async () => {
+    await apiFetch("/notifications", { method: "DELETE" });
+    setItems([]);
+  };
+
+  const unread = items.filter((n) => !n.read).length;
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="Notifications" description="Meetings, welfare updates, and announcements." />
-        {!loading && items.some((n) => !n.read) ? (
-          <button
-            type="button"
-            onClick={markAllRead}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white"
-          >
-            <CheckCheck className="h-4 w-4" />
-            Mark all read
-          </button>
+        <PageHeader
+          title="Notifications"
+          description={unread > 0 ? `${unread} unread` : "Meetings, welfare updates, and announcements."}
+        />
+        {!loading && items.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {unread > 0 ? (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white"
+              >
+                <CheckCheck className="h-4 w-4" />
+                Mark all read
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={deleteAll}
+              className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear all
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -63,23 +90,37 @@ export default function NotificationsPage() {
             </div>
           ) : (
             items.map((n) => (
-              <button
+              <div
                 key={n.id}
-                type="button"
-                onClick={() => !n.read && markRead(n.id)}
-                className={`w-full px-4 py-4 text-left transition hover:bg-slate-50/80 sm:px-6 ${!n.read ? "bg-brand-50/30" : ""}`}
+                className={`flex items-start gap-2 px-4 py-4 sm:px-6 ${!n.read ? "bg-brand-50/30" : ""}`}
               >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-slate-300" : "bg-brand-500"}`} />
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1.5">
-                      <NotificationTypeBadge type={n.type} />
+                <button
+                  type="button"
+                  onClick={() => !n.read && markRead(n.id)}
+                  className="min-w-0 flex-1 text-left transition hover:opacity-90"
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-slate-300" : "bg-brand-500"}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1.5">
+                        <NotificationTypeBadge type={n.type} />
+                      </div>
+                      <p className="font-medium text-slate-900">{n.title}</p>
+                      <p className="mt-1 text-sm text-slate-600">{n.message}</p>
                     </div>
-                    <p className="font-medium text-slate-900">{n.title}</p>
-                    <p className="mt-1 text-sm text-slate-600">{n.message}</p>
                   </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteOne(n.id)}
+                  aria-label="Delete notification"
+                  className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             ))
           )}
         </div>

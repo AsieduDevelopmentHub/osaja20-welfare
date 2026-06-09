@@ -55,6 +55,7 @@ def vote_to_dict(vote: Vote, options: list[VoteOption] | None = None) -> dict:
         "minimum_contribution": float(vote.minimum_contribution) if vote.minimum_contribution else None,
         "executive_only": vote.executive_only,
         "results_published": vote.results_published,
+        "results_published_at": vote.results_published_at.isoformat() if vote.results_published_at else None,
         "options": [
             {"id": str(o.id), "label": o.label, "sort_order": o.sort_order} for o in opts
         ],

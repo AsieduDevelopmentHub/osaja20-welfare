@@ -4,7 +4,6 @@ const DUES = {
   MONTHLY_AMOUNT: 30,
   CURRENCY: "GHS",
   EFFECTIVE_FROM: { year: 2025, month: 1 },
-  DUE_DAY: 5,
 } as const;
 
 export type DuesPeriodStatus = "paid" | "due" | "overdue" | "upcoming";
@@ -85,7 +84,8 @@ function iterDuePeriods(
 export function computeDuesSummary(
   memberSince: Date | string,
   paidPeriods: PaidPeriodInput[],
-  asOf: Date = new Date()
+  asOf: Date = new Date(),
+  monthlyAmount: number = DUES.MONTHLY_AMOUNT
 ): DuesSummary {
   const since = typeof memberSince === "string" ? new Date(memberSince) : memberSince;
   const memberStart = { year: since.getFullYear(), month: since.getMonth() + 1 };
@@ -98,9 +98,6 @@ export function computeDuesSummary(
   }
 
   const duePeriods = iterDuePeriods(memberStart, current);
-  const isOverdueMonth =
-    asOf.getDate() > DUES.DUE_DAY &&
-    comparePeriod(current, { year: asOf.getFullYear(), month: asOf.getMonth() + 1 }) === 0;
 
   let arrearsCount = 0;
   let totalOwed = 0;
@@ -108,9 +105,10 @@ export function computeDuesSummary(
 
   const periods: DuesPeriod[] = duePeriods.map(({ year, month }) => {
     const paidAmount = paidMap.get(periodKey(year, month)) ?? 0;
-    const isPaid = paidAmount >= DUES.MONTHLY_AMOUNT;
+    const isPaid = paidAmount >= monthlyAmount;
     const isCurrent = year === current.year && month === current.month;
     const isFuture = comparePeriod({ year, month }, current) > 0;
+    const isPast = comparePeriod({ year, month }, current) < 0;
 
     let status: DuesPeriodStatus;
     if (isPaid) {
@@ -118,19 +116,21 @@ export function computeDuesSummary(
       totalPaidMonths += 1;
     } else if (isFuture) {
       status = "upcoming";
-    } else if (isCurrent && !isOverdueMonth) {
+    } else if (isCurrent) {
       status = "due";
     } else {
       status = "overdue";
-      arrearsCount += 1;
-      totalOwed += DUES.MONTHLY_AMOUNT - paidAmount;
+      if (isPast) {
+        arrearsCount += 1;
+        totalOwed += monthlyAmount - paidAmount;
+      }
     }
 
     return {
       year,
       month,
       label: periodLabel(year, month),
-      amount: DUES.MONTHLY_AMOUNT,
+      amount: monthlyAmount,
       status,
       paidAmount,
     };
@@ -142,7 +142,7 @@ export function computeDuesSummary(
   else if (currentPeriod?.status === "overdue") currentStatus = "overdue";
 
   return {
-    monthlyAmount: DUES.MONTHLY_AMOUNT,
+    monthlyAmount,
     currency: DUES.CURRENCY,
     currentMonth: { ...current, label: periodLabel(current.year, current.month) },
     currentStatus,

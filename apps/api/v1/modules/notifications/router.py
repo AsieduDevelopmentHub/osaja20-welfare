@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -93,6 +92,43 @@ async def mark_all_read(
     return ApiResponse(success=True, message="All notifications marked as read")
 
 
+@router.delete("/{notification_id}", response_model=ApiResponse)
+async def delete_notification(
+    notification_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    try:
+        await platform_service.delete_member_notification(db, notification_id, current.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, message="Notification deleted")
+
+
+@router.delete("", response_model=ApiResponse)
+async def delete_all_notifications(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: Annotated[Member, Depends(get_current_member)],
+):
+    count = await platform_service.delete_all_member_notifications(db, current.id)
+    return ApiResponse(success=True, data={"deleted": count}, message="All notifications deleted")
+
+
+@router.delete("/admin/{notification_id}", response_model=ApiResponse)
+async def admin_delete_notification(
+    notification_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        await platform_service.delete_notification_by_id(
+            db, notification_id, actor_id=executive.id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, message="Notification deleted for member")
+
+
 @router.post("", response_model=ApiResponse)
 async def create_notification(
     payload: NotificationCreate,
@@ -115,7 +151,7 @@ async def scan_birthdays(
     db: Annotated[AsyncSession, Depends(get_db)],
     executive: Annotated[Member, Depends(require_executive)],
 ):
-    """On-demand birthday scan (replaces Celery worker). Creates celebration notifications."""
+    """On-demand birthday scan. Also runs automatically via the job worker."""
     created = await platform_service.scan_birthday_notifications(db, actor_id=executive.id)
     return ApiResponse(
         success=True,

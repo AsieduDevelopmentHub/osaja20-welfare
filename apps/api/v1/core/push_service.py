@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 NOTIFICATION_PREF_KEY: dict[str, str] = {
     "contribution": "notify_dues",
     "voting": "notify_votes",
-    "celebration": "notify_celebrations",
+    "celebration": "notify_birthdays",
     "announcement": "notify_announcements",
     "welfare": "notify_welfare",
     "meeting": "notify_announcements",

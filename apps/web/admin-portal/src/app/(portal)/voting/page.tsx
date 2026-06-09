@@ -101,10 +101,23 @@ export default function VotingPage() {
     setBusy(true);
     try {
       await apiFetch(`/voting/${id}/publish-results`, { method: "PATCH" });
-      setMessage("Results published — members can view on dashboard and voting page.");
+      setMessage("Results published — members can view for 7 days (auto-hidden after).");
       await load();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to publish results");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unpublishResults = async (id: string) => {
+    setBusy(true);
+    try {
+      await apiFetch(`/voting/${id}/unpublish-results`, { method: "PATCH" });
+      setMessage("Results hidden from members.");
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to unpublish results");
     } finally {
       setBusy(false);
     }
@@ -290,7 +303,19 @@ export default function VotingPage() {
                   </button>
                 ) : null}
                 {v.results_published ? (
-                  <span className="rounded-lg bg-white/10 px-3 py-1.5 text-xs text-slate-300">Results live</span>
+                  <>
+                    <span className="rounded-lg bg-white/10 px-3 py-1.5 text-xs text-slate-300">
+                      Results live · auto-hides after 7 days
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => unpublishResults(v.id)}
+                      className="rounded-lg bg-red-600/20 px-3 py-1.5 text-xs font-medium text-red-300"
+                    >
+                      Unpublish
+                    </button>
+                  </>
                 ) : null}
                 <button
                   type="button"

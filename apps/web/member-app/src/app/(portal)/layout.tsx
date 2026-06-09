@@ -4,6 +4,8 @@ import { FloatingContact, MobileShell, memberNavItems, PortalShellSkeleton } fro
 import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { NotificationBell } from "@/components/NotificationBell";
+import { PushAutoEnable } from "@/components/PushAutoEnable";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth";
 import { getToken } from "@/lib/api";
@@ -34,6 +36,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       brandTitle={BRAND_COPY.name}
       brandSubtitle="Member Portal"
       mobilePrimaryCount={4}
+      headerRight={<NotificationBell />}
       footer={
         <div className="rounded-xl bg-brand-navy/5 p-4">
           <div className="flex items-center gap-3">
@@ -56,6 +59,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
       }
     >
+      <PushAutoEnable />
       {children}
       <FloatingContact
         variant="light"
