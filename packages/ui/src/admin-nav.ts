@@ -1,8 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Cake,
   ClipboardList,
   HeartHandshake,
+  MessageSquare,
   Megaphone,
   Settings,
   User,
@@ -19,6 +21,8 @@ export const adminNavItems: NavItem[] = [
   { href: "/contributions", label: "Contributions", icon: Wallet },
   { href: "/voting", label: "Voting", icon: Vote },
   { href: "/announcements", label: "Announcements", icon: Megaphone },
+  { href: "/inquiries", label: "Inquiries", icon: MessageSquare },
+  { href: "/birthdays", label: "Birthdays", icon: Cake },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/activity", label: "Activity", icon: ClipboardList },
   { href: "/profile", label: "My profile", icon: User },
@@ -38,6 +42,8 @@ export const adminModules: AdminModule[] = [
   { name: "Contributions", desc: "Ledger & receipts", href: "/contributions", icon: Wallet },
   { name: "Voting", desc: "Elections & decisions", href: "/voting", icon: Vote },
   { name: "Announcements", desc: "Publish & notify", href: "/announcements", icon: Megaphone },
+  { name: "Inquiries", desc: "Member messages & replies", href: "/inquiries", icon: MessageSquare },
+  { name: "Birthdays", desc: "Monthly celebrations", href: "/birthdays", icon: Cake },
   { name: "Reports", desc: "Export CSV & summaries", href: "/reports", icon: BarChart3 },
   { name: "Settings", desc: "Payment gateways & dues", href: "/settings", icon: Settings },
 ];

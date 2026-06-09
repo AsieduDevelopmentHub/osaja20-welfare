@@ -136,7 +136,7 @@ export default function DashboardPage() {
         }
       >
         <StatCard
-          label="Fund balance"
+          label="Total contributions"
           value={formatCurrency(dues?.balance ?? 0)}
           icon={Wallet}
           iconClassName="text-emerald-600"

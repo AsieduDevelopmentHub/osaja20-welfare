@@ -5,6 +5,8 @@ import { BRAND_COPY, BRAND_PATHS } from "@osaja/config";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { NotificationBell } from "@/components/NotificationBell";
+import { PushAutoEnable } from "@/components/PushAutoEnable";
 import { getToken } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { env } from "@/lib/env";
@@ -35,6 +37,7 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
       brandTitle={BRAND_COPY.name}
       brandSubtitle="Admin Portal"
       mobilePrimaryCount={4}
+      headerRight={<NotificationBell />}
       footer={
         <div className="rounded-xl bg-white/5 p-4">
           <Link href="/profile" className="block hover:opacity-90">
@@ -61,6 +64,7 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
         </div>
       }
     >
+      <PushAutoEnable />
       {children}
       <FloatingContact
         variant="dark"

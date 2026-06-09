@@ -241,7 +241,7 @@ export default function AdminSelfProfilePage() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Fund balance</dt>
+              <dt className="text-xs text-slate-500">Total contributions</dt>
               <dd className="text-slate-200">
                 {loadingExtras ? (
                   <Skeleton variant="dark" className="inline-block h-4 w-24" />

@@ -7,6 +7,8 @@ DEFAULT_MEMBER_PREFERENCES: dict[str, bool] = {
     "notify_announcements": True,
     "notify_welfare": True,
     "notify_celebrations": True,
+    "notify_support": True,
+    "notify_payments": True,
     "email_digest": False,
     "compact_dashboard": False,
 }

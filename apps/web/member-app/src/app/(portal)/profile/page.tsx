@@ -86,7 +86,7 @@ export default function ProfilePage() {
           <p className="font-semibold text-slate-900">Contributions & dues</p>
           <p className="text-sm text-slate-500">
             {dues
-              ? `${formatCurrency(env.monthlyDuesAmount)}/month · Balance ${formatCurrency(dues.balance)}`
+              ? `${formatCurrency(env.monthlyDuesAmount)}/month · ${formatCurrency(dues.balance)} contributed`
               : "View payment history and dues status"}
           </p>
         </div>

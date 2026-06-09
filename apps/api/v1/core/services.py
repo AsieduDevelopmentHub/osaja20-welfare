@@ -32,6 +32,8 @@ from v1.core.models import (
     MemberStatus,
     Notification,
     PushSubscription,
+    SupportInquiry,
+    SupportInquiryStatus,
     UserRole,
     Vote,
     VoteAuditLog,
@@ -658,6 +660,21 @@ class PlatformService:
                 else f"GHS {float(contribution.amount):.2f} {contrib_type} payment recorded. Ref: {ref or '—'}"
             ),
             actor_id=actor_id,
+        )
+
+        payer = await db.get(Member, member_uuid)
+        payer_label = f"{payer.full_name} ({payer.membership_id})" if payer else "Member"
+        await self.notify_executives(
+            db,
+            notification_type="payment",
+            title="Member payment received" if is_online else "Contribution recorded",
+            message=(
+                f"{payer_label}: GHS {float(contribution.amount):.2f} {contrib_type} paid online. Ref: {ref}"
+                if is_online
+                else f"{payer_label}: GHS {float(contribution.amount):.2f} {contrib_type} recorded. Ref: {ref or '—'}"
+            ),
+            actor_id=actor_id,
+            exclude_member_ids={member_uuid},
         )
 
         return contribution_to_dict(contribution, registry.ledger.get_balance(data["member_id"]))
@@ -1415,6 +1432,45 @@ class PlatformService:
 
         return self._wish_to_dict(reply, await self._author_brief(db, recipient_id))
 
+    def _push_url_for_type(self, notification_type: str) -> str:
+        return {
+            "support": "/inquiries",
+            "payment": "/contributions",
+        }.get(notification_type, "/notifications")
+
+    async def notify_executives(
+        self,
+        db: AsyncSession,
+        *,
+        notification_type: str,
+        title: str,
+        message: str,
+        actor_id: UUID | None = None,
+        exclude_member_ids: set[UUID] | None = None,
+    ) -> int:
+        excluded = exclude_member_ids or set()
+        result = await db.execute(
+            select(Member).where(
+                Member.role.in_([UserRole.EXECUTIVE.value, UserRole.ADMINISTRATOR.value]),
+                Member.status == MemberStatus.ACTIVE.value,
+            )
+        )
+        executives = result.scalars().all()
+        notified = 0
+        for exec_member in executives:
+            if exec_member.id in excluded:
+                continue
+            await self.create_notification(
+                db,
+                member_id=exec_member.id,
+                type=notification_type,
+                title=title,
+                message=message,
+                actor_id=actor_id,
+            )
+            notified += 1
+        return notified
+
     async def create_notification(
         self,
         db: AsyncSession,
@@ -1425,6 +1481,7 @@ class PlatformService:
         message: str,
         actor_id: UUID | None = None,
         push_pending: bool = True,
+        push_url: str | None = None,
     ) -> dict:
         now = datetime.now(timezone.utc)
         notification = Notification(
@@ -1445,6 +1502,8 @@ class PlatformService:
             entity_id=notification.id,
         )
 
+        target_url = push_url or self._push_url_for_type(type)
+
         if push_pending:
             delivered = await self.deliver_push_notification(
                 db,
@@ -1453,6 +1512,7 @@ class PlatformService:
                 notification_type=type,
                 title=title,
                 message=message,
+                url=target_url,
             )
             if delivered:
                 notification.push_pending = False
@@ -1464,7 +1524,7 @@ class PlatformService:
                     "notification_type": type,
                     "title": title,
                     "message": message,
-                    "url": "/notifications",
+                    "url": target_url,
                 }
                 await job_queue.enqueue("push_notification", push_payload)
 
@@ -2016,6 +2076,20 @@ class PlatformService:
         )
         return True
 
+    def _support_inquiry_dict(self, inquiry: SupportInquiry, member: Member | None = None) -> dict:
+        return {
+            "id": str(inquiry.id),
+            "member_id": str(inquiry.member_id),
+            "member_name": member.full_name if member else None,
+            "membership_id": member.membership_id if member else None,
+            "subject": inquiry.subject,
+            "message": inquiry.message,
+            "status": inquiry.status,
+            "admin_reply": inquiry.admin_reply,
+            "replied_at": inquiry.replied_at.isoformat() if inquiry.replied_at else None,
+            "created_at": inquiry.created_at.isoformat(),
+        }
+
     async def submit_support_inquiry(
         self,
         db: AsyncSession,
@@ -2027,32 +2101,102 @@ class PlatformService:
         title = subject.strip() if subject and subject.strip() else "Member inquiry"
         body = f"{member.full_name} ({member.membership_id}): {message.strip()}"
 
-        result = await db.execute(
-            select(Member).where(
-                Member.role.in_([UserRole.EXECUTIVE.value, UserRole.ADMINISTRATOR.value]),
-                Member.status == MemberStatus.ACTIVE.value,
-            )
+        inquiry = SupportInquiry(
+            member_id=member.id,
+            subject=title if subject and subject.strip() else None,
+            message=message.strip(),
+            status=SupportInquiryStatus.OPEN.value,
         )
-        executives = result.scalars().all()
-        for exec_member in executives:
-            await self.create_notification(
-                db,
-                member_id=exec_member.id,
-                type="support",
-                title=title,
-                message=body,
-                actor_id=member.id,
-            )
+        db.add(inquiry)
+        await db.flush()
+
+        notified = await self.notify_executives(
+            db,
+            notification_type="support",
+            title=title,
+            message=body,
+            actor_id=member.id,
+            exclude_member_ids={member.id},
+        )
 
         await self.log_activity(
             db,
             actor_id=member.id,
             action="support_inquiry_sent",
-            entity_type="member",
-            entity_id=member.id,
-            metadata={"executive_count": len(executives)},
+            entity_type="support_inquiry",
+            entity_id=inquiry.id,
+            metadata={"executive_count": notified},
         )
-        return {"notified": len(executives)}
+        data = self._support_inquiry_dict(inquiry, member)
+        data["notified"] = notified
+        return data
+
+    async def list_support_inquiries(
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+    ) -> dict:
+        count_query = select(func.count()).select_from(SupportInquiry)
+        if status:
+            count_query = count_query.where(SupportInquiry.status == status)
+        total = await db.scalar(count_query)
+
+        query = select(SupportInquiry, Member).join(Member, SupportInquiry.member_id == Member.id)
+        if status:
+            query = query.where(SupportInquiry.status == status)
+        query = query.order_by(SupportInquiry.created_at.desc())
+        result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+        items = [self._support_inquiry_dict(inquiry, member) for inquiry, member in result.all()]
+        return {
+            "items": items,
+            "page": page,
+            "page_size": page_size,
+            "total": total or 0,
+        }
+
+    async def reply_support_inquiry(
+        self,
+        db: AsyncSession,
+        *,
+        inquiry_id: UUID,
+        executive: Member,
+        reply_message: str,
+    ) -> dict:
+        inquiry = await db.get(SupportInquiry, inquiry_id)
+        if not inquiry:
+            raise ValueError("Inquiry not found")
+
+        member = await db.get(Member, inquiry.member_id)
+        now = datetime.now(timezone.utc)
+        inquiry.admin_reply = reply_message.strip()
+        inquiry.replied_by = executive.id
+        inquiry.replied_at = now
+        inquiry.status = SupportInquiryStatus.RESOLVED.value
+        await db.flush()
+
+        member_name = member.full_name if member else "Member"
+        await self.create_notification(
+            db,
+            member_id=inquiry.member_id,
+            type="support",
+            title="Reply from welfare team",
+            message=f"{executive.full_name} replied to your inquiry: {reply_message.strip()}",
+            actor_id=executive.id,
+            push_url="/notifications",
+        )
+
+        await self.log_activity(
+            db,
+            actor_id=executive.id,
+            action="support_inquiry_replied",
+            entity_type="support_inquiry",
+            entity_id=inquiry.id,
+            metadata={"member_name": member_name},
+        )
+        return self._support_inquiry_dict(inquiry, member)
 
 
 platform_service = PlatformService()

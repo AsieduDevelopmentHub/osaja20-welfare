@@ -143,8 +143,10 @@ export type NotificationType =
   | "welfare"
   | "announcement"
   | "contribution"
+  | "payment"
   | "celebration"
-  | "voting";
+  | "voting"
+  | "support";
 
 export interface Notification {
   id: string;

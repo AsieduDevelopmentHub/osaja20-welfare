@@ -78,7 +78,7 @@ export function DuesStatusBanner({ dues, compact = false }: { dues: DuesSummary;
       </div>
 
       <div className="grid grid-cols-2 gap-px bg-slate-100/80 sm:grid-cols-4">
-        <Stat label="Fund balance" value={formatCurrency(dues.balance)} />
+        <Stat label="Total contributions" value={formatCurrency(dues.balance)} />
         <Stat label="Months paid" value={String(dues.totalPaidMonths)} />
         <Stat label="Arrears" value={String(dues.arrearsCount)} highlight={dues.arrearsCount > 0} />
         <Stat

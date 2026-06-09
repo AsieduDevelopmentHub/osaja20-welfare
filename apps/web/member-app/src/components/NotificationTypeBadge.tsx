@@ -1,11 +1,13 @@
 import type { NotificationType } from "@osaja/types";
-import { Bell, Cake, Megaphone, Receipt, Users, Vote } from "lucide-react";
+import { Bell, Cake, Megaphone, MessageSquare, Receipt, Users, Vote, Wallet } from "lucide-react";
 
 const TYPE_CONFIG: Record<
   NotificationType | string,
   { label: string; className: string; icon: typeof Bell }
 > = {
   contribution: { label: "Contribution", className: "bg-emerald-50 text-emerald-700", icon: Receipt },
+  payment: { label: "Payment", className: "bg-teal-50 text-teal-700", icon: Wallet },
+  support: { label: "Support", className: "bg-indigo-50 text-indigo-700", icon: MessageSquare },
   celebration: { label: "Birthday", className: "bg-amber-50 text-amber-700", icon: Cake },
   announcement: { label: "Announcement", className: "bg-blue-50 text-blue-700", icon: Megaphone },
   voting: { label: "Voting", className: "bg-violet-50 text-violet-700", icon: Vote },

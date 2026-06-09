@@ -201,6 +201,10 @@ class SupportInquiryCreate(BaseModel):
     subject: str | None = Field(default=None, max_length=120)
 
 
+class SupportInquiryReply(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+
+
 class ApiResponse(BaseModel):
     success: bool
     data: dict | list | None = None
