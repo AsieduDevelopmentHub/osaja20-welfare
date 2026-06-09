@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Charity giving">
+  <defs>
+    <linearGradient id="bg" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1e4a8c"/>
+      <stop offset="100%" stop-color="#031025"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect x="300" y="250" width="200" height="140" rx="16" fill="#c9a227" opacity="0.85"/>
+  <rect x="330" y="220" width="140" height="40" rx="8" fill="#e4c04a"/>
+  <text x="48" y="520" fill="#e4c04a" font-family="system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="0.2em">GIVING</text>
+  <text x="48" y="120" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">Charity</text>
+  <text x="48" y="168" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">giving</text>
+</svg>

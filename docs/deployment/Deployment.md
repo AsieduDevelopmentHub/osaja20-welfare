@@ -6,19 +6,21 @@ Production deployment for **OSAJA'20 Welfare**: API on Render, member + admin ap
 
 | Component | Host | Repo path | Public URL (example) |
 |-----------|------|-----------|----------------------|
-| API (FastAPI) | Render | `apps/api` | `https://osaja-api.onrender.com` |
-| Member app | Vercel | `apps/web/member-app` | `https://osaja-members.vercel.app` |
-| Admin portal | Vercel | `apps/web/admin-portal` | `https://osaja-admin.vercel.app` |
+| **Landing site** | Vercel | `apps/web/landing` | `https://osaja2020welfare.org` |
+| API (FastAPI) | Render | `apps/api` | `https://api.osaja2020welfare.org` |
+| Member app | Vercel | `apps/web/member-app` | `https://member.osaja2020welfare.org` |
+| Admin portal | Vercel | `apps/web/admin-portal` | `https://admin.osaja2020welfare.org` |
 | Database | Supabase | — | PostgreSQL session pooler `:5432` |
 
 **Deploy in this order:**
 
 1. Supabase project + `DATABASE_URL`
 2. **API** on Render → note the API URL
-3. **Member app** on Vercel → note the member URL
-4. **Admin portal** on Vercel
-5. Update API env (`CORS_ORIGINS`, `MEMBER_PORTAL_URL`) and redeploy API
-6. Supabase auth redirect URLs + Paystack webhook (if used)
+3. **Landing site** on Vercel (apex domain) → note the public URL
+4. **Member app** on Vercel → note the member URL
+5. **Admin portal** on Vercel
+6. Update API env (`CORS_ORIGINS`, `MEMBER_PORTAL_URL`) and redeploy API
+7. Supabase auth redirect URLs + Paystack webhook (if used)
 
 Both Next.js apps proxy `/api/v1` and `/uploads` to the API using `API_PROXY_TARGET` (server-side). The browser usually talks to the same origin as the app, not Render directly.
 
@@ -97,7 +99,42 @@ python scripts/create_admin.py
 
 ---
 
-## 2. Member app on Vercel
+## 2. Landing site on Vercel
+
+Public marketing site for the welfare organisation — vision, mission, gallery, and links to the member and admin portals.
+
+### Create the project
+
+1. Vercel → **Add New** → **Project** → same repo (separate project from member/admin).
+2. **Project name:** e.g. `osaja-landing`.
+3. **Root Directory:** `apps/web/landing`.
+4. Leave Install/Build empty (uses `apps/web/landing/vercel.json`).
+5. **Deploy**.
+
+### Environment variables
+
+| Variable | Required | Value |
+|----------|----------|--------|
+| `NEXT_PUBLIC_SITE_URL` | Recommended | `https://osaja2020welfare.org` (or your apex domain) |
+| `NEXT_PUBLIC_MEMBER_URL` | Recommended | `https://member.osaja2020welfare.org` |
+| `NEXT_PUBLIC_ADMIN_URL` | Optional | `https://admin.osaja2020welfare.org` |
+
+The landing app does **not** need `API_PROXY_TARGET` — it is static marketing content only.
+
+### Gallery photos
+
+1. Add images to `apps/web/landing/public/gallery/` (`.jpg`, `.png`, or `.webp`).
+2. Update `GALLERY_ITEMS` in `packages/config/src/landing.ts` with titles, dates, and image paths.
+3. Redeploy the landing project.
+
+### Verify landing site
+
+1. Open the apex URL — hero, vision, gallery, and portal CTAs load.
+2. **Member portal** and **Admin** buttons point to the correct subdomains.
+
+---
+
+## 3. Member app on Vercel
 
 ### Create the project
 
@@ -154,7 +191,7 @@ If using Supabase Auth, in **Supabase → Authentication → URL Configuration**
 
 ---
 
-## 3. Admin portal on Vercel
+## 4. Admin portal on Vercel
 
 ### Create the project
 
@@ -185,7 +222,7 @@ Full list: `apps/web/admin-portal/.env.local.example`.
 
 ---
 
-## 4. Wire URLs back to the API
+## 5. Wire URLs back to the API
 
 After both Vercel URLs exist, update **Render** env and redeploy API:
 
@@ -202,15 +239,16 @@ https://YOUR-API.onrender.com/api/v1/payments/webhook
 
 ---
 
-## 5. Custom domains (optional)
+## 6. Custom domains (optional)
 
 | App | Suggested |
 |-----|-----------|
-| Member | `members.osaja20.org` |
-| Admin | `admin.osaja20.org` |
-| API | `api.osaja20.org` (CNAME to Render) |
+| Landing | `osaja2020welfare.org` or `osaja2020.org` (apex / `www`) |
+| Member | `member.osaja2020welfare.org` |
+| Admin | `admin.osaja2020welfare.org` |
+| API | `api.osaja2020welfare.org` (CNAME to Render) |
 
-Update `CORS_ORIGINS`, `MEMBER_PORTAL_URL`, `NEXT_PUBLIC_SITE_URL`, and Supabase redirect URLs to match.
+Update `CORS_ORIGINS`, `MEMBER_PORTAL_URL`, landing `NEXT_PUBLIC_*_URL`, member/admin `NEXT_PUBLIC_SITE_URL`, and Supabase redirect URLs to match.
 
 ---
 
@@ -234,6 +272,7 @@ pnpm install
 pnpm --filter "./packages/*" build
 pnpm --filter @osaja/member-app build
 pnpm --filter @osaja/admin-portal build
+pnpm --filter @osaja/landing build
 ```
 
 ---

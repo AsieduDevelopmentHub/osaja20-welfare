@@ -29,5 +29,14 @@ export const CONTRIBUTION = {
 export { DUES } from "./dues.js";
 
 export { BRAND, BRAND_COPY, BRAND_PATHS } from "./brand.js";
+export {
+  GALLERY_CATEGORY_LABELS,
+  GALLERY_ITEMS,
+  LANDING_COPY,
+  LANDING_PORTAL_URLS,
+  type GalleryCategory,
+  type GalleryItem,
+  type LandingPillar,
+} from "./landing.js";
 export { SITE_META, resolveSiteUrl } from "./site.js";
 export { nextSecurityHeaders } from "./security-headers.js";

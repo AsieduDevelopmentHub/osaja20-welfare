@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Welfare support">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#061d47"/>
+      <stop offset="50%" stop-color="#0a2d6e"/>
+      <stop offset="100%" stop-color="#1e4a8c"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <path d="M400 170c-44 0-80 36-80 80 0 60 80 140 80 140s80-80 80-140c0-44-36-80-80-80z" fill="#c9a227" opacity="0.9"/>
+  <text x="48" y="520" fill="#e4c04a" font-family="system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="0.2em">WELFARE</text>
+  <text x="48" y="120" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">Member</text>
+  <text x="48" y="168" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">support</text>
+</svg>

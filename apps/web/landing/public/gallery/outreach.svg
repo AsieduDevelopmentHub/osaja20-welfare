@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Community outreach">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a2d6e"/>
+      <stop offset="55%" stop-color="#2b6cb0"/>
+      <stop offset="100%" stop-color="#5a9fd4"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <circle cx="680" cy="120" r="140" fill="#c9a227" opacity="0.18"/>
+  <circle cx="120" cy="520" r="180" fill="#ffffff" opacity="0.06"/>
+  <text x="48" y="520" fill="#e4c04a" font-family="system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="0.2em">OUTREACH</text>
+  <text x="48" y="120" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">Community</text>
+  <text x="48" y="168" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">outreach</text>
+  <text x="48" y="220" fill="#dbeafe" font-family="system-ui,sans-serif" font-size="18">OSAJA&apos;20 Welfare</text>
+</svg>

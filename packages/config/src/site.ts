@@ -25,4 +25,13 @@ export const SITE_META = {
     siteName: `${BRAND_COPY.name} Admin`,
     defaultUrl: "http://localhost:3001",
   },
+  landing: {
+    favicon: BRAND_PATHS.welfareLogo,
+    ogImage: BRAND_PATHS.welfareLogo,
+    ogImageAlt: `${BRAND_COPY.name} ${BRAND_COPY.welfare} logo`,
+    title: `${BRAND_COPY.name} ${BRAND_COPY.welfare}`,
+    description: `${BRAND_COPY.batch} — ${BRAND_COPY.tagline}. Official welfare organisation for former students united in care, support, and community.`,
+    siteName: `${BRAND_COPY.name} ${BRAND_COPY.welfare}`,
+    defaultUrl: "http://localhost:3002",
+  },
 } as const;

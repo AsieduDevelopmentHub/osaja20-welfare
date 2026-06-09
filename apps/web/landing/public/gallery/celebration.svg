@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Celebration">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#9a7b1a"/>
+      <stop offset="40%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#0a2d6e"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <circle cx="640" cy="180" r="8" fill="#fff"/>
+  <circle cx="680" cy="220" r="6" fill="#fff" opacity="0.8"/>
+  <circle cx="600" cy="240" r="5" fill="#fff" opacity="0.7"/>
+  <text x="48" y="520" fill="#ffffff" font-family="system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="0.2em">CELEBRATION</text>
+  <text x="48" y="120" fill="#ffffff" font-family="system-ui,sans-serif" font-size="42" font-weight="700">End of year</text>
+  <text x="48" y="168" fill="#fff9eb" font-family="system-ui,sans-serif" font-size="42" font-weight="700">celebration</text>
+</svg>
