@@ -33,6 +33,12 @@ const onlyArg = args.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.replace("--only=", "").split(",").map((s) => s.trim()) : null;
 
 const steps = [
+  {
+    id: "packages",
+    label: "Build workspace packages",
+    ...pnpmInvoke(["--filter", "./packages/*", "build"]),
+    cwd: root,
+  },
   { id: "lint", label: "Lint", ...pnpmInvoke(["lint"]), cwd: root },
   { id: "typecheck", label: "Typecheck", ...pnpmInvoke(["typecheck"]), cwd: root },
   { id: "build", label: "Build", ...pnpmInvoke(["build"]), cwd: root, skip: skipBuild },
