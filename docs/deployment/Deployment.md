@@ -51,28 +51,56 @@ alembic upgrade head
 
 For databases created before Alembic was introduced, run `alembic upgrade head` once to apply `20260605_incremental`.
 
-## API deploy steps
+## API deploy steps (Render)
+
+**Root directory:** `apps/api`
+
+| Setting | Value |
+|---------|--------|
+| Runtime | Python **3.12** (not 3.14 — `pydantic-core` has no wheel yet) |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn v1.main:app --host 0.0.0.0 --port $PORT` |
+
+Pin Python via `apps/api/.python-version` / `runtime.txt` (`3.12.8`) or Render env `PYTHON_VERSION=3.12.8`.
+
+If the build fails with `pydantic-core` / `maturin` / Rust errors, Render is on Python 3.14 and compiling from source — switch to 3.12.
 
 ```bash
 cd apps/api
 pip install -r requirements.txt
 alembic upgrade head   # optional if schema already current
-uvicorn v1.main:app --host 0.0.0.1 --port 8000
+uvicorn v1.main:app --host 0.0.0.0 --port 8000
 ```
 
 Use a process manager (systemd, Docker, Render web service) and persist the `uploads/` volume for avatars.
 
-## Web deploy steps
+## Web deploy steps (Vercel)
+
+Deploy **member** and **admin** as **two separate Vercel projects** from the same GitHub repo.
+
+| Setting | Member app | Admin portal |
+|---------|------------|--------------|
+| Root directory | `apps/web/member-app` | `apps/web/admin-portal` |
+| Framework | Next.js | Next.js |
+
+Each app includes a `vercel.json` that installs from the monorepo root with **pnpm** and builds shared packages first. Do **not** use `npm install --prefix=../../..` — that only installs the repo root and misses `next` and workspace packages.
+
+**Required env (both apps):**
+
+- `API_PROXY_TARGET=https://your-api.onrender.com`
+
+**Admin only:**
+
+- `NEXT_PUBLIC_MEMBER_APP_URL=https://your-member-app.vercel.app`
+
+Override install/build in the Vercel UI only if you remove `vercel.json`; otherwise leave them empty so the file is used.
 
 ```bash
 pnpm install
-pnpm --filter @osaja/types build
-pnpm --filter @osaja/ui build
+pnpm --filter "./packages/*" build
 pnpm --filter @osaja/member-app build
 pnpm --filter @osaja/admin-portal build
 ```
-
-Deploy each Next.js app separately on Vercel with root directory set to the app folder.
 
 ## Health checks
 
