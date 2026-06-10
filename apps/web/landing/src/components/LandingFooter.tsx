@@ -1,6 +1,7 @@
 import { BRAND_COPY, BRAND_PATHS, LANDING_COPY } from "@osaja/config";
 import { BrandLogo } from "@osaja/ui";
 import Link from "next/link";
+import { aos } from "@/lib/aos";
 import { portalUrls } from "@/lib/env";
 
 const FOOTER_LINKS = [
@@ -17,7 +18,7 @@ export function LandingFooter() {
     <footer className="border-t border-brand-navy/10 bg-brand-navy-dark text-slate-300">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
-          <div>
+          <div {...aos("fade-up")}>
             <div className="flex items-center gap-3">
               <BrandLogo src={BRAND_PATHS.welfareLogo} alt={`${BRAND_COPY.name} logo`} size="sm" />
               <div>
@@ -31,7 +32,7 @@ export function LandingFooter() {
             <p className="mt-2 text-sm text-brand-gold-light">{BRAND_COPY.motto}</p>
           </div>
 
-          <div>
+          <div {...aos("fade-up", { delay: 100 })}>
             <p className="text-xs font-bold uppercase tracking-wider text-brand-gold">Explore</p>
             <ul className="mt-4 space-y-2 text-sm">
               {FOOTER_LINKS.map((link) => (
@@ -44,7 +45,7 @@ export function LandingFooter() {
             </ul>
           </div>
 
-          <div>
+          <div {...aos("fade-up", { delay: 200 })}>
             <p className="text-xs font-bold uppercase tracking-wider text-brand-gold">Members</p>
             <ul className="mt-4 space-y-2 text-sm">
               <li>

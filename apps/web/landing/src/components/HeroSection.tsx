@@ -3,6 +3,7 @@ import { BrandLogo } from "@osaja/ui";
 import { ArrowRight, Heart, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { aos } from "@/lib/aos";
 import { portalUrls } from "@/lib/env";
 
 export function HeroSection() {
@@ -16,7 +17,7 @@ export function HeroSection() {
 
       <div className="section-pad relative mx-auto max-w-6xl">
         <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-          <div>
+          <div {...aos("fade-right", { duration: 800 })}>
             <p className="section-label">{hero.eyebrow}</p>
             <h1 className="mt-4 text-4xl font-bold leading-[1.1] tracking-tight text-brand-navy sm:text-5xl lg:text-6xl">
               {hero.headline}
@@ -49,7 +50,7 @@ export function HeroSection() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
+          <div className="relative mx-auto w-full max-w-md lg:max-w-none" {...aos("fade-left", { delay: 150, duration: 900 })}>
             <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/60 p-6 shadow-hero backdrop-blur-sm">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-navy via-brand-blue to-brand-gold" />
               <div className="flex flex-col items-center text-center">

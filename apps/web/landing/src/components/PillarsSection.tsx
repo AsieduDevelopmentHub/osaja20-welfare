@@ -8,6 +8,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { aos } from "@/lib/aos";
 
 const ICONS: LucideIcon[] = [HandHeart, Wallet, Megaphone, Scale, Cake, Landmark];
 
@@ -17,9 +18,13 @@ export function PillarsSection() {
   return (
     <section id="pillars" className="section-pad scroll-mt-20 bg-white">
       <div className="mx-auto max-w-6xl">
-        <p className="section-label text-center">What we do</p>
-        <h2 className="section-title text-center">Our welfare pillars</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-slate-600">
+        <p className="section-label text-center" {...aos("fade-up")}>
+          What we do
+        </p>
+        <h2 className="section-title text-center" {...aos("fade-up", { delay: 80 })}>
+          Our welfare pillars
+        </h2>
+        <p className="mx-auto mt-4 max-w-2xl text-center text-slate-600" {...aos("fade-up", { delay: 120 })}>
           A complete ecosystem for member care — from monthly dues to emergency support, governance, and celebration.
         </p>
 
@@ -30,6 +35,7 @@ export function PillarsSection() {
               <article
                 key={pillar.title}
                 className="rounded-2xl border border-brand-navy/8 bg-brand-cream/50 p-6 transition hover:border-brand-navy/15 hover:bg-white hover:shadow-card"
+                {...aos("fade-up", { delay: 80 + index * 70 })}
               >
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-navy text-white">
                   <Icon className="h-5 w-5" />

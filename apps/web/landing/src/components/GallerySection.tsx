@@ -9,8 +9,17 @@ import {
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import { aos } from "@/lib/aos";
 
-function GalleryCard({ item, onOpen }: { item: GalleryItem; onOpen: () => void }) {
+function GalleryCard({
+  item,
+  index,
+  onOpen,
+}: {
+  item: GalleryItem;
+  index: number;
+  onOpen: () => void;
+}) {
   return (
     <button
       type="button"
@@ -18,6 +27,7 @@ function GalleryCard({ item, onOpen }: { item: GalleryItem; onOpen: () => void }
       className={`group relative w-full overflow-hidden rounded-2xl bg-brand-navy/5 text-left shadow-sm ring-1 ring-brand-navy/10 transition hover:shadow-card focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold ${
         item.featured ? "md:row-span-2" : ""
       }`}
+      {...aos("fade-up", { delay: 60 + index * 80 })}
     >
       <div className={`relative w-full ${item.featured ? "aspect-[4/5] md:min-h-full md:flex-1" : "aspect-[4/3]"}`}>
         <Image
@@ -80,13 +90,19 @@ export function GallerySection() {
   return (
     <section id="gallery" className="section-pad scroll-mt-20">
       <div className="mx-auto max-w-6xl">
-        <p className="section-label text-center">{gallery.title}</p>
-        <h2 className="section-title text-center">Activities & memories</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-slate-600">{gallery.subtitle}</p>
+        <p className="section-label text-center" {...aos("fade-up")}>
+          {gallery.title}
+        </p>
+        <h2 className="section-title text-center" {...aos("fade-up", { delay: 80 })}>
+          Activities & memories
+        </h2>
+        <p className="mx-auto mt-4 max-w-2xl text-center text-slate-600" {...aos("fade-up", { delay: 120 })}>
+          {gallery.subtitle}
+        </p>
 
         <div className="mt-12 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {GALLERY_ITEMS.map((item, index) => (
-            <GalleryCard key={item.id} item={item} onOpen={() => setActiveIndex(index)} />
+            <GalleryCard key={item.id} item={item} index={index} onOpen={() => setActiveIndex(index)} />
           ))}
         </div>
 
