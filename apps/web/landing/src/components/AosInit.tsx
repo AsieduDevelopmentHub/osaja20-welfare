@@ -9,7 +9,7 @@ export function AosInit() {
     AOS.init({
       duration: 700,
       easing: "ease-out-cubic",
-      once: true,
+      once: false,
       offset: 72,
       disable: () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     });
