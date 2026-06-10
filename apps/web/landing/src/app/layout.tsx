@@ -15,6 +15,19 @@ export const metadata: Metadata = {
     template: `%s | ${meta.siteName}`,
   },
   description: meta.description,
+  alternates: {
+    canonical: siteUrl,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: [{ url: "/brand/welfare-logo.jpg", type: "image/jpeg" }],
     apple: [{ url: "/brand/welfare-logo.jpg", type: "image/jpeg" }],

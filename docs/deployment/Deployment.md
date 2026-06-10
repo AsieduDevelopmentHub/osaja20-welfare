@@ -130,7 +130,22 @@ The landing app does **not** need `API_PROXY_TARGET` — it is static marketing 
 ### Verify landing site
 
 1. Open the apex URL — hero, vision, gallery, and portal CTAs load.
-2. **Member portal** and **Admin** buttons point to the correct subdomains.
+2. **Member portal** button points to the correct subdomain.
+3. `https://YOUR-APEX-DOMAIN/robots.txt` loads and references the sitemap.
+4. `https://YOUR-APEX-DOMAIN/sitemap.xml` lists the homepage URL (uses `NEXT_PUBLIC_SITE_URL`).
+
+### Google Search Console
+
+1. Add a **Domain** or **URL prefix** property for the apex domain (e.g. `osaja2020welfare.org`).
+2. Verify ownership (DNS TXT record recommended for apex + `www`).
+3. Ensure Vercel env **`NEXT_PUBLIC_SITE_URL`** is the production apex URL (no trailing slash), then redeploy.
+4. In Search Console → **Sitemaps** → submit:
+   ```text
+   https://osaja2020welfare.org/sitemap.xml
+   ```
+5. Use **URL inspection** → **Request indexing** on the homepage after the first deploy.
+
+The landing app is a single page; section links (`#vision`, `#gallery`, etc.) are on-page anchors and do not need separate sitemap entries.
 
 ---
 
