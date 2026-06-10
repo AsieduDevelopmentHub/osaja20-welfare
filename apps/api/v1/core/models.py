@@ -288,6 +288,7 @@ class PaymentTransaction(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    charge_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(10), default="GHS")
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     reference: Mapped[str] = mapped_column(String(100), nullable=False)

@@ -65,10 +65,22 @@ class Settings(BaseSettings):
     # Paystack (online dues payments)
     paystack_secret_key: str = ""
     paystack_public_key: str = ""
+    # Add Paystack fees on top at checkout so the welfare fund receives the exact dues amount
+    paystack_pass_fees_to_customer: bool = True
+    paystack_fee_percent: float = 1.95
+    # Optional cap (GHS). Leave unset for Ghana local pricing (percentage only).
+    paystack_fee_cap_ghs: float | None = None
 
     @property
     def paystack_enabled(self) -> bool:
         return bool(self.paystack_secret_key.strip())
+
+    @field_validator("paystack_fee_cap_ghs", mode="before")
+    @classmethod
+    def empty_fee_cap_is_none(cls, value: object) -> object:
+        if value is None or value == "":
+            return None
+        return value
 
     @field_validator("database_url")
     @classmethod

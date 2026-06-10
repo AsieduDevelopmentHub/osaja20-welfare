@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from v1.core.config import settings
 from v1.core.models import Member, PaymentTransaction
 from v1.core.paystack_client import PaystackError, initialize_transaction, verify_transaction
+from v1.core.paystack_fees import paystack_charge_for_dues
 from v1.core.platform_settings import get_monthly_dues_amount, get_payment_settings
 from v1.core.services import platform_service
 
@@ -98,12 +99,23 @@ async def _validate_periods(
     return normalized, amount
 
 
+def _expected_charge_amount(tx: PaymentTransaction) -> float:
+    if tx.charge_amount is not None:
+        return float(tx.charge_amount)
+    return float(tx.amount)
+
+
 def _transaction_to_dict(tx: PaymentTransaction) -> dict:
+    dues_amount = float(tx.amount)
+    charge_amount = _expected_charge_amount(tx)
     return {
         "id": str(tx.id),
         "reference": tx.reference,
         "status": tx.status,
-        "amount": float(tx.amount),
+        "amount": dues_amount,
+        "dues_amount": dues_amount,
+        "charge_amount": charge_amount,
+        "processing_fee": round(max(0.0, charge_amount - dues_amount), 2),
         "currency": tx.currency,
         "periods": tx.periods_json or [],
         "contribution_ids": tx.contribution_ids_json or [],
@@ -124,14 +136,16 @@ async def initialize_dues_payment(
     if not settings.paystack_secret_key.strip():
         raise ValueError("Paystack is not configured on the server")
 
-    normalized, amount = await _validate_periods(db, member, periods)
+    normalized, dues_amount = await _validate_periods(db, member, periods)
+    charge_amount, processing_fee = paystack_charge_for_dues(dues_amount)
     reference = await _build_paystack_reference(db, member, normalized)
-    amount_pesewas = int(round(amount * 100))
+    amount_pesewas = int(round(charge_amount * 100))
 
     tx = PaymentTransaction(
         id=uuid4(),
         member_id=member.id,
-        amount=Decimal(str(amount)),
+        amount=Decimal(str(dues_amount)),
+        charge_amount=Decimal(str(charge_amount)),
         currency="GHS",
         status="pending",
         reference=reference,
@@ -151,6 +165,8 @@ async def initialize_dues_payment(
                 "membership_id": member.membership_id,
                 "periods": normalized,
                 "transaction_id": str(tx.id),
+                "dues_amount": dues_amount,
+                "processing_fee": processing_fee,
             },
         )
     except PaystackError as exc:
@@ -195,12 +211,14 @@ async def complete_payment_if_successful(
         raise ValueError(f"Payment not completed (status: {status or 'unknown'})")
 
     amount_paid = float(paystack_data.get("amount", 0)) / 100.0
-    if abs(amount_paid - float(tx.amount)) > 0.01:
+    expected_charge = _expected_charge_amount(tx)
+    if abs(amount_paid - expected_charge) > 0.02:
         logger.warning(
-            "Paystack amount mismatch for %s: expected %s got %s",
+            "Paystack charge mismatch for %s: expected %s got %s (dues %s)",
             reference,
-            tx.amount,
+            expected_charge,
             amount_paid,
+            tx.amount,
         )
 
     tx.paystack_reference = str(paystack_data.get("reference") or reference)

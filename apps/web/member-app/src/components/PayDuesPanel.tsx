@@ -120,6 +120,9 @@ export function PayDuesPanel({ dues, payment, onPaymentStarted }: PayDuesPanelPr
 
         <p className="text-center text-xs text-slate-400">
           Secured by Paystack · Card, mobile money &amp; bank
+          <span className="mt-1 block">
+            Paystack checkout adds a small processing fee so the welfare fund receives the full dues amount.
+          </span>
         </p>
       </div>
     </div>
