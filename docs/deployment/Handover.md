@@ -1,14 +1,16 @@
 # Client Handover Checklist
 
-Use this after production deploy (Render API + Vercel member + Vercel admin) before handing the platform to the welfare executives.
+Use this after production deploy (Render API + Vercel member + admin + SMS + landing) before handing the platform to the welfare executives.
 
 ## 1. Live URLs
 
 | Service | URL | Purpose |
 |---------|-----|---------|
+| Landing site | `https://…` | Public marketing site |
 | Member portal | `https://…` | Members sign in, pay dues, vote, welfare |
 | Admin portal | `https://…` | Executives manage members, cases, inquiries |
-| API | `https://…onrender.com` | Backend (proxied by both apps) |
+| SMS portal | `https://…` | Executives send / schedule SMS via Arkesel |
+| API | `https://…onrender.com` | Backend (proxied by member, admin, and SMS apps) |
 
 Save these in a secure place for the client. Add custom domains later if needed.
 
@@ -54,7 +56,9 @@ After purging, **redeploy or restart the API on Render** so in-memory member sea
 | `REGISTRATION_AUTO_APPROVE` | `false` (executives approve new members) |
 | `ALLOW_TUNNEL_CORS` | `false` |
 | `MEMBER_PORTAL_URL` | Live member Vercel URL |
-| `CORS_ORIGINS` | `https://member…,https://admin…` (comma-separated) |
+| `CORS_ORIGINS` | `https://member…,https://admin…,https://sms…` (comma-separated) |
+| `PUBLIC_API_URL` | Live API URL (Arkesel SMS delivery webhooks) |
+| `ARKESEL_API_KEY` / `ARKESEL_SENDER_ID` | Arkesel configured; sender ≤ 11 chars & approved |
 | `JWT_SECRET` | 32+ random characters |
 | `WHATSAPP_NUMBER` | Executive WhatsApp(s), slash-separated |
 | VAPID keys | Set (push notifications) |
@@ -76,6 +80,15 @@ After purging, **redeploy or restart the API on Render** so in-memory member sea
 | `API_PROXY_TARGET` | Render API URL |
 | `NEXT_PUBLIC_MEMBER_APP_URL` | Member app URL |
 | `NEXT_PUBLIC_SITE_URL` | Admin app URL |
+
+### SMS app (Vercel)
+
+| Variable | Set? |
+|----------|------|
+| `API_PROXY_TARGET` | Render API URL |
+| `NEXT_PUBLIC_SITE_URL` | SMS app URL |
+| `NEXT_PUBLIC_ADMIN_APP_URL` | Admin app URL |
+| `NEXT_PUBLIC_MEMBER_APP_URL` | Member app URL |
 
 ## 4. Functional smoke test
 
@@ -105,6 +118,16 @@ Walk through with the client (or record a short Loom):
 - [ ] Welfare case workflow (approve → resolve)
 - [ ] Reports export (CSV)
 
+**SMS portal**
+
+- [ ] Log in with the same executive/admin account
+- [ ] Dashboard shows **SMS credits** (`sms_balance`) and wallet (`main_balance`)
+- [ ] **Compose** — send a test SMS to a real Ghana number (`055…` / `+233…`)
+- [ ] Apply a **Template** on compose
+- [ ] **Members yet to join** — paste contacts and send
+- [ ] **History** / **Campaigns** / **Scheduled** pages load
+- [ ] Settings shows Arkesel configured + webhook status
+
 ## 5. Paystack (when accepting real payments)
 
 1. Switch API env to **live** `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY`
@@ -131,6 +154,8 @@ Walk through with the client (or record a short Loom):
 | Reply to member inquiries | As needed | Executive |
 | Record manual MoMo/bank payments | Weekly | Treasurer |
 | Publish announcements | As needed | Executive |
+| Send SMS campaigns (SMS portal) | As needed | Executive |
+| Monitor Arkesel SMS credits | Weekly | Treasurer / Executive |
 | Run birthday scan (or rely on daily job if worker enabled) | Daily / on birthdays page | Executive |
 | Monitor Render/Vercel deploy logs | After each release | Technical contact |
 | Database backups | Automatic (Supabase) | — |
@@ -140,8 +165,9 @@ Walk through with the client (or record a short Loom):
 Document who maintains:
 
 - Render billing / API uptime
-- Vercel billing / frontend deploys
+- Vercel billing / frontend deploys (member, admin, landing, SMS)
 - Supabase database
+- Arkesel SMS account / sender ID / credits
 - Paystack merchant account
 - Domain DNS (if custom domains added)
 
@@ -155,4 +181,5 @@ Document who maintains:
 
 - [Deployment.md](./Deployment.md) — deploy steps
 - [Installation.md](../setup/Installation.md) — local development
+- [sms_portal.md](../sms/sms_portal.md) — SMS portal product + Arkesel
 - [Security.md](../security/Security.md) — security notes

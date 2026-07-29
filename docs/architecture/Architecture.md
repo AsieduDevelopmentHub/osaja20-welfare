@@ -7,17 +7,31 @@ Modular monorepo following Domain-Driven Design (DDD) with API-first REST commun
 ```
 osaja20-welfare/
 ├── apps/
-│   ├── api/v1/          # FastAPI backend
+│   ├── api/v1/           # FastAPI backend
 │   └── web/
-│       ├── member-app/  # Next.js member portal
-│       └── admin-portal/# Next.js admin dashboard
+│       ├── member-app/   # Next.js member portal (:3000)
+│       ├── admin-portal/ # Next.js admin dashboard (:3001)
+│       ├── landing/      # Public marketing site (:3002)
+│       └── sms-portal/   # SMS campaigns portal (:3003)
 ├── packages/
-│   ├── types/           # Shared TypeScript types
-│   ├── utils/           # Algorithms & helpers
-│   └── config/          # Shared constants
+│   ├── types/            # Shared TypeScript types
+│   ├── utils/            # Algorithms & helpers
+│   ├── config/           # Shared constants + SITE_META
+│   └── ui/               # Shared UI, adminNav, smsNav
 └── infrastructure/
-    └── docker/          # PostgreSQL, Redis, API
+    └── docker/           # PostgreSQL, Redis, API
 ```
+
+## Platform surfaces
+
+| App | Port (local) | Audience | Auth |
+|-----|--------------|----------|------|
+| Member portal | 3000 | Members | Any active member |
+| Admin portal | 3001 | Executives / admins | Executive roles only |
+| Landing | 3002 | Public | None |
+| SMS portal | 3003 | Executives / admins | Same auth as admin |
+
+All authenticated apps share the FastAPI backend, Postgres database, and brand system.
 
 ## Data Structure Algorithms
 
@@ -32,16 +46,30 @@ osaja20-welfare/
 
 ## Backend Modules
 
-- `auth` — Supabase Auth integration (pending)
+- `auth` — Local JWT or Supabase Auth
 - `members` — Registration, search, profiles
 - `welfare` — Case lifecycle with FSM
 - `contributions` — Ledger-backed financial records
 - `voting` — Vote engine with fraud protection
 - `dashboard` — Aggregated analytics
+- `sms` — Arkesel campaigns, history, templates, delivery webhooks
+- `announcements`, `notifications`, `payments`, `support`, `settings`
+
+## SMS integration
+
+- Provider: **Arkesel** (`POST /api/v2/sms/send`)
+- Models: `sms_campaigns`, `sms_messages`, `sms_templates`
+- Phone numbers normalized to `233XXXXXXXXX` (`055…`, `+233…`, `233…`)
+- Optional delivery callbacks via `PUBLIC_API_URL` → `/api/v1/sms/webhooks/arkesel`
+- `sms_balance` = send credits; `main_balance` = GHS wallet
+
+See [docs/sms/sms_portal.md](../sms/sms_portal.md).
 
 ## Database
 
 PostgreSQL with `UNIQUE(member_id, vote_id)` constraint for vote duplicate protection at the persistence layer.
+
+Fresh local databases: run `python scripts/seed_admin.py` (creates tables via `init_database()`), then `alembic stamp head`. Do not run incremental Alembic upgrades on an empty database first.
 
 ## Notifications (No Celery)
 
@@ -53,10 +81,12 @@ Background workers are **not** used to keep hosting costs low. Instead:
 | Birthday scan | On-demand `POST /notifications/scan-birthdays` |
 | Announcements | Fan-out notifications at publish time |
 | Push notifications | Web Push API + stored subscriptions (`POST /push/subscribe`) |
+| SMS delivery updates | Arkesel callback webhook when `PUBLIC_API_URL` is set |
 
 ## Deployment
 
-- Frontend: Vercel
+- Frontend apps: Vercel (member, admin, landing, SMS)
 - Backend: Render
 - Database/Auth: Supabase
+- SMS: Arkesel
 - Push: Web Push (VAPID keys on server when ready)

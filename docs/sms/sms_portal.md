@@ -480,7 +480,37 @@ This ensures there is a single source of truth for all member information while 
 
 ---
 
-## Suggested Git Branch
+# Implementation status (codebase)
+
+The SMS Portal is implemented in this monorepo on branch `feature/sms-portal` (and subsequent merges).
+
+| Area | Location |
+|------|----------|
+| Web app | `apps/web/sms-portal` (`pnpm dev:sms` → http://localhost:3003) |
+| API module | `apps/api/v1/modules/sms` → `/api/v1/sms/*` |
+| Arkesel client | `apps/api/v1/core/arkesel_client.py` |
+| Models | `sms_campaigns`, `sms_messages`, `sms_templates` |
+| Nav / modules | `packages/ui/src/sms-nav.ts` |
+| Env (API) | `ARKESEL_*`, `PUBLIC_API_URL` in `apps/api/.env.example` |
+| Env (web) | `apps/web/sms-portal/.env.local.example` |
+
+### Working features
+
+- Login (executive / administrator only; same accounts as admin portal)
+- Dashboard (SMS credits = `sms_balance`, wallet = `main_balance`)
+- Compose (templates, recipient groups, manual contacts for yet-to-join, schedule, sandbox, cost estimate)
+- Campaigns, Scheduled, History (refresh status from Arkesel), Templates CRUD, Settings
+- Phone sanitize: `055…`, `+233…`, `233…`, `2330…`
+- Delivery webhook: `/api/v1/sms/webhooks/arkesel` when `PUBLIC_API_URL` is public HTTPS
+
+### Still product backlog (from this doc)
+
+- Full automation engine (birthday / dues / meeting / voting jobs)
+- Outstanding-dues recipient group
+- Rich reports / CSV export for SMS
+- Multi-provider abstraction beyond Arkesel (architecture allows it)
+
+### Local git branch (historical)
 
 ```bash
 git checkout -b feature/sms-portal

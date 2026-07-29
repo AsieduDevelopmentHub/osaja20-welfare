@@ -2,14 +2,14 @@
 
 **Audit date:** June 2026  
 **Repository:** `osaga20-welfare`  
-**Scope:** API, member app, admin portal, shared packages, infrastructure, tests, security, UX/theming, documentation  
+**Scope:** API, member app, admin portal, SMS portal, landing, shared packages, infrastructure, tests, security, UX/theming, documentation
 **Audience:** Executive team, developers, and deployment stakeholders
 
 ---
 
 ## Executive summary
 
-The OSAJA'20 Welfare Platform is a **functionally rich monorepo** with a working FastAPI backend, member portal (Next.js :3000), and admin portal (Next.js :3001). Core workflows—registration, dues, contributions, welfare cases, voting with published results, announcements, web push, payment settings, member profiles, and CSV/Excel exports—are **implemented and wired end-to-end**.
+The OSAJA'20 Welfare Platform is a **functionally rich monorepo** with a working FastAPI backend, member portal (Next.js :3000), admin portal (Next.js :3001), landing (:3002), and SMS portal (Next.js :3003, Arkesel). Core workflows—registration, dues, contributions, welfare cases, voting with published results, announcements, web push, payment settings, member profiles, CSV/Excel exports, and SMS campaigns—are **implemented and wired end-to-end**.
 
 The system is **suitable for pilot / internal use** with manual ops, but is **not production-hardened** from an engineering-operations perspective. The largest gaps are:
 
@@ -38,8 +38,10 @@ The system is **suitable for pilot / internal use** with manual ops, but is **no
 This audit reviewed:
 
 - **Backend:** `apps/api/v1/` — routers, services, auth, models, algorithms, push, uploads  
-- **Member app:** `apps/web/member-app/` — all portal and auth routes  
-- **Admin portal:** `apps/web/admin-portal/` — all portal and auth routes  
+- **Member app:** `apps/web/member-app/` — all portal and auth routes
+- **Admin portal:** `apps/web/admin-portal/` — all portal and auth routes
+- **SMS portal:** `apps/web/sms-portal/` — compose, campaigns, templates, history (`/api/v1/sms`)
+- **Landing:** `apps/web/landing/`
 - **Shared packages:** `packages/types`, `packages/ui`, `packages/utils`, `packages/config`  
 - **Infrastructure:** `infrastructure/docker/`, scripts, env examples  
 - **Tests & CI:** `apps/api/tests/`, `.github/` (none found), root scripts  
@@ -52,24 +54,23 @@ Method: static code review, route inventory, dependency and config inspection, c
 ## 2. Architecture overview
 
 ```
-┌─────────────────┐     ┌─────────────────┐
-│  Member App     │     │  Admin Portal   │
-│  :3000          │     │  :3001          │
-│  (light theme)  │     │  (dark theme)   │
-└────────┬────────┘     └────────┬────────┘
-         │    Next.js rewrites   │
-         │    /api/v1 → API      │
-         └──────────┬────────────┘
-                    ▼
-         ┌──────────────────────┐
-         │  FastAPI API :8000   │
-         │  apps/api/v1/        │
-         └──────────┬───────────┘
-                    ▼
-         ┌──────────────────────┐
-         │  PostgreSQL / SQLite │
-         │  (Supabase prod)     │
-         └──────────────────────┘
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ Member App  │  │ Admin       │  │ SMS Portal  │
+│ :3000       │  │ Portal:3001 │  │ :3003       │
+│ (light)     │  │ (dark)      │  │ (exec)      │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │  Next.js rewrites /api/v1 → API  │
+       └────────────────┬─────────────────┘
+                        ▼
+             ┌──────────────────────┐
+             │  FastAPI API :8000   │
+             │  (+ Arkesel SMS)     │
+             └──────────┬───────────┘
+                        ▼
+             ┌──────────────────────┐
+             │  PostgreSQL / SQLite │
+             │  (Supabase prod)     │
+             └──────────────────────┘
 ```
 
 | Layer | Technology | Notes |
@@ -78,6 +79,7 @@ Method: static code review, route inventory, dependency and config inspection, c
 | Web | Next.js 15, React 19, Tailwind 3.4 | pnpm workspace; API outside workspace (venv) |
 | Auth | Dual: local bcrypt **or** Supabase + API-issued JWT | Role always resolved from DB |
 | Push | pywebpush + VAPID | Synchronous delivery in request path |
+| SMS | Arkesel API v2 | Via `/api/v1/sms`; SMS portal on `:3003` |
 | Algorithms | In-memory Trie, VoteEngine, Ledger, FSM, BirthdayIndex | Rebuilt from DB on startup |
 
 **Strengths:** Clear module boundaries, shared `@osaja/ui` / `@osaja/types`, consistent `ApiResponse` envelope, executive RBAC on sensitive routes.
@@ -102,6 +104,7 @@ Method: static code review, route inventory, dependency and config inspection, c
 | Push | `/push` | ✅ Complete | VAPID key, subscribe, test |
 | Settings | `/settings` | ✅ Complete | Payment config (public GET, exec PUT) |
 | Dashboard | `/dashboard` | ✅ Complete | Stats, birthdays by month |
+| SMS | `/sms` | ✅ Complete | Compose, campaigns, templates, balance, Arkesel webhook |
 | Health | `/health` | ✅ Present | Liveness check |
 
 ### 3.2 Member portal (`apps/web/member-app`)
@@ -137,7 +140,22 @@ Method: static code review, route inventory, dependency and config inspection, c
 
 **Missing routes:** Admin self-profile/settings, bulk member operations, dedicated audit log UI.
 
-### 3.4 Welfare workflow (current)
+### 3.4 SMS portal (`apps/web/sms-portal`)
+
+| Route | Status | Gaps |
+|-------|--------|------|
+| `/` Dashboard | ✅ | Balance (credits + wallet), recent activity |
+| `/compose` | ✅ | Templates, estimate, schedule, manual phones |
+| `/campaigns` | ✅ | List + detail |
+| `/scheduled` | ✅ | Upcoming sends |
+| `/history` | ✅ | Refresh status from Arkesel |
+| `/templates` | ✅ | CRUD |
+| `/settings` | ✅ | Sender, webhook, Arkesel config |
+| `/login` | ✅ | Executive/admin only (same as admin) |
+
+**Backlog:** automation engine, outstanding-dues recipient group, rich export reports, multi-provider abstraction. Spec: `docs/sms/sms_portal.md`.
+
+### 3.5 Welfare workflow (current)
 
 Simplified status model (migrated from legacy states):
 
@@ -147,7 +165,7 @@ pending → approved → allocated → resolved
 
 Members see cases on `/welfare` and dashboard. Executives manage on `/welfare` (admin).
 
-### 3.5 Voting workflow (current)
+### 3.6 Voting workflow (current)
 
 ```
 draft → open → closed → (admin publishes) → result_published
@@ -155,7 +173,7 @@ draft → open → closed → (admin publishes) → result_published
 
 Members see published results on dashboard and `/voting`. Admins see full results anytime.
 
-### 3.6 Functional gaps (cross-cutting)
+### 3.7 Functional gaps (cross-cutting)
 
 | Gap | Impact | Suggested fix |
 |-----|--------|---------------|
@@ -403,7 +421,11 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 | README | `README.md` |
 | Installation guide | `docs/setup/Installation.md` |
 | Architecture | `docs/architecture/Architecture.md` |
+| SMS portal | `docs/sms/sms_portal.md` |
 | SQL schema reference | `docs/architecture/schema.sql` |
+| Deployment | `docs/deployment/Deployment.md` |
+| Handover | `docs/deployment/Handover.md` |
+| Security | `docs/security/Security.md` |
 | Env examples | `apps/api/.env.example`, `apps/web/*/.env.local.example` |
 | Full spec (aspirational) | `overview.md` (root) |
 | **This audit** | `docs/audit/SYSTEM_AUDIT.md` |
@@ -412,11 +434,9 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 
 | Document | Priority |
 |----------|----------|
-| `docs/deployment/Deployment.md` | 🔴 High |
-| `docs/security/Security.md` | 🔴 High |
 | `docs/api/API.md` (OpenAPI companion) | 🟠 Medium |
 | `docs/workflows/Workflows.md` | 🟠 Medium |
-| `docs/user-guides/` (member + admin) | 🟡 Low |
+| `docs/user-guides/` (member + admin + SMS) | 🟡 Low |
 | `CONTRIBUTING.md`, `SECURITY.md` | 🟡 Low |
 | Runbooks (incident, backup, key rotation) | 🟠 Medium |
 
@@ -430,6 +450,8 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 |--------|-------|-------|
 | `dev:member` | ✅ | Port 3000 |
 | `dev:admin` | ✅ | Port 3001 |
+| `dev:landing` | ✅ | Port 3002 |
+| `dev:sms` | ✅ | Port 3003 |
 | `dev:web` | ⚠️ | `&` may fail on Windows PowerShell |
 | `build` | ✅ | Requires package builds first |
 | `lint` | ✅ | Per-app `next lint` |
@@ -516,6 +538,8 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 | Tests | `apps/api/tests/test_algorithms.py` |
 | Member app | `apps/web/member-app/src/app/` |
 | Admin portal | `apps/web/admin-portal/src/app/` |
+| SMS portal | `apps/web/sms-portal/src/app/` |
+| Landing | `apps/web/landing/` |
 | Shared UI | `packages/ui/src/` |
 | Shared types | `packages/types/src/index.ts` |
 | Docker | `infrastructure/docker/` |
@@ -534,4 +558,4 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 
 ---
 
-*This document should be updated after major releases or before production deployment. For setup instructions, see [docs/setup/Installation.md](../setup/Installation.md). For architecture context, see [docs/architecture/Architecture.md](../architecture/Architecture.md).*
+*This document should be updated after major releases or before production deployment. For setup instructions, see [docs/setup/Installation.md](../setup/Installation.md). For architecture context, see [do

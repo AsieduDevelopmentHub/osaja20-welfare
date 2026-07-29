@@ -33,9 +33,10 @@ Never commit:
 - `apps/api/.env`
 - `apps/web/*/.env.local`
 - VAPID private keys
+- Arkesel API keys (`ARKESEL_API_KEY`)
 - `uploads/` user content
 
-Rotate `JWT_SECRET` and VAPID keys if compromised — all users must re-login and re-subscribe to push.
+Rotate `JWT_SECRET` and VAPID keys if compromised — all users must re-login and re-subscribe to push. Rotate `ARKESEL_API_KEY` in the Arkesel dashboard if leaked.
 
 ## Production environment variables
 
@@ -44,8 +45,17 @@ DEBUG=false
 JWT_SECRET=<64+ char random string>
 REGISTRATION_AUTO_APPROVE=false
 ALLOW_TUNNEL_CORS=false
-CORS_ORIGINS=https://members.example.com,https://admin.example.com
+CORS_ORIGINS=https://member.example.com,https://admin.example.com,https://sms.example.com
+PUBLIC_API_URL=https://api.example.com
+ARKESEL_API_KEY=<from Arkesel dashboard>
+ARKESEL_SENDER_ID=OSAJA20
 ```
+
+### SMS portal notes
+
+- SMS portal uses the same executive RBAC as the admin portal
+- Arkesel provider HTTP 401/403 are mapped to API 502 so they do not clear portal JWTs
+- Delivery webhook (`/api/v1/sms/webhooks/arkesel`) is unauthenticated by design (Arkesel callback); keep `PUBLIC_API_URL` HTTPS-only and treat updates as status signals keyed by Arkesel `sms_id`
 
 ## Reporting vulnerabilities
 
@@ -62,4 +72,5 @@ Contact the platform administrator directly. Do not open public issues for undis
 ## Related
 
 - [Deployment](../deployment/Deployment.md)
+- [SMS portal](../sms/sms_portal.md)
 - [System audit](../audit/SYSTEM_AUDIT.md)
