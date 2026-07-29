@@ -13,10 +13,15 @@ from v1.core.schemas import (
     ApiResponse,
     SmsAutomationRun,
     SmsAutomationUpdate,
+    SmsCampaignUpdate,
     SmsComposeRequest,
+    SmsCustomGroupCreate,
     SmsEstimateRequest,
     SmsTemplateCreate,
+    SmsTemplateUpdate,
     SmsWorkflowCreate,
+    SmsWorkflowRun,
+    SmsWorkflowUpdate,
 )
 from v1.core.serializers import member_to_dict
 from v1.core.sms_service import sms_service
@@ -227,6 +232,7 @@ async def create_template(
             name=payload.name,
             body=payload.body,
             category=payload.category,
+            linked_trigger=payload.linked_trigger,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -301,6 +307,7 @@ async def create_workflow(
             recipient_group=payload.recipient_group,
             message=payload.message,
             enabled=payload.enabled,
+            template_id=payload.template_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -325,9 +332,15 @@ async def run_workflow(
     workflow_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     executive: Annotated[Member, Depends(require_executive)],
+    payload: SmsWorkflowRun | None = None,
 ):
     try:
-        data = await sms_service.run_workflow(db, actor=executive, workflow_id=workflow_id)
+        data = await sms_service.run_workflow(
+            db,
+            actor=executive,
+            workflow_id=workflow_id,
+            phones=(payload.phones if payload else None),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ArkeselError as exc:
@@ -375,3 +388,123 @@ async def run_sms_automation(
             status_code = 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return ApiResponse(success=True, data=data, message="Automation job submitted")
+
+
+@router.put("/workflows/{workflow_id}", response_model=ApiResponse)
+async def update_workflow(
+    workflow_id: str,
+    payload: SmsWorkflowUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.update_workflow(
+            db,
+            workflow_id=workflow_id,
+            name=payload.name,
+            message=payload.message,
+            enabled=payload.enabled,
+            template_id=payload.template_id,
+            clear_template=payload.clear_template,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Workflow updated")
+
+
+@router.patch("/templates/{template_id}", response_model=ApiResponse)
+async def update_template_meta(
+    template_id: UUID,
+    payload: SmsTemplateUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    await sms_service.set_template_linked_trigger(
+        db, template_id=str(template_id), linked_trigger=payload.linked_trigger
+    )
+    templates = await sms_service.list_templates(db)
+    match = next((t for t in templates if t["id"] == str(template_id)), None)
+    return ApiResponse(success=True, data=match, message="Template updated")
+
+
+@router.post("/recipient-groups", response_model=ApiResponse)
+async def create_recipient_group(
+    payload: SmsCustomGroupCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.create_custom_group(
+            db, name=payload.name, contacts=payload.contacts
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Recipient group created")
+
+
+@router.post("/recipient-groups/restore-builtin", response_model=ApiResponse)
+async def restore_builtin_recipient_groups(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    data = await sms_service.restore_builtin_groups(db)
+    return ApiResponse(success=True, data=data, message="Built-in groups restored")
+
+
+@router.delete("/recipient-groups/{group_id}", response_model=ApiResponse)
+async def delete_recipient_group(
+    group_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        await sms_service.delete_custom_group(db, group_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, message="Recipient group removed")
+
+
+@router.get("/campaigns/{campaign_id}", response_model=ApiResponse)
+async def get_campaign(
+    campaign_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.get_campaign(db, campaign_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data)
+
+
+@router.patch("/campaigns/{campaign_id}", response_model=ApiResponse)
+async def update_campaign(
+    campaign_id: UUID,
+    payload: SmsCampaignUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.update_scheduled_campaign(
+            db,
+            campaign_id=campaign_id,
+            message=payload.message,
+            name=payload.name,
+            schedule_at=payload.schedule_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Campaign updated")
+
+
+@router.post("/campaigns/{campaign_id}/cancel", response_model=ApiResponse)
+async def cancel_campaign(
+    campaign_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.cancel_scheduled_campaign(db, campaign_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Campaign cancelled")

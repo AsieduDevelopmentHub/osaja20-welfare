@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, ChevronRight } from "lucide-react";
 import { Skeleton } from "@osaja/ui";
 import { apiFetch } from "@/lib/api";
 import { SmsAlert, SmsEmptyState, SmsPageHeader, SmsStatusBadge } from "@/components/sms-ui";
@@ -16,6 +16,7 @@ interface Campaign {
   estimated_units: number;
   scheduled_at: string | null;
   created_at: string | null;
+  schedule_state?: string;
 }
 
 interface CampaignsResponse {
@@ -23,10 +24,17 @@ interface CampaignsResponse {
   total: number;
 }
 
+function scheduleBadge(c: Campaign, now: number): string {
+  if (c.schedule_state) return c.schedule_state;
+  if (c.status !== "scheduled" || !c.scheduled_at) return c.status;
+  return new Date(c.scheduled_at).getTime() <= now ? "due" : "upcoming";
+}
+
 export default function ScheduledPage() {
   const [data, setData] = useState<CampaignsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     apiFetch<CampaignsResponse>("/sms/campaigns?status=scheduled&page_size=50")
@@ -35,11 +43,18 @@ export default function ScheduledPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const items = useMemo(() => data?.items ?? [], [data]);
+
   return (
     <div className="space-y-5">
       <SmsPageHeader
         title="Scheduled SMS"
-        description="Campaigns queued for future delivery."
+        description="Upcoming sends — open a campaign to edit, reschedule, or cancel before delivery."
         action={
           <Link
             href="/compose"
@@ -58,7 +73,7 @@ export default function ScheduledPage() {
             <Skeleton key={i} variant="dark" className="h-28 rounded-2xl" />
           ))}
         </div>
-      ) : (data?.items.length ?? 0) === 0 ? (
+      ) : items.length === 0 ? (
         <SmsEmptyState
           icon={CalendarClock}
           title="No scheduled campaigns"
@@ -68,19 +83,30 @@ export default function ScheduledPage() {
         />
       ) : (
         <ul className="space-y-3">
-          {data?.items.map((c) => (
-            <li key={c.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-white">{c.name}</h2>
-                <SmsStatusBadge status="scheduled" />
-              </div>
-              <p className="mt-2 line-clamp-2 text-sm text-slate-300">{c.message}</p>
-              <p className="mt-2 text-xs text-slate-500">
-                {c.recipient_count} recipients · {c.estimated_units} credits
-                {c.scheduled_at ? ` · fires ${new Date(c.scheduled_at).toLocaleString()}` : ""}
-              </p>
-            </li>
-          ))}
+          {items.map((c) => {
+            const badge = scheduleBadge(c, now);
+            return (
+              <li key={c.id}>
+                <Link
+                  href={`/scheduled/${c.id}`}
+                  className="block rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:border-brand-gold/40 hover:bg-brand-gold/5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-white">{c.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <SmsStatusBadge status={badge} />
+                      <ChevronRight className="h-4 w-4 text-slate-500" />
+                    </div>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-sm text-slate-300">{c.message}</p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {c.recipient_count} recipients · {c.estimated_units} credits
+                    {c.scheduled_at ? ` · fires ${new Date(c.scheduled_at).toLocaleString()}` : ""}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -198,8 +198,8 @@ export default function ComposeWizard() {
         setError("Select at least one member or paste phone numbers");
         return;
       }
-      if (group === "pending" && phones.length === 0 && (estimate?.recipient_count ?? 0) === 0) {
-        setError("Paste contacts for members yet to join, or wait for pending DB members");
+      if (group === "pending" && phones.length === 0) {
+        setError("Paste at least one contact — members yet to join are not in the database");
         return;
       }
     }
@@ -217,7 +217,7 @@ export default function ComposeWizard() {
       setError("Select at least one member or paste phone numbers");
       return;
     }
-    if (group === "pending" && phones.length === 0 && (estimate?.recipient_count ?? 0) === 0) {
+    if (group === "pending" && phones.length === 0) {
       setError("Paste at least one valid contact for members yet to join (055… / +233… / 233…)");
       return;
     }
@@ -287,7 +287,7 @@ export default function ComposeWizard() {
                 id="campaign-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="July contribution reminder"
+                placeholder="e.g. Monthly contribution reminder"
                 className="input-dark outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
               />
             </div>
@@ -320,7 +320,7 @@ export default function ComposeWizard() {
                 maxLength={1000}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="OSAJA'20 Welfare: ..."
+                placeholder="OSAJA'20 Welfare: your message here…"
                 className="input-dark resize-y outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
               />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -413,10 +413,31 @@ export default function ComposeWizard() {
             </div>
           ) : null}
 
-          {showManualPhones ? (
+          {group === "pending" ? (
+            <div className="mt-4 rounded-xl border border-dashed border-brand-gold/30 bg-brand-gold/5 p-4">
+              <p className="text-sm font-semibold text-white">Enter contacts to message</p>
+              <p className="mt-1 text-xs text-slate-400">
+                These people are not stored as members yet, so there is no roster to load. Paste numbers
+                (and optional names) below.
+              </p>
+              <label htmlFor="manual-phones" className="mb-1.5 mt-3 block text-sm font-medium text-slate-300">
+                Contacts (required)
+              </label>
+              <textarea
+                id="manual-phones"
+                rows={5}
+                value={manualPhones}
+                onChange={(e) => setManualPhones(e.target.value)}
+                placeholder={"One per line:\n0553995047\nAma Mensah, 0241234567\n+233544919953"}
+                className="input-dark resize-y outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
+              />
+            </div>
+          ) : null}
+
+          {group === "custom" ? (
             <div className="mt-4">
               <label htmlFor="manual-phones" className="mb-1.5 block text-sm font-medium text-slate-300">
-                {group === "pending" ? "Contacts for members yet to join" : "Additional contacts (optional)"}
+                Additional contacts (optional)
               </label>
               <textarea
                 id="manual-phones"

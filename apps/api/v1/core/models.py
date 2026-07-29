@@ -332,6 +332,7 @@ class SmsCampaignStatus(str, enum.Enum):
     SCHEDULED = "scheduled"
     FAILED = "failed"
     PARTIAL = "partial"
+    CANCELLED = "cancelled"
 
 
 class SmsDeliveryStatus(str, enum.Enum):
@@ -353,7 +354,7 @@ class SmsCampaign(Base):
     recipient_count: Mapped[int] = mapped_column(default=0)
     status: Mapped[str] = mapped_column(String(20), default=SmsCampaignStatus.DRAFT.value, index=True)
     provider: Mapped[str] = mapped_column(String(30), default="arkesel")
-    sender_id: Mapped[str] = mapped_column(String(11), nullable=False)
+    sender_id: Mapped[str] = mapped_column(String(64), nullable=False)
     estimated_units: Mapped[int] = mapped_column(default=0)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
