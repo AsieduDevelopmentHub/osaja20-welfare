@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { History, RefreshCw, Search } from "lucide-react";
+import { Skeleton } from "@osaja/ui";
 import { apiFetch } from "@/lib/api";
+import { SmsAlert, SmsEmptyState, SmsPageHeader, SmsStatusBadge } from "@/components/sms-ui";
 
 interface HistoryItem {
   id: string;
@@ -46,6 +48,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const handle = window.setTimeout(load, 250);
     return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, status]);
 
   const refreshStatus = async (id: string) => {
@@ -62,14 +65,11 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <header>
-        <p className="text-sm font-medium text-brand-gold">SMS Portal</p>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">History</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Search delivery records. Use refresh to pull the latest status from Arkesel when a message id exists.
-        </p>
-      </header>
+    <div className="space-y-5">
+      <SmsPageHeader
+        title="History"
+        description="Search delivery records. Refresh pulls the latest status from Arkesel when a message id exists."
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
@@ -95,15 +95,16 @@ export default function HistoryPage() {
         </select>
       </div>
 
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+      {error ? <SmsAlert variant="error">{error}</SmsAlert> : null}
 
       {loading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
-      ) : (data?.items.length ?? 0) === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 px-6 py-12 text-center">
-          <History className="mx-auto h-10 w-10 text-brand-gold" />
-          <p className="mt-4 text-sm font-semibold text-white">No SMS history yet</p>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} variant="dark" className="h-24 rounded-2xl" />
+          ))}
         </div>
+      ) : (data?.items.length ?? 0) === 0 ? (
+        <SmsEmptyState icon={History} title="No SMS history yet" description="Sent messages will appear here." />
       ) : (
         <ul className="space-y-3">
           {data?.items.map((item) => (
@@ -113,15 +114,14 @@ export default function HistoryPage() {
                   {item.member_name || item.recipient_phone}
                 </p>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs capitalize text-slate-300">
-                    {item.status}
-                  </span>
+                  <SmsStatusBadge status={item.status} />
                   <button
                     type="button"
                     onClick={() => refreshStatus(item.id)}
                     disabled={refreshingId === item.id}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-brand-gold disabled:opacity-50"
                     title="Refresh delivery status from Arkesel"
+                    aria-label="Refresh delivery status"
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${refreshingId === item.id ? "animate-spin" : ""}`} />
                   </button>
@@ -131,7 +131,7 @@ export default function HistoryPage() {
                 {item.recipient_phone} · {item.cost_units} unit(s)
                 {item.created_at ? ` · ${new Date(item.created_at).toLocaleString()}` : ""}
               </p>
-              <p className="mt-2 text-sm text-slate-300">{item.message}</p>
+              <p className="mt-2 line-clamp-3 text-sm text-slate-300">{item.message}</p>
             </li>
           ))}
         </ul>

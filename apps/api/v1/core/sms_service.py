@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import and_, delete, extract, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,10 +14,12 @@ from v1.core.arkesel_client import (
     estimate_units,
     normalize_gh_msisdn,
     parse_phone_list,
+    sms_encoding,
     sms_page_count,
 )
 from v1.core.config import settings
 from v1.core.models import (
+    Contribution,
     Member,
     MemberStatus,
     SmsCampaign,
@@ -27,6 +29,7 @@ from v1.core.models import (
     SmsTemplate,
     UserRole,
 )
+from v1.core.platform_settings import get_monthly_dues_amount
 
 # Ghana (Africa/Accra) has no DST and matches UTC year-round.
 GHANA_TZ = timezone.utc
@@ -52,9 +55,46 @@ RECIPIENT_GROUPS: list[dict[str, str]] = [
         "description": "Pending members + paste contacts (055 / +233 / 233)",
     },
     {"id": "executive", "label": "Executive Members", "description": "Administrators and executives"},
+    {
+        "id": "welfare_committee",
+        "label": "Welfare Committee",
+        "description": "Executive roles managing welfare operations",
+    },
+    {
+        "id": "outstanding_dues",
+        "label": "Outstanding Dues",
+        "description": "Active members who have not paid this month's dues",
+    },
     {"id": "birthdays_today", "label": "Birthday Celebrants", "description": "Members with birthday today"},
     {"id": "custom", "label": "Custom Selection", "description": "Pick members and/or paste contacts"},
 ]
+
+SMS_AUTOMATION_KEY = "sms_automation"
+
+TRIGGER_PRESETS: dict[str, dict[str, str]] = {
+    "birthday": {
+        "recipient_group": "birthdays_today",
+        "default_message": (
+            "Happy Birthday from OSAJA'20 Welfare! "
+            "Wishing you joy, health, and a wonderful year ahead."
+        ),
+    },
+    "outstanding_dues": {
+        "recipient_group": "outstanding_dues",
+        "default_message": (
+            "OSAJA'20 Welfare reminder: your monthly dues are still outstanding. "
+            "Please pay via the member portal. Thank you."
+        ),
+    },
+    "manual": {
+        "recipient_group": "active",
+        "default_message": "",
+    },
+}
+
+DEFAULT_AUTOMATION: dict = {
+    "workflows": [],
+}
 
 
 def _campaign_dict(campaign: SmsCampaign, *, include_response: bool = False) -> dict:
@@ -133,7 +173,7 @@ class SmsService:
             query = query.where(Member.status == MemberStatus.ACTIVE.value)
         elif group == "pending":
             query = query.where(Member.status == MemberStatus.PENDING.value)
-        elif group == "executive":
+        elif group in ("executive", "welfare_committee"):
             query = query.where(
                 Member.role.in_([UserRole.ADMINISTRATOR.value, UserRole.EXECUTIVE.value]),
                 Member.status != MemberStatus.ARCHIVED.value,
@@ -145,11 +185,43 @@ class SmsService:
                 extract("month", Member.date_of_birth) == today.month,
                 extract("day", Member.date_of_birth) == today.day,
             )
+        elif group == "outstanding_dues":
+            return await self._members_with_outstanding_dues(db)
         else:
             raise ValueError(f"Unknown recipient group: {group}")
 
         result = await db.execute(query.order_by(Member.full_name.asc()))
         return list(result.scalars().all())
+
+    async def _members_with_outstanding_dues(self, db: AsyncSession) -> list[Member]:
+        """Active members who have not fully paid the current calendar month's dues."""
+        today = date.today()
+        monthly = await get_monthly_dues_amount(db)
+        active = list(
+            (
+                await db.execute(
+                    select(Member)
+                    .where(Member.status == MemberStatus.ACTIVE.value)
+                    .order_by(Member.full_name.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not active:
+            return []
+
+        paid_rows = await db.execute(
+            select(Contribution.member_id, func.coalesce(func.sum(Contribution.amount), 0))
+            .where(
+                Contribution.type == "dues",
+                Contribution.period_year == today.year,
+                Contribution.period_month == today.month,
+            )
+            .group_by(Contribution.member_id)
+        )
+        paid_map = {mid: float(amount or 0) for mid, amount in paid_rows.all()}
+        return [m for m in active if paid_map.get(m.id, 0.0) < monthly]
 
     async def estimate(
         self,
@@ -181,6 +253,7 @@ class SmsService:
             "pages_per_message": pages,
             "estimated_units": units,
             "character_count": len(message),
+            "encoding": sms_encoding(message),
             "sender_id": settings.arkesel_sender,
             "arkesel_configured": arkesel_client.is_configured(),
             "sandbox": settings.arkesel_sandbox,
@@ -593,6 +666,260 @@ class SmsService:
             "public_api_url": settings.public_api_url or None,
             "callback_url": settings.arkesel_callback_url,
         }
+
+    async def reports_summary(self, db: AsyncSession) -> dict:
+        now = datetime.now(timezone.utc)
+        start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        async def _count(*, since: datetime | None = None, status: str | None = None) -> int:
+            stmt = select(func.count()).select_from(SmsMessage)
+            conditions = []
+            if since is not None:
+                conditions.append(SmsMessage.created_at >= since)
+            if status is not None:
+                conditions.append(SmsMessage.status == status)
+            if conditions:
+                stmt = stmt.where(and_(*conditions))
+            return int((await db.execute(stmt)).scalar() or 0)
+
+        sent_month = await _count(since=start_month)
+        sent_today = await _count(since=start_today)
+        delivered = await _count(since=start_month, status=SmsDeliveryStatus.DELIVERED.value)
+        failed = await _count(since=start_month, status=SmsDeliveryStatus.FAILED.value)
+        submitted = await _count(since=start_month, status=SmsDeliveryStatus.SUBMITTED.value)
+        invalid = await _count(since=start_month, status=SmsDeliveryStatus.INVALID.value)
+
+        units_row = await db.execute(
+            select(func.coalesce(func.sum(SmsMessage.cost_units), 0)).where(
+                SmsMessage.created_at >= start_month
+            )
+        )
+        units_month = int(units_row.scalar() or 0)
+
+        campaign_counts = await db.execute(
+            select(SmsCampaign.status, func.count())
+            .where(SmsCampaign.created_at >= start_month)
+            .group_by(SmsCampaign.status)
+        )
+        by_status = {status: int(count) for status, count in campaign_counts.all()}
+
+        denom = delivered + submitted + failed
+        success_rate = round(((delivered + submitted) / denom) * 100, 1) if denom else None
+
+        groups = await self.list_recipient_groups(db)
+        workflows = await self.list_workflows(db)
+
+        return {
+            "period": {
+                "label": start_month.strftime("%B %Y"),
+                "start": start_month.isoformat(),
+                "as_of": now.isoformat(),
+            },
+            "messages": {
+                "sent_today": sent_today,
+                "sent_this_month": sent_month,
+                "delivered": delivered,
+                "submitted": submitted,
+                "failed": failed,
+                "invalid": invalid,
+                "units_this_month": units_month,
+                "delivery_success_rate": success_rate,
+            },
+            "campaigns_by_status": by_status,
+            "recipient_groups": groups,
+            "workflows_count": len(workflows),
+        }
+
+    async def export_history_rows(
+        self,
+        db: AsyncSession,
+        *,
+        limit: int = 500,
+    ) -> list[list[str]]:
+        rows = await db.execute(
+            select(SmsMessage, Member.full_name, SmsCampaign.name)
+            .outerjoin(Member, Member.id == SmsMessage.member_id)
+            .outerjoin(SmsCampaign, SmsCampaign.id == SmsMessage.campaign_id)
+            .order_by(SmsMessage.created_at.desc())
+            .limit(limit)
+        )
+        out: list[list[str]] = [
+            ["created_at", "campaign", "member_name", "recipient_phone", "status", "cost_units", "message"]
+        ]
+        for msg, member_name, campaign_name in rows.all():
+            out.append(
+                [
+                    msg.created_at.isoformat() if msg.created_at else "",
+                    campaign_name or "",
+                    member_name or "",
+                    msg.recipient_phone,
+                    msg.status,
+                    str(msg.cost_units),
+                    (msg.message or "").replace("\n", " "),
+                ]
+            )
+        return out
+
+    async def export_history_csv(
+        self,
+        db: AsyncSession,
+        *,
+        limit: int = 500,
+    ) -> str:
+        rows = await self.export_history_rows(db, limit=limit)
+        lines: list[str] = []
+        for row in rows:
+            escaped = []
+            for cell in row:
+                text = str(cell)
+                if "," in text or '"' in text or "\n" in text:
+                    escaped.append('"' + text.replace('"', '""') + '"')
+                else:
+                    escaped.append(text)
+            lines.append(",".join(escaped))
+        return "\n".join(lines) + "\n"
+
+    def _migrate_workflows(self, raw: dict) -> list[dict]:
+        if isinstance(raw.get("workflows"), list):
+            return list(raw["workflows"])
+        workflows: list[dict] = []
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if raw.get("birthday_enabled") or raw.get("birthday_message"):
+            workflows.append(
+                {
+                    "id": str(uuid4()),
+                    "name": "Birthday wishes",
+                    "trigger": "birthday",
+                    "recipient_group": "birthdays_today",
+                    "message": str(raw.get("birthday_message") or TRIGGER_PRESETS["birthday"]["default_message"]),
+                    "enabled": bool(raw.get("birthday_enabled")),
+                    "created_at": now_iso,
+                    "last_run_at": raw.get("last_birthday_run_at"),
+                }
+            )
+        if raw.get("dues_reminder_enabled") or raw.get("dues_message"):
+            workflows.append(
+                {
+                    "id": str(uuid4()),
+                    "name": "Outstanding dues reminder",
+                    "trigger": "outstanding_dues",
+                    "recipient_group": "outstanding_dues",
+                    "message": str(raw.get("dues_message") or TRIGGER_PRESETS["outstanding_dues"]["default_message"]),
+                    "enabled": bool(raw.get("dues_reminder_enabled")),
+                    "created_at": now_iso,
+                    "last_run_at": raw.get("last_dues_run_at"),
+                }
+            )
+        return workflows
+
+    async def list_workflows(self, db: AsyncSession) -> list[dict]:
+        from v1.core.models import PlatformSetting
+
+        row = await db.get(PlatformSetting, SMS_AUTOMATION_KEY)
+        raw = dict(DEFAULT_AUTOMATION)
+        if row and isinstance(row.value, dict):
+            raw.update(row.value)
+        workflows = self._migrate_workflows(raw)
+        # Persist migration if needed
+        if "workflows" not in (row.value if row and isinstance(row.value, dict) else {}):
+            await self._save_workflows(db, workflows)
+        return workflows
+
+    async def _save_workflows(self, db: AsyncSession, workflows: list[dict]) -> list[dict]:
+        from v1.core.models import PlatformSetting
+
+        payload = {"workflows": workflows}
+        row = await db.get(PlatformSetting, SMS_AUTOMATION_KEY)
+        if row:
+            row.value = payload
+        else:
+            db.add(PlatformSetting(key=SMS_AUTOMATION_KEY, value=payload))
+        await db.commit()
+        return workflows
+
+    async def create_workflow(
+        self,
+        db: AsyncSession,
+        *,
+        name: str,
+        trigger: str,
+        recipient_group: str | None,
+        message: str,
+        enabled: bool = True,
+    ) -> dict:
+        trigger_key = (trigger or "manual").strip().lower()
+        if trigger_key not in TRIGGER_PRESETS:
+            raise ValueError("Unknown trigger — use birthday, outstanding_dues, or manual")
+        preset = TRIGGER_PRESETS[trigger_key]
+        group = (recipient_group or preset["recipient_group"]).strip()
+        valid_groups = {g["id"] for g in RECIPIENT_GROUPS if g["id"] != "custom"}
+        if group not in valid_groups and trigger_key == "manual":
+            raise ValueError(f"Unknown recipient group: {group}")
+        if trigger_key != "manual":
+            group = preset["recipient_group"]
+        body = (message or "").strip() or preset["default_message"]
+        if not body:
+            raise ValueError("Message is required")
+        workflow = {
+            "id": str(uuid4()),
+            "name": name.strip() or "Untitled workflow",
+            "trigger": trigger_key,
+            "recipient_group": group,
+            "message": body,
+            "enabled": bool(enabled),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_run_at": None,
+        }
+        workflows = await self.list_workflows(db)
+        workflows.append(workflow)
+        await self._save_workflows(db, workflows)
+        return workflow
+
+    async def delete_workflow(self, db: AsyncSession, workflow_id: str) -> None:
+        workflows = await self.list_workflows(db)
+        next_list = [w for w in workflows if str(w.get("id")) != str(workflow_id)]
+        if len(next_list) == len(workflows):
+            raise ValueError("Workflow not found")
+        await self._save_workflows(db, next_list)
+
+    async def run_workflow(
+        self,
+        db: AsyncSession,
+        *,
+        actor: Member,
+        workflow_id: str,
+    ) -> dict:
+        workflows = await self.list_workflows(db)
+        workflow = next((w for w in workflows if str(w.get("id")) == str(workflow_id)), None)
+        if not workflow:
+            raise ValueError("Workflow not found")
+        if not workflow.get("enabled", True):
+            raise ValueError("Workflow is disabled — enable it before running")
+
+        result = await self.compose_and_send(
+            db,
+            actor=actor,
+            message=str(workflow.get("message") or ""),
+            name=f"Workflow · {workflow.get('name')}",
+            recipient_group=str(workflow.get("recipient_group") or "active"),
+            member_ids=[],
+            phones=None,
+            schedule_at=None,
+            sandbox=False,
+        )
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for w in workflows:
+            if str(w.get("id")) == str(workflow_id):
+                w["last_run_at"] = now_iso
+                break
+        await self._save_workflows(db, workflows)
+        return {"workflow_id": workflow_id, "run_at": now_iso, **result}
+
+    # Backward-compatible aliases used by older reports payload
+    async def get_automation(self, db: AsyncSession) -> dict:
+        workflows = await self.list_workflows(db)
+        return {"workflows": workflows}
 
 
 sms_service = SmsService()

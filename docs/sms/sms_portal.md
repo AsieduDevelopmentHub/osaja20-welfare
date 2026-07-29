@@ -498,16 +498,20 @@ The SMS Portal is implemented in this monorepo on branch `feature/sms-portal` (a
 
 - Login (executive / administrator only; same accounts as admin portal)
 - Dashboard (SMS credits = `sms_balance`, wallet = `main_balance`)
-- Compose (templates, recipient groups, manual contacts for yet-to-join, schedule, sandbox, cost estimate)
+- Compose **3-step mobile wizard** (templates, GSM-7/UCS-2 segment meter, phone preview, recipients, schedule, cost estimate)
+- Recipient groups page (live counts + member preview) including **Outstanding Dues** and **Welfare Committee**
 - Campaigns, Scheduled, History (refresh status from Arkesel), Templates CRUD, Settings
+- Reports (monthly usage, delivery breakdown, Excel/CSV export)
+- Custom automation workflows — owner can create, run, and delete (`/sms/workflows`)
+- PWA install banner + service worker (same pattern as admin/member)
 - Phone sanitize: `055…`, `+233…`, `233…`, `2330…`
 - Delivery webhook: `/api/v1/sms/webhooks/arkesel` when `PUBLIC_API_URL` is public HTTPS
 
 ### Still product backlog (from this doc)
 
-- Full automation engine (birthday / dues / meeting / voting jobs)
-- Outstanding-dues recipient group
-- Rich reports / CSV export for SMS
+- Scheduled cron worker for automation (workflows are runnable on demand today)
+- Welcome SMS hook on member approval
+- Meeting / voting reminder automation jobs
 - Multi-provider abstraction beyond Arkesel (architecture allows it)
 
 ### Local git branch (historical)

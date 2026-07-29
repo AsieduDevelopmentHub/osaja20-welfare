@@ -8,6 +8,14 @@ export { PriorityQueue } from "./algorithms/priority-queue.js";
 export type { ScheduledItem } from "./algorithms/priority-queue.js";
 export { BirthdayIndex } from "./algorithms/birthday-index.js";
 export type { BirthdayMember } from "./algorithms/birthday-index.js";
+export {
+  analyzeSmsSegments,
+  estimateSmsUnits,
+  gsm7SeptetCount,
+  messageIsGsm7,
+  smsPageCount,
+} from "./algorithms/sms-segment.js";
+export type { SmsEncoding, SmsSegmentInfo } from "./algorithms/sms-segment.js";
 
 export function formatCurrency(amount: number, currency = "GHS"): string {
   return new Intl.NumberFormat("en-GH", { style: "currency", currency }).format(amount);

@@ -63,3 +63,30 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
   return json;
 }
+
+/** Download authenticated binary/text responses (e.g. CSV export). */
+export async function apiDownload(path: string, filename: string): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${getApiBase()}${path}`, { headers });
+  if (!res.ok) {
+    if (res.status === 401 && token) setToken(null);
+    let message = `Download failed (${res.status})`;
+    try {
+      const json = await res.json();
+      message = parseApiError(json, res.status);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

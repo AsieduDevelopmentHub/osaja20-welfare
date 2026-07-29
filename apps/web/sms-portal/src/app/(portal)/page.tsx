@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { SmsAlert, SmsPageHeader, SmsStatusBadge } from "@/components/sms-ui";
 
 interface DashboardData {
   sms_sent_today: number;
@@ -137,34 +138,27 @@ export default function SmsDashboard() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-brand-gold">SMS management</p>
-          <h1 className="text-2xl font-bold text-white sm:text-3xl">Dashboard</h1>
-          <p className="text-sm text-slate-400">
-            Welcome{member?.fullName ? `, ${member.fullName.split(" ")[0]}` : ""}. Sender{" "}
-            <span className="text-brand-gold">{data?.sender_id ?? "—"}</span>
-            {data?.sandbox ? " · sandbox on" : ""}.
-          </p>
-        </div>
-        <Link
-          href="/compose"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark hover:bg-brand-gold-light"
-        >
-          <MessageSquare className="h-4 w-4" />
-          Compose SMS
-        </Link>
-      </header>
+      <SmsPageHeader
+        title="Dashboard"
+        description={`Welcome${member?.fullName ? `, ${member.fullName.split(" ")[0]}` : ""}. Sender ${data?.sender_id ?? "—"}.`}
+        action={
+          <Link
+            href="/compose"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark hover:bg-brand-gold-light"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Compose SMS
+          </Link>
+        }
+      />
 
-      {error ? (
-        <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>
-      ) : null}
+      {error ? <SmsAlert variant="error">{error}</SmsAlert> : null}
 
       {!data?.arkesel_configured ? (
-        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <SmsAlert variant="warning">
           Arkesel API key is not configured on the API. Add <code>ARKESEL_API_KEY</code> to{" "}
           <code>apps/api/.env</code>.
-        </p>
+        </SmsAlert>
       ) : null}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -219,8 +213,9 @@ export default function SmsDashboard() {
               {data?.recent_campaigns.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="truncate text-slate-200">{c.name}</span>
-                  <span className="shrink-0 capitalize text-slate-400">
-                    {c.status} · {c.recipient_count}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <SmsStatusBadge status={c.status} />
+                    <span className="text-slate-500">{c.recipient_count}</span>
                   </span>
                 </li>
               ))}

@@ -107,14 +107,43 @@ def parse_phone_list(raw_phones: list[str] | str | None) -> tuple[list[str], lis
     return valid, invalid
 
 
+# GSM-7 basic set (3GPP TS 23.038). Extended set costs 2 septets each.
+_GSM7_BASIC = (
+    "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
+    "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà"
+)
+_GSM7_EXTENDED = frozenset("^\\{}[~]|€")
+
+
+def _is_gsm7(message: str) -> bool:
+    for ch in message or "":
+        if ch not in _GSM7_BASIC and ch not in _GSM7_EXTENDED:
+            return False
+    return True
+
+
+def _gsm7_septet_count(message: str) -> int:
+    return sum(2 if ch in _GSM7_EXTENDED else 1 for ch in (message or ""))
+
+
 def sms_page_count(message: str) -> int:
-    """Estimate SMS pages (GSM-7 approximation: 160 / 153 concatenated)."""
-    length = len(message or "")
-    if length <= 0:
+    """Estimate SMS pages using GSM-7 (160/153) or UCS-2 (70/67) rules."""
+    if not message:
         return 0
-    if length <= 160:
+    if _is_gsm7(message):
+        septets = _gsm7_septet_count(message)
+        if septets <= 160:
+            return 1
+        return (septets + 152) // 153
+    # UCS-2 / Unicode — count code points
+    length = len(message)
+    if length <= 70:
         return 1
-    return (length + 152) // 153
+    return (length + 66) // 67
+
+
+def sms_encoding(message: str) -> str:
+    return "GSM-7" if _is_gsm7(message or "") else "UCS-2"
 
 
 def estimate_units(message: str, recipient_count: int) -> int:

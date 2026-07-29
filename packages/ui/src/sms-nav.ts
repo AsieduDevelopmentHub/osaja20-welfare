@@ -16,12 +16,12 @@ import type { NavItem } from "./nav-config.js";
 export const smsNavItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/compose", label: "Compose SMS", icon: MessageSquarePlus },
+  { href: "/history", label: "History", icon: History },
   { href: "/campaigns", label: "Campaigns", icon: MessagesSquare },
   { href: "/scheduled", label: "Scheduled SMS", icon: CalendarClock },
   { href: "/templates", label: "Templates", icon: FileText },
   { href: "/recipients", label: "Recipient Groups", icon: Users },
   { href: "/automation", label: "Automation", icon: Workflow },
-  { href: "/history", label: "History", icon: History },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

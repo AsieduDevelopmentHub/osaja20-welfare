@@ -19,7 +19,7 @@ The platform will serve as the official operational environment for:
 * Member Management
 * Welfare Administration
 * Contributions
-* Communication
+* Communication (in-app, push, SMS)
 * Celebrations
 * Notifications
 * Governance
@@ -43,7 +43,7 @@ The platform must:
 * Digitize welfare operations
 * Increase transparency
 * Improve participation
-* Strengthen communication
+* Strengthen communication (including executive SMS campaigns)
 * Automate repetitive operations
 * Enable governance and voting
 * Support financial tracking

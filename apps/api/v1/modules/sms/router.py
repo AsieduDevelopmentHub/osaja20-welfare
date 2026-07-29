@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.arkesel_client import ArkeselError, normalize_gh_msisdn
@@ -10,9 +11,12 @@ from v1.core.database import get_db
 from v1.core.models import Member
 from v1.core.schemas import (
     ApiResponse,
+    SmsAutomationRun,
+    SmsAutomationUpdate,
     SmsComposeRequest,
     SmsEstimateRequest,
     SmsTemplateCreate,
+    SmsWorkflowCreate,
 )
 from v1.core.serializers import member_to_dict
 from v1.core.sms_service import sms_service
@@ -240,3 +244,134 @@ async def delete_template(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return ApiResponse(success=True, message="Template deleted")
+
+
+@router.get("/reports", response_model=ApiResponse)
+async def sms_reports(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    data = await sms_service.reports_summary(db)
+    return ApiResponse(success=True, data=data)
+
+
+@router.get("/reports/export")
+async def sms_reports_export(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+    limit: int = Query(default=500, ge=1, le=5000),
+):
+    csv_text = await sms_service.export_history_csv(db, limit=limit)
+    return PlainTextResponse(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="sms-history.csv"'},
+    )
+
+
+@router.get("/automation", response_model=ApiResponse)
+async def get_sms_automation(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    data = await sms_service.get_automation(db)
+    return ApiResponse(success=True, data=data)
+
+
+@router.get("/workflows", response_model=ApiResponse)
+async def list_workflows(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    data = await sms_service.list_workflows(db)
+    return ApiResponse(success=True, data=data)
+
+
+@router.post("/workflows", response_model=ApiResponse)
+async def create_workflow(
+    payload: SmsWorkflowCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.create_workflow(
+            db,
+            name=payload.name,
+            trigger=payload.trigger,
+            recipient_group=payload.recipient_group,
+            message=payload.message,
+            enabled=payload.enabled,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Workflow created")
+
+
+@router.delete("/workflows/{workflow_id}", response_model=ApiResponse)
+async def delete_workflow(
+    workflow_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        await sms_service.delete_workflow(db, workflow_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, message="Workflow deleted")
+
+
+@router.post("/workflows/{workflow_id}/run", response_model=ApiResponse)
+async def run_workflow(
+    workflow_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.run_workflow(db, actor=executive, workflow_id=workflow_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ArkeselError as exc:
+        upstream = exc.status_code or 502
+        status_code = 502 if upstream in (401, 403) else (upstream if 400 <= upstream < 600 else 502)
+        if upstream == 422:
+            status_code = 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Workflow submitted")
+
+
+@router.put("/automation", response_model=ApiResponse)
+async def update_sms_automation(
+    payload: SmsAutomationUpdate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    # Legacy endpoint kept for compatibility; prefer /workflows
+    data = await sms_service.get_automation(db)
+    return ApiResponse(success=True, data=data, message="Use /sms/workflows to manage workflows")
+
+
+@router.post("/automation/run", response_model=ApiResponse)
+async def run_sms_automation(
+    payload: SmsAutomationRun,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    executive: Annotated[Member, Depends(require_executive)],
+):
+    # Legacy: map old job names onto first matching workflow, or create ephemeral run
+    try:
+        job = payload.job.strip().lower()
+        trigger = "birthday" if job == "birthday" else "outstanding_dues" if job == "dues" else job
+        workflows = await sms_service.list_workflows(db)
+        match = next((w for w in workflows if w.get("trigger") == trigger and w.get("enabled")), None)
+        if match:
+            data = await sms_service.run_workflow(db, actor=executive, workflow_id=str(match["id"]))
+        else:
+            raise ValueError("No enabled workflow found for this job — create one under Automation")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ArkeselError as exc:
+        upstream = exc.status_code or 502
+        status_code = 502 if upstream in (401, 403) else (upstream if 400 <= upstream < 600 else 502)
+        if upstream == 422:
+            status_code = 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Automation job submitted")

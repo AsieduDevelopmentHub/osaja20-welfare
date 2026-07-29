@@ -230,6 +230,28 @@ class SmsTemplateCreate(BaseModel):
     category: str = Field(default="general", max_length=50)
 
 
+class SmsAutomationUpdate(BaseModel):
+    birthday_enabled: bool | None = None
+    dues_reminder_enabled: bool | None = None
+    welcome_enabled: bool | None = None
+    birthday_message: str | None = Field(default=None, max_length=1000)
+    dues_message: str | None = Field(default=None, max_length=1000)
+    welcome_message: str | None = Field(default=None, max_length=1000)
+
+
+class SmsAutomationRun(BaseModel):
+    job: str = Field(description="birthday | dues")
+    sandbox: bool | None = None
+
+
+class SmsWorkflowCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    trigger: str = Field(description="birthday | outstanding_dues | manual")
+    recipient_group: str | None = Field(default=None, max_length=50)
+    message: str = Field(min_length=1, max_length=1000)
+    enabled: bool = True
+
+
 class ApiResponse(BaseModel):
     success: bool
     data: dict | list | None = None

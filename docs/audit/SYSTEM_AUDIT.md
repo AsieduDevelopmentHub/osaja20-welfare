@@ -391,6 +391,7 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 |---------|--------|-------|
 | In-app notifications | ✅ | Created synchronously on events |
 | Web Push (VAPID) | ✅ | Member settings; server-side keys in `apps/api/.env` |
+| SMS campaigns (Arkesel) | ✅ | SMS portal `:3003`; API `/api/v1/sms` |
 | Service worker | ⚠️ Push only | `public/sw.js` — no offline cache |
 | Web manifest | ✅ | `manifest.json`, theme color |
 | Admin push | ❌ | Not applicable |
@@ -558,4 +559,4 @@ Admin portal rejects non-executive roles at login (`apps/web/admin-portal/src/li
 
 ---
 
-*This document should be updated after major releases or before production deployment. For setup instructions, see [docs/setup/Installation.md](../setup/Installation.md). For architecture context, see [do
+*This document should be updated after major releases or before production deployment. For setup instructions, see [docs/setup/Installation.md](../setup/Installation.md). For architecture context, see [docs/architecture/Architecture.md](../architecture/Architecture.md).*

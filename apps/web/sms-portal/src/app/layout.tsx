@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { BRAND, SITE_META, resolveSiteUrl } from "@osaja/config";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
@@ -61,7 +63,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${inter.className} antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ServiceWorkerInit />
+          {children}
+          <PwaInstallBanner />
+        </AuthProvider>
       </body>
     </html>
   );

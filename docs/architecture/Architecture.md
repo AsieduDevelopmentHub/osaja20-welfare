@@ -90,3 +90,10 @@ Background workers are **not** used to keep hosting costs low. Instead:
 - Database/Auth: Supabase
 - SMS: Arkesel
 - Push: Web Push (VAPID keys on server when ready)
+
+## Related
+
+- [Installation](../setup/Installation.md)
+- [SMS portal](../sms/sms_portal.md)
+- [Deployment](../deployment/Deployment.md)
+- [Security](../security/Security.md)

@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { SmsAlert, SmsPageHeader } from "@/components/sms-ui";
 
 interface SmsSettings {
   arkesel_configured: boolean;
   sender_id: string;
   base_url: string;
-  sandbox: boolean;
   api_key_set: boolean;
   delivery_webhook_enabled: boolean;
   public_api_url: string | null;
@@ -33,20 +33,17 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-sm font-medium text-brand-gold">SMS Portal</p>
-        <h1 className="text-2xl font-bold text-white sm:text-3xl">Settings</h1>
-        <p className="mt-1 text-sm text-slate-400">
-          Arkesel provider configuration is managed via API environment variables.
-        </p>
-      </header>
+      <SmsPageHeader
+        title="Settings"
+        description="SMS provider configuration and account balance."
+      />
 
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+      {error ? <SmsAlert variant="error">{error}</SmsAlert> : null}
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
         <div className="mb-4 flex items-center gap-2">
           <Settings className="h-5 w-5 text-brand-gold" />
-          <h2 className="text-sm font-semibold text-white">Arkesel</h2>
+          <h2 className="text-sm font-semibold text-white">Provider</h2>
         </div>
         <dl className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -60,17 +57,9 @@ export default function SettingsPage() {
             <dd className="text-sm font-semibold text-white">{data?.sender_id ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Base URL</dt>
-            <dd className="truncate text-sm text-slate-300">{data?.base_url ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-slate-500">Sandbox default</dt>
-            <dd className="text-sm font-semibold text-white">{data?.sandbox ? "On" : "Off"}</dd>
-          </div>
-          <div>
             <dt className="text-xs text-slate-500">Delivery webhook</dt>
             <dd className="text-sm font-semibold text-white">
-              {data?.delivery_webhook_enabled ? "Enabled" : "Disabled (needs PUBLIC_API_URL)"}
+              {data?.delivery_webhook_enabled ? "Enabled" : "Disabled"}
             </dd>
           </div>
           <div>
@@ -78,11 +67,6 @@ export default function SettingsPage() {
             <dd className="truncate text-sm text-slate-300">{data?.callback_url ?? "—"}</dd>
           </div>
         </dl>
-        <p className="mt-4 text-xs text-slate-500">
-          Set <code>PUBLIC_API_URL</code> to a publicly reachable API origin (production or Cloudflare
-          tunnel). Localhost cannot receive Arkesel delivery callbacks. Also keep{" "}
-          <code>ARKESEL_SENDER_ID</code> ≤ 11 characters and approved in Arkesel.
-        </p>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
@@ -92,13 +76,13 @@ export default function SettingsPage() {
         ) : balance ? (
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-slate-500">SMS credits (can send)</dt>
+              <dt className="text-xs text-slate-500">SMS credits</dt>
               <dd className="text-lg font-semibold text-brand-gold">
                 {String(balance.sms_balance ?? "—")}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-500">Wallet / main balance (GHS)</dt>
+              <dt className="text-xs text-slate-500">Wallet (GHS)</dt>
               <dd className="text-lg font-semibold text-white">
                 {String(balance.main_balance ?? "—")}
               </dd>
