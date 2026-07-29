@@ -57,6 +57,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     throw new Error(res.ok ? "Invalid server response" : `Request failed (${res.status})`);
   }
   if (!res.ok) {
+    // Real auth failures only — Arkesel provider errors are mapped to 502 on the API.
     if (res.status === 401 && token) setToken(null);
     throw new Error(parseApiError(json, res.status));
   }

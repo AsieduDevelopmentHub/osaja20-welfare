@@ -38,7 +38,9 @@ async def sms_balance(
 
         data = await arkesel_client.get_balance()
     except ArkeselError as exc:
-        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+        upstream = exc.status_code or 502
+        status_code = 502 if upstream in (401, 403) else (upstream if 400 <= upstream < 600 else 502)
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return ApiResponse(success=True, data=data)
 
 
@@ -119,7 +121,18 @@ async def compose_sms(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ArkeselError as exc:
-        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+        upstream = exc.status_code or 502
+        # Auth-style codes from Arkesel must not clear the portal session.
+        if upstream in (401, 403):
+            status_code = 502
+        elif upstream == 422:
+            # Arkesel uses 422 for business rules (invalid recipients, etc.)
+            status_code = 400
+        elif 400 <= upstream < 600:
+            status_code = upstream
+        else:
+            status_code = 502
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return ApiResponse(success=True, data=data, message="SMS campaign submitted")
 
 

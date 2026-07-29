@@ -25,19 +25,33 @@ def is_configured() -> bool:
 
 
 def normalize_gh_msisdn(phone: str) -> str | None:
-    """Normalize Ghana phone numbers to 233XXXXXXXXX (no plus)."""
+    """Normalize Ghana mobile numbers to 233XXXXXXXXX (no plus).
+
+    Arkesel expects recipients like ``["233553995047", "233544919953"]``.
+    Placeholder numbers (e.g. 0000000000) are rejected.
+    """
     digits = re.sub(r"\D", "", phone or "")
     if not digits:
         return None
-    if digits.startswith("233") and len(digits) == 12:
-        return digits
-    if digits.startswith("0") and len(digits) == 10:
-        return "233" + digits[1:]
-    if len(digits) == 9:
-        return "233" + digits
     if digits.startswith("2330") and len(digits) == 13:
-        return "233" + digits[4:]
-    return None
+        digits = "233" + digits[4:]
+    elif digits.startswith("0") and len(digits) == 10:
+        digits = "233" + digits[1:]
+    elif len(digits) == 9:
+        digits = "233" + digits
+    elif digits.startswith("233") and len(digits) == 12:
+        pass
+    else:
+        return None
+
+    # Ghana mobile: 233 + 9 digits, first of those must be 2–9 (not 0).
+    if not re.fullmatch(r"233[2-9]\d{8}", digits):
+        return None
+    # Reject obvious placeholders (000000000, 111111111, …)
+    national = digits[3:]
+    if len(set(national)) == 1:
+        return None
+    return digits
 
 
 def sms_page_count(message: str) -> int:

@@ -184,7 +184,10 @@ class SmsService:
             recipients.append((member, msisdn))
 
         if not recipients:
-            raise ValueError("No recipients with valid phone numbers")
+            raise ValueError(
+                "No recipients with valid Ghana mobile numbers "
+                "(use format 024… / 233… — placeholder numbers like 0000000000 are skipped)"
+            )
 
         use_sandbox = settings.arkesel_sandbox if sandbox is None else sandbox
         pages = sms_page_count(message)
