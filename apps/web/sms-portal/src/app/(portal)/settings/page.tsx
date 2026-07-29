@@ -10,6 +10,9 @@ interface SmsSettings {
   base_url: string;
   sandbox: boolean;
   api_key_set: boolean;
+  delivery_webhook_enabled: boolean;
+  public_api_url: string | null;
+  callback_url: string | null;
 }
 
 export default function SettingsPage() {
@@ -64,10 +67,21 @@ export default function SettingsPage() {
             <dt className="text-xs text-slate-500">Sandbox default</dt>
             <dd className="text-sm font-semibold text-white">{data?.sandbox ? "On" : "Off"}</dd>
           </div>
+          <div>
+            <dt className="text-xs text-slate-500">Delivery webhook</dt>
+            <dd className="text-sm font-semibold text-white">
+              {data?.delivery_webhook_enabled ? "Enabled" : "Disabled (needs PUBLIC_API_URL)"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Callback URL</dt>
+            <dd className="truncate text-sm text-slate-300">{data?.callback_url ?? "—"}</dd>
+          </div>
         </dl>
         <p className="mt-4 text-xs text-slate-500">
-          Update <code>ARKESEL_API_KEY</code>, <code>ARKESEL_SENDER_ID</code> (max 11 chars), and{" "}
-          <code>ARKESEL_SANDBOX</code> in <code>apps/api/.env</code>, then restart the API.
+          Set <code>PUBLIC_API_URL</code> to a publicly reachable API origin (production or Cloudflare
+          tunnel). Localhost cannot receive Arkesel delivery callbacks. Also keep{" "}
+          <code>ARKESEL_SENDER_ID</code> ≤ 11 characters and approved in Arkesel.
         </p>
       </div>
 
@@ -76,9 +90,20 @@ export default function SettingsPage() {
         {balanceError ? (
           <p className="text-sm text-amber-200">{balanceError}</p>
         ) : balance ? (
-          <pre className="overflow-x-auto rounded-xl bg-slate-950/60 p-3 text-xs text-slate-300">
-            {JSON.stringify(balance, null, 2)}
-          </pre>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-slate-500">SMS credits (can send)</dt>
+              <dd className="text-lg font-semibold text-brand-gold">
+                {String(balance.sms_balance ?? "—")}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">Wallet / main balance (GHS)</dt>
+              <dd className="text-lg font-semibold text-white">
+                {String(balance.main_balance ?? "—")}
+              </dd>
+            </div>
+          </dl>
         ) : (
           <p className="text-sm text-slate-400">Loading…</p>
         )}

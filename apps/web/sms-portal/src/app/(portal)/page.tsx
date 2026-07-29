@@ -7,7 +7,6 @@ import {
   MessagesSquare,
   Percent,
   Wallet,
-  Workflow,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -43,13 +42,26 @@ interface DashboardData {
   }[];
 }
 
-function balanceLabel(data: DashboardData | null): string {
+function balanceCredits(data: DashboardData | null): string {
   if (!data?.arkesel_configured) return "Not configured";
   if (data.balance_error) return "Unavailable";
-  const sms = data.balance?.sms_balance;
-  if (sms != null && sms !== "") return String(sms);
-  const main = data.balance?.main_balance;
-  if (main != null && main !== "") return String(main);
+  const raw = data.balance as
+    | { sms_balance?: string | number; data?: { sms_balance?: string | number } }
+    | null
+    | undefined;
+  const sms = raw?.sms_balance ?? raw?.data?.sms_balance;
+  if (sms != null && String(sms) !== "") return String(sms);
+  return "—";
+}
+
+function walletBalance(data: DashboardData | null): string {
+  if (!data?.arkesel_configured || data.balance_error) return "—";
+  const raw = data.balance as
+    | { main_balance?: string | number; data?: { main_balance?: string | number } }
+    | null
+    | undefined;
+  const main = raw?.main_balance ?? raw?.data?.main_balance;
+  if (main != null && String(main) !== "") return String(main);
   return "—";
 }
 
@@ -98,14 +110,14 @@ export default function SmsDashboard() {
       iconClassName: "text-blue-400",
     },
     {
-      label: "Automatic messages",
-      value: String(data?.automatic_messages ?? 0),
-      icon: Workflow,
-      iconClassName: "text-purple-400",
+      label: "SMS credits",
+      value: balanceCredits(data),
+      icon: MessageSquare,
+      iconClassName: "text-brand-gold",
     },
     {
-      label: "SMS balance",
-      value: balanceLabel(data),
+      label: "Wallet (GHS)",
+      value: walletBalance(data),
       icon: Wallet,
       iconClassName: "text-green-400",
     },

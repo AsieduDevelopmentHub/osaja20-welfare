@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     arkesel_sender_id: str = "OSAJA20"
     arkesel_base_url: str = "https://sms.arkesel.com/api/v2"
     arkesel_sandbox: bool = False
+    # Public API origin for Arkesel delivery callbacks (no trailing slash), e.g. https://api.osajawelfare.org
+    # Localhost will not work — use a Cloudflare tunnel URL while developing.
+    public_api_url: str = ""
 
     @property
     def paystack_enabled(self) -> bool:
@@ -89,6 +92,13 @@ class Settings(BaseSettings):
     def arkesel_sender(self) -> str:
         """Arkesel rejects sender IDs longer than 11 characters."""
         return self.arkesel_sender_id.strip()[:11] or "OSAJA20"
+
+    @property
+    def arkesel_callback_url(self) -> str | None:
+        base = self.public_api_url.strip().rstrip("/")
+        if not base or "localhost" in base or "127.0.0.1" in base:
+            return None
+        return f"{base}/api/v1/sms/webhooks/arkesel"
 
     @field_validator("paystack_fee_cap_ghs", mode="before")
     @classmethod

@@ -95,6 +95,7 @@ async def estimate_sms(
             message=payload.message,
             recipient_group=payload.recipient_group,
             member_ids=payload.member_ids,
+            phones=payload.phones,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -115,6 +116,7 @@ async def compose_sms(
             name=payload.name,
             recipient_group=payload.recipient_group,
             member_ids=payload.member_ids,
+            phones=payload.phones,
             schedule_at=payload.schedule_at,
             sandbox=payload.sandbox,
         )
@@ -142,8 +144,11 @@ async def list_campaigns(
     _: Annotated[Member, Depends(require_executive)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    status: str | None = None,
 ):
-    data = await sms_service.list_campaigns(db, page=page, page_size=page_size)
+    data = await sms_service.list_campaigns(
+        db, page=page, page_size=page_size, status=status
+    )
     return ApiResponse(success=True, data=data)
 
 
@@ -160,6 +165,40 @@ async def sms_history(
         db, page=page, page_size=page_size, status=status, q=q
     )
     return ApiResponse(success=True, data=data)
+
+
+@router.post("/messages/{message_id}/refresh", response_model=ApiResponse)
+async def refresh_message_status(
+    message_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await sms_service.refresh_message_status(db, message_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ArkeselError as exc:
+        upstream = exc.status_code or 502
+        status_code = 502 if upstream in (401, 403) else (upstream if 400 <= upstream < 600 else 502)
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return ApiResponse(success=True, data=data, message="Delivery status refreshed")
+
+
+@router.get("/webhooks/arkesel", response_model=ApiResponse)
+@router.post("/webhooks/arkesel", response_model=ApiResponse)
+async def arkesel_delivery_webhook(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    sms_id: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+):
+    """Public Arkesel delivery callback — query params: sms_id, status."""
+    if not sms_id or not status:
+        raise HTTPException(status_code=400, detail="sms_id and status are required")
+    updated = await sms_service.apply_delivery_webhook(db, sms_id=sms_id, status=status)
+    if not updated:
+        # Still 200 so Arkesel does not retry forever for unknown ids
+        return ApiResponse(success=True, message="No matching message", data={"sms_id": sms_id})
+    return ApiResponse(success=True, data=updated, message="Delivery status updated")
 
 
 @router.get("/templates", response_model=ApiResponse)
@@ -188,3 +227,16 @@ async def create_template(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ApiResponse(success=True, data=data, message="Template created")
+
+
+@router.delete("/templates/{template_id}", response_model=ApiResponse)
+async def delete_template(
+    template_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        await sms_service.delete_template(db, template_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return ApiResponse(success=True, message="Template deleted")

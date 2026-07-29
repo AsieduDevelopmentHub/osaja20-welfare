@@ -5,11 +5,17 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import and_, extract, func, or_, select, update
+from sqlalchemy import and_, delete, extract, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core import arkesel_client
-from v1.core.arkesel_client import ArkeselError, estimate_units, normalize_gh_msisdn, sms_page_count
+from v1.core.arkesel_client import (
+    ArkeselError,
+    estimate_units,
+    normalize_gh_msisdn,
+    parse_phone_list,
+    sms_page_count,
+)
 from v1.core.config import settings
 from v1.core.models import (
     Member,
@@ -22,13 +28,32 @@ from v1.core.models import (
     UserRole,
 )
 
+# Ghana (Africa/Accra) has no DST and matches UTC year-round.
+GHANA_TZ = timezone.utc
+
+ARKSEL_STATUS_MAP = {
+    "DELIVERED": SmsDeliveryStatus.DELIVERED.value,
+    "SUBMITTED": SmsDeliveryStatus.SUBMITTED.value,
+    "QUEUED": SmsDeliveryStatus.SUBMITTED.value,
+    "SCHEDULED": SmsDeliveryStatus.SCHEDULED.value,
+    "NOT_DELIVERED": SmsDeliveryStatus.FAILED.value,
+    "FAILED": SmsDeliveryStatus.FAILED.value,
+    "EXPIRED": SmsDeliveryStatus.FAILED.value,
+    "PROHIBITED": SmsDeliveryStatus.FAILED.value,
+    "INVALID": SmsDeliveryStatus.INVALID.value,
+}
+
 RECIPIENT_GROUPS: list[dict[str, str]] = [
     {"id": "all", "label": "All Members", "description": "Every member with a phone number"},
     {"id": "active", "label": "Registered Members", "description": "Active members only"},
-    {"id": "pending", "label": "Members Yet to Join", "description": "Pending registration / approval"},
+    {
+        "id": "pending",
+        "label": "Members Yet to Join",
+        "description": "Pending members + paste contacts (055 / +233 / 233)",
+    },
     {"id": "executive", "label": "Executive Members", "description": "Administrators and executives"},
     {"id": "birthdays_today", "label": "Birthday Celebrants", "description": "Members with birthday today"},
-    {"id": "custom", "label": "Custom Selection", "description": "Pick specific members"},
+    {"id": "custom", "label": "Custom Selection", "description": "Pick members and/or paste contacts"},
 ]
 
 
@@ -133,6 +158,7 @@ class SmsService:
         message: str,
         recipient_group: str,
         member_ids: list[UUID],
+        phones: list[str] | None = None,
     ) -> dict:
         members = await self.resolve_recipients(db, group=recipient_group, member_ids=member_ids)
         valid_phones: list[str] = []
@@ -143,7 +169,9 @@ class SmsService:
                 valid_phones.append(msisdn)
             else:
                 invalid += 1
-        # unique phones
+        manual_valid, manual_invalid = parse_phone_list(phones or [])
+        valid_phones.extend(manual_valid)
+        invalid += len(manual_invalid)
         unique = list(dict.fromkeys(valid_phones))
         pages = sms_page_count(message)
         units = estimate_units(message, len(unique))
@@ -156,6 +184,7 @@ class SmsService:
             "sender_id": settings.arkesel_sender,
             "arkesel_configured": arkesel_client.is_configured(),
             "sandbox": settings.arkesel_sandbox,
+            "sms_credits_needed": units,
         }
 
     async def compose_and_send(
@@ -167,6 +196,7 @@ class SmsService:
         name: str | None,
         recipient_group: str,
         member_ids: list[UUID],
+        phones: list[str] | None,
         schedule_at: datetime | None,
         sandbox: bool | None,
     ) -> dict:
@@ -174,7 +204,7 @@ class SmsService:
             raise ArkeselError("Arkesel is not configured — set ARKESEL_API_KEY")
 
         members = await self.resolve_recipients(db, group=recipient_group, member_ids=member_ids)
-        recipients: list[tuple[Member, str]] = []
+        recipients: list[tuple[Member | None, str]] = []
         seen: set[str] = set()
         for member in members:
             msisdn = normalize_gh_msisdn(member.phone_number)
@@ -183,10 +213,21 @@ class SmsService:
             seen.add(msisdn)
             recipients.append((member, msisdn))
 
+        manual_valid, manual_invalid = parse_phone_list(phones or [])
+        for msisdn in manual_valid:
+            if msisdn in seen:
+                continue
+            seen.add(msisdn)
+            recipients.append((None, msisdn))
+
         if not recipients:
+            hint = ""
+            if manual_invalid:
+                hint = f" Invalid entries: {', '.join(manual_invalid[:5])}"
             raise ValueError(
-                "No recipients with valid Ghana mobile numbers "
-                "(use format 024… / 233… — placeholder numbers like 0000000000 are skipped)"
+                "No recipients with valid Ghana mobile numbers. "
+                "Use 055…, +233…, or 233… formats."
+                + hint
             )
 
         use_sandbox = settings.arkesel_sandbox if sandbox is None else sandbox
@@ -196,7 +237,9 @@ class SmsService:
 
         scheduled_at = schedule_at
         if scheduled_at and scheduled_at.tzinfo is None:
-            scheduled_at = scheduled_at.replace(tzinfo=timezone.utc)
+            scheduled_at = scheduled_at.replace(tzinfo=GHANA_TZ)
+        elif scheduled_at:
+            scheduled_at = scheduled_at.astimezone(GHANA_TZ)
 
         campaign = SmsCampaign(
             name=campaign_name,
@@ -207,7 +250,7 @@ class SmsService:
             provider="arkesel",
             sender_id=settings.arkesel_sender,
             estimated_units=units,
-            scheduled_at=scheduled_at,
+            scheduled_at=scheduled_at.astimezone(timezone.utc) if scheduled_at else None,
             created_by=actor.id,
             sandbox=use_sandbox,
         )
@@ -218,7 +261,7 @@ class SmsService:
             db.add(
                 SmsMessage(
                     campaign_id=campaign.id,
-                    member_id=member.id,
+                    member_id=member.id if member else None,
                     recipient_phone=msisdn,
                     message=message,
                     status=SmsDeliveryStatus.SCHEDULED.value if scheduled_at else SmsDeliveryStatus.PENDING.value,
@@ -229,9 +272,7 @@ class SmsService:
 
         scheduled_date = None
         if scheduled_at:
-            # Arkesel format: 'Y-m-d H:i A' e.g. 2026-07-29 05:30 PM
-            local = scheduled_at.astimezone(timezone.utc)
-            scheduled_date = local.strftime("%Y-%m-%d %I:%M %p")
+            scheduled_date = scheduled_at.astimezone(GHANA_TZ).strftime("%Y-%m-%d %I:%M %p")
 
         try:
             provider_payload = await arkesel_client.send_sms(
@@ -239,6 +280,7 @@ class SmsService:
                 recipients=[msisdn for _, msisdn in recipients],
                 scheduled_date=scheduled_date,
                 sandbox=use_sandbox,
+                callback_url=settings.arkesel_callback_url,
             )
         except ArkeselError as exc:
             campaign.status = SmsCampaignStatus.FAILED.value
@@ -277,13 +319,9 @@ class SmsService:
             provider_id = id_by_recipient.get(row.recipient_phone)
             if provider_id:
                 row.provider_message_id = provider_id
-                row.status = (
-                    SmsDeliveryStatus.SCHEDULED.value if scheduled_at else SmsDeliveryStatus.SUBMITTED.value
-                )
-            else:
-                row.status = (
-                    SmsDeliveryStatus.SCHEDULED.value if scheduled_at else SmsDeliveryStatus.SUBMITTED.value
-                )
+            row.status = (
+                SmsDeliveryStatus.SCHEDULED.value if scheduled_at else SmsDeliveryStatus.SUBMITTED.value
+            )
 
         if scheduled_at:
             campaign.status = SmsCampaignStatus.SCHEDULED.value
@@ -302,7 +340,9 @@ class SmsService:
             "campaign": _campaign_dict(campaign, include_response=True),
             "submitted": len(messages) - failed,
             "invalid": failed,
+            "skipped_invalid_inputs": manual_invalid,
             "estimated_units": units,
+            "delivery_webhook_enabled": bool(settings.arkesel_callback_url),
         }
 
     async def dashboard_stats(self, db: AsyncSession) -> dict:
@@ -403,12 +443,24 @@ class SmsService:
         }
 
     async def list_campaigns(
-        self, db: AsyncSession, *, page: int = 1, page_size: int = 20
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
     ) -> dict:
-        total = int((await db.execute(select(func.count()).select_from(SmsCampaign))).scalar() or 0)
+        conditions = []
+        if status:
+            conditions.append(SmsCampaign.status == status)
+        count_stmt = select(func.count()).select_from(SmsCampaign)
+        list_stmt = select(SmsCampaign)
+        if conditions:
+            count_stmt = count_stmt.where(and_(*conditions))
+            list_stmt = list_stmt.where(and_(*conditions))
+        total = int((await db.execute(count_stmt)).scalar() or 0)
         result = await db.execute(
-            select(SmsCampaign)
-            .order_by(SmsCampaign.created_at.desc())
+            list_stmt.order_by(SmsCampaign.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -467,6 +519,45 @@ class SmsService:
             "total_pages": max(1, (total + page_size - 1) // page_size),
         }
 
+    async def apply_delivery_webhook(
+        self,
+        db: AsyncSession,
+        *,
+        sms_id: str,
+        status: str,
+    ) -> dict | None:
+        result = await db.execute(
+            select(SmsMessage).where(SmsMessage.provider_message_id == sms_id)
+        )
+        row = result.scalar_one_or_none()
+        if not row:
+            return None
+        mapped = ARKSEL_STATUS_MAP.get(status.strip().upper(), row.status)
+        row.status = mapped
+        row.provider_response = {"sms_id": sms_id, "status": status, "source": "webhook"}
+        await db.commit()
+        await db.refresh(row)
+        return _message_dict(row)
+
+    async def refresh_message_status(self, db: AsyncSession, message_id: UUID) -> dict:
+        result = await db.execute(select(SmsMessage).where(SmsMessage.id == message_id))
+        row = result.scalar_one_or_none()
+        if not row:
+            raise ValueError("SMS message not found")
+        if not row.provider_message_id:
+            raise ValueError("No Arkesel message id to refresh — webhook/callback may not have been enabled")
+        details = await arkesel_client.get_sms_details(row.provider_message_id)
+        nested = details.get("data") if isinstance(details.get("data"), dict) else details
+        remote_status = str(
+            nested.get("status") or nested.get("message_status") or details.get("status") or ""
+        )
+        if remote_status:
+            row.status = ARKSEL_STATUS_MAP.get(remote_status.strip().upper(), row.status)
+        row.provider_response = details
+        await db.commit()
+        await db.refresh(row)
+        return {"message": _message_dict(row), "provider": details}
+
     async def list_templates(self, db: AsyncSession) -> list[dict]:
         result = await db.execute(select(SmsTemplate).order_by(SmsTemplate.name.asc()))
         return [_template_dict(t) for t in result.scalars().all()]
@@ -485,6 +576,12 @@ class SmsService:
         await db.refresh(template)
         return _template_dict(template)
 
+    async def delete_template(self, db: AsyncSession, template_id: UUID) -> None:
+        result = await db.execute(delete(SmsTemplate).where(SmsTemplate.id == template_id))
+        if result.rowcount == 0:
+            raise ValueError("Template not found")
+        await db.commit()
+
     def settings_public(self) -> dict:
         return {
             "arkesel_configured": arkesel_client.is_configured(),
@@ -492,6 +589,9 @@ class SmsService:
             "base_url": settings.arkesel_base_url,
             "sandbox": settings.arkesel_sandbox,
             "api_key_set": bool(settings.arkesel_api_key.strip()),
+            "delivery_webhook_enabled": bool(settings.arkesel_callback_url),
+            "public_api_url": settings.public_api_url or None,
+            "callback_url": settings.arkesel_callback_url,
         }
 
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarClock,
+  FileText,
   Loader2,
   MessageSquarePlus,
   Send,
@@ -38,13 +39,30 @@ interface MemberOption {
   status: string;
 }
 
+interface Template {
+  id: string;
+  name: string;
+  body: string;
+  category: string;
+}
+
+function splitPhones(raw: string): string[] {
+  return raw
+    .split(/[\n,;]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 export default function ComposePage() {
   const [groups, setGroups] = useState<RecipientGroup[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [group, setGroup] = useState("active");
+  const [templateId, setTemplateId] = useState("");
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
   const [scheduleAt, setScheduleAt] = useState("");
   const [sandbox, setSandbox] = useState(false);
+  const [manualPhones, setManualPhones] = useState("");
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [customMembers, setCustomMembers] = useState<MemberOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -54,13 +72,19 @@ export default function ComposePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const showManualPhones = group === "pending" || group === "custom";
+
   const loadGroups = useCallback(async () => {
     setLoadingGroups(true);
     try {
-      const res = await apiFetch<RecipientGroup[]>("/sms/recipients/groups");
-      setGroups(res.data ?? []);
+      const [groupsRes, templatesRes] = await Promise.all([
+        apiFetch<RecipientGroup[]>("/sms/recipients/groups"),
+        apiFetch<Template[]>("/sms/templates"),
+      ]);
+      setGroups(groupsRes.data ?? []);
+      setTemplates(templatesRes.data ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load recipient groups");
+      setError(err instanceof Error ? err.message : "Failed to load compose data");
     } finally {
       setLoadingGroups(false);
     }
@@ -71,7 +95,10 @@ export default function ComposePage() {
   }, [loadGroups]);
 
   useEffect(() => {
-    if (group !== "custom") return;
+    if (group !== "custom") {
+      setCustomMembers([]);
+      return;
+    }
     apiFetch<MemberOption[]>("/sms/recipients?group=active")
       .then((res) => setCustomMembers(res.data ?? []))
       .catch(() => setCustomMembers([]));
@@ -80,6 +107,11 @@ export default function ComposePage() {
   const memberIds = useMemo(
     () => (group === "custom" ? selectedIds : []),
     [group, selectedIds]
+  );
+
+  const phones = useMemo(
+    () => (showManualPhones ? splitPhones(manualPhones) : []),
+    [showManualPhones, manualPhones]
   );
 
   useEffect(() => {
@@ -95,6 +127,7 @@ export default function ComposePage() {
           message,
           recipient_group: group,
           member_ids: memberIds,
+          phones,
         }),
       })
         .then((res) => setEstimate(res.data ?? null))
@@ -102,7 +135,16 @@ export default function ComposePage() {
         .finally(() => setEstimating(false));
     }, 350);
     return () => window.clearTimeout(handle);
-  }, [message, group, memberIds]);
+  }, [message, group, memberIds, phones]);
+
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const tpl = templates.find((t) => t.id === id);
+    if (tpl) {
+      setMessage(tpl.body);
+      if (!name.trim()) setName(tpl.name);
+    }
+  };
 
   const toggleMember = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -116,9 +158,16 @@ export default function ComposePage() {
       setError("Message is required");
       return;
     }
-    if (group === "custom" && selectedIds.length === 0) {
-      setError("Select at least one recipient");
+    if (group === "custom" && selectedIds.length === 0 && phones.length === 0) {
+      setError("Select at least one member or paste phone numbers");
       return;
+    }
+    if (group === "pending" && phones.length === 0) {
+      // pending DB members may still exist; allow send but warn if estimate is 0
+      if ((estimate?.recipient_count ?? 0) === 0) {
+        setError("Paste at least one valid contact for members yet to join (055… / +233… / 233…)");
+        return;
+      }
     }
     setSending(true);
     try {
@@ -127,6 +176,7 @@ export default function ComposePage() {
         submitted: number;
         invalid: number;
         estimated_units: number;
+        skipped_invalid_inputs?: string[];
       }>("/sms/compose", {
         method: "POST",
         body: JSON.stringify({
@@ -134,17 +184,23 @@ export default function ComposePage() {
           name: name.trim() || null,
           recipient_group: group,
           member_ids: memberIds,
+          phones,
           schedule_at: scheduleAt ? new Date(scheduleAt).toISOString() : null,
           sandbox,
         }),
       });
+      const skipped = res.data?.skipped_invalid_inputs?.length
+        ? ` Skipped invalid: ${res.data.skipped_invalid_inputs.join(", ")}.`
+        : "";
       setSuccess(
-        `Campaign ${res.data?.campaign.status ?? "submitted"} — ${res.data?.submitted ?? 0} recipient(s), ~${res.data?.estimated_units ?? 0} SMS unit(s).`
+        `Campaign ${res.data?.campaign.status ?? "submitted"} — ${res.data?.submitted ?? 0} recipient(s), ~${res.data?.estimated_units ?? 0} SMS credit(s).${skipped}`
       );
       setMessage("");
       setName("");
       setScheduleAt("");
       setSelectedIds([]);
+      setManualPhones("");
+      setTemplateId("");
       await loadGroups();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send SMS");
@@ -159,7 +215,7 @@ export default function ComposePage() {
         <p className="text-sm font-medium text-brand-gold">SMS Portal</p>
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Compose SMS</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Write a message, choose recipients, preview cost, then send or schedule via Arkesel.
+          Use a template or write freely, choose recipients, then send. Cost uses your SMS credits.
         </p>
       </header>
 
@@ -185,7 +241,29 @@ export default function ComposePage() {
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
-          <label htmlFor="message" className="mb-1.5 block text-sm font-medium text-slate-300">
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-300">
+            <FileText className="h-4 w-4 text-brand-gold" />
+            Template
+          </div>
+          <select
+            value={templateId}
+            onChange={(e) => applyTemplate(e.target.value)}
+            className="input-dark outline-none focus:border-brand-gold"
+          >
+            <option value="">No template — write message below</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.category})
+              </option>
+            ))}
+          </select>
+          {templates.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-500">
+              No templates yet. Create some under Templates, then they appear here.
+            </p>
+          ) : null}
+
+          <label htmlFor="message" className="mb-1.5 mt-4 block text-sm font-medium text-slate-300">
             Message
           </label>
           <textarea
@@ -262,6 +340,26 @@ export default function ComposePage() {
               )}
             </div>
           ) : null}
+
+          {showManualPhones ? (
+            <div className="mt-4">
+              <label htmlFor="manual-phones" className="mb-1.5 block text-sm font-medium text-slate-300">
+                {group === "pending" ? "Contacts for members yet to join" : "Additional contacts (optional)"}
+              </label>
+              <textarea
+                id="manual-phones"
+                rows={4}
+                value={manualPhones}
+                onChange={(e) => setManualPhones(e.target.value)}
+                placeholder={"One per line or comma-separated:\n0553995047\n+233544919953\n233501234567"}
+                className="input-dark resize-y outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/20"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                Accepted formats: <code>055…</code>, <code>+233…</code>, <code>233…</code>. Invalid numbers are
+                skipped after sanitize.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -281,7 +379,7 @@ export default function ComposePage() {
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6">
-            <p className="mb-3 text-sm font-medium text-slate-300">Cost estimate</p>
+            <p className="mb-3 text-sm font-medium text-slate-300">Cost estimate (SMS credits)</p>
             {estimating ? (
               <p className="flex items-center gap-2 text-sm text-slate-400">
                 <Loader2 className="h-4 w-4 animate-spin" /> Calculating…
@@ -297,12 +395,12 @@ export default function ComposePage() {
                   <dd className="font-semibold text-white">{estimate.pages_per_message}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">SMS units</dt>
+                  <dt className="text-slate-500">Credits needed</dt>
                   <dd className="font-semibold text-brand-gold">{estimate.estimated_units}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Sender</dt>
-                  <dd className="font-semibold text-white">{estimate.sender_id}</dd>
+                  <dt className="text-slate-500">Invalid skipped</dt>
+                  <dd className="font-semibold text-white">{estimate.invalid_phone_count}</dd>
                 </div>
               </dl>
             ) : (
@@ -327,7 +425,8 @@ export default function ComposePage() {
 
       <p className="flex items-center gap-2 text-xs text-slate-500">
         <MessageSquarePlus className="h-3.5 w-3.5" />
-        Delivery is handled by Arkesel. Ensure your sender ID is approved in the Arkesel dashboard.
+        Arkesel <strong className="font-semibold text-slate-400">sms_balance</strong> is your send credits;
+        <strong className="font-semibold text-slate-400"> main_balance</strong> is wallet money (GHS).
       </p>
     </div>
   );

@@ -211,6 +211,8 @@ class SmsComposeRequest(BaseModel):
     name: str | None = Field(default=None, max_length=200)
     recipient_group: str = Field(default="custom", max_length=50)
     member_ids: list[UUID] = Field(default_factory=list)
+    # Manual contacts (yet-to-join / pasted numbers). Accepts 055…, +233…, 233…
+    phones: list[str] = Field(default_factory=list)
     schedule_at: datetime | None = None
     sandbox: bool | None = None
 
@@ -219,6 +221,7 @@ class SmsEstimateRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     recipient_group: str = Field(default="custom", max_length=50)
     member_ids: list[UUID] = Field(default_factory=list)
+    phones: list[str] = Field(default_factory=list)
 
 
 class SmsTemplateCreate(BaseModel):
