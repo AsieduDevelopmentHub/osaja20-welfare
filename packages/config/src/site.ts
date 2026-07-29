@@ -34,4 +34,13 @@ export const SITE_META = {
     siteName: `${BRAND_COPY.name} ${BRAND_COPY.welfare}`,
     defaultUrl: "http://localhost:3002",
   },
+  sms: {
+    favicon: BRAND_PATHS.batchLogo,
+    ogImage: BRAND_PATHS.batchLogo,
+    ogImageAlt: `${BRAND_COPY.batch} logo`,
+    title: `${BRAND_COPY.name} ${BRAND_COPY.welfare} — SMS Portal`,
+    description: `SMS campaigns and messaging for ${BRAND_COPY.name} ${BRAND_COPY.welfare}`,
+    siteName: `${BRAND_COPY.name} SMS`,
+    defaultUrl: "http://localhost:3003",
+  },
 } as const;

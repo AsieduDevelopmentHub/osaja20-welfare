@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -203,6 +204,27 @@ class SupportInquiryCreate(BaseModel):
 
 class SupportInquiryReply(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
+
+
+class SmsComposeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    name: str | None = Field(default=None, max_length=200)
+    recipient_group: str = Field(default="custom", max_length=50)
+    member_ids: list[UUID] = Field(default_factory=list)
+    schedule_at: datetime | None = None
+    sandbox: bool | None = None
+
+
+class SmsEstimateRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    recipient_group: str = Field(default="custom", max_length=50)
+    member_ids: list[UUID] = Field(default_factory=list)
+
+
+class SmsTemplateCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=1000)
+    category: str = Field(default="general", max_length=50)
 
 
 class ApiResponse(BaseModel):

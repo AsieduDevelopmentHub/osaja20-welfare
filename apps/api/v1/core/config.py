@@ -71,9 +71,24 @@ class Settings(BaseSettings):
     # Optional cap (GHS). Leave unset for Ghana local pricing (percentage only).
     paystack_fee_cap_ghs: float | None = None
 
+    # Arkesel SMS — sender ID must be ≤11 characters (NCA / Arkesel rule)
+    arkesel_api_key: str = ""
+    arkesel_sender_id: str = "OSAJA20"
+    arkesel_base_url: str = "https://sms.arkesel.com/api/v2"
+    arkesel_sandbox: bool = False
+
     @property
     def paystack_enabled(self) -> bool:
         return bool(self.paystack_secret_key.strip())
+
+    @property
+    def arkesel_enabled(self) -> bool:
+        return bool(self.arkesel_api_key.strip())
+
+    @property
+    def arkesel_sender(self) -> str:
+        """Arkesel rejects sender IDs longer than 11 characters."""
+        return self.arkesel_sender_id.strip()[:11] or "OSAJA20"
 
     @field_validator("paystack_fee_cap_ghs", mode="before")
     @classmethod
