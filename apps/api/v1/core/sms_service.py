@@ -80,29 +80,46 @@ TRIGGER_PRESETS: dict[str, dict[str, str]] = {
     "birthday": {
         "recipient_group": "birthdays_today",
         "default_message": (
-            "Happy Birthday from OSAJA'20 Welfare! "
-            "Wishing you joy, health, and a wonderful year ahead."
+            "Dear member,\n\n"
+            "Happy Birthday from the OSAJA Welfare family! "
+            "We wish you joy, good health, and a wonderful year ahead.\n\n"
+            "Thank you,\n"
+            "OSAJA Welfare Team"
         ),
     },
     "outstanding_dues": {
         "recipient_group": "outstanding_dues",
         "default_message": (
-            "OSAJA'20 Welfare reminder: your monthly dues are still outstanding. "
-            f"Please pay at {MEMBER_PORTAL_URL} Thank you."
+            "Dear member,\n\n"
+            "This is a kind reminder that your monthly welfare dues are still outstanding. "
+            "Our ability to support one another depends on our collective commitment.\n\n"
+            f"Please pay your dues at {MEMBER_PORTAL_URL}\n\n"
+            "Thank you,\n"
+            "OSAJA Welfare Team"
         ),
     },
     "dues_month_end": {
         "recipient_group": "outstanding_dues",
         "default_message": (
-            "OSAJA'20 Welfare: the month is ending soon and your dues are still unpaid. "
-            f"Please pay at {MEMBER_PORTAL_URL} before month-end. Thank you."
+            "Dear member,\n\n"
+            "The month is ending soon and your welfare dues remain unpaid. "
+            "Kindly settle them so we can continue supporting one another as a family.\n\n"
+            f"Pay at {MEMBER_PORTAL_URL}\n\n"
+            "Thank you,\n"
+            "OSAJA Welfare Team"
         ),
     },
     "members_yet_to_join": {
         "recipient_group": "pending",
         "default_message": (
-            "OSAJA'20 Welfare: you are invited to complete your membership. "
-            f"Join and register at {MEMBER_PORTAL_URL}"
+            "Dear friend,\n\n"
+            "If you have not yet joined the OLD Students of Asuofua JHS A (OSAJA) Welfare Group, "
+            "we warmly encourage you to join today. The welfare scheme is here to support all of us, "
+            "and that support depends on our collective commitment.\n\n"
+            "Join the welfare group, pay your monthly dues, and be an active part of our support system.\n\n"
+            f"Join and register at {MEMBER_PORTAL_URL}\n\n"
+            "Thank you,\n"
+            "OSAJA Welfare Team"
         ),
     },
     "manual": {
@@ -1021,8 +1038,7 @@ class SmsService:
             if default["id"] not in existing_ids:
                 out.append(dict(default))
                 changed = True
-        # Patch stock default messages to include member portal URL when still using old copy
-        portal = MEMBER_PORTAL_URL
+        # Refresh stock default copy to the current welfare-team tone when still on old text
         for w in out:
             if not w.get("is_default"):
                 continue
@@ -1031,10 +1047,10 @@ class SmsService:
             if not preset:
                 continue
             current = str(w.get("message") or "")
-            if trigger in ("outstanding_dues", "dues_month_end", "members_yet_to_join"):
-                if portal not in current:
-                    w["message"] = preset
-                    changed = True
+            # New defaults are signed "OSAJA Welfare Team"; older stock copy is replaced once
+            if "OSAJA Welfare Team" not in current:
+                w["message"] = preset
+                changed = True
             if trigger == "members_yet_to_join":
                 if w.get("requires_phones") is not True:
                     w["requires_phones"] = True

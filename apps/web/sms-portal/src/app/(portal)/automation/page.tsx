@@ -81,7 +81,7 @@ export default function AutomationPage() {
   const [trigger, setTrigger] = useState("birthday");
   const [recipientGroup, setRecipientGroup] = useState("active");
   const [message, setMessage] = useState(
-    "Happy Birthday from OSAJA'20 Welfare! Wishing you joy, health, and a wonderful year ahead."
+    "Dear member,\n\nHappy Birthday from the OSAJA Welfare family! We wish you joy, good health, and a wonderful year ahead.\n\nThank you,\nOSAJA Welfare Team"
   );
   const [templateId, setTemplateId] = useState("");
 
@@ -120,19 +120,19 @@ export default function AutomationPage() {
     if (!preset || trigger === "manual") return;
     if (trigger === "outstanding_dues") {
       setMessage(
-        `OSAJA'20 Welfare reminder: your monthly dues are still outstanding. Please pay at ${MEMBER_PORTAL} Thank you.`
+        `Dear member,\n\nThis is a kind reminder that your monthly welfare dues are still outstanding. Our ability to support one another depends on our collective commitment.\n\nPlease pay your dues at ${MEMBER_PORTAL}\n\nThank you,\nOSAJA Welfare Team`
       );
     } else if (trigger === "dues_month_end") {
       setMessage(
-        `OSAJA'20 Welfare: the month is ending soon and your dues are still unpaid. Please pay at ${MEMBER_PORTAL} before month-end. Thank you.`
+        `Dear member,\n\nThe month is ending soon and your welfare dues remain unpaid. Kindly settle them so we can continue supporting one another as a family.\n\nPay at ${MEMBER_PORTAL}\n\nThank you,\nOSAJA Welfare Team`
       );
     } else if (trigger === "members_yet_to_join") {
       setMessage(
-        `OSAJA'20 Welfare: you are invited to complete your membership. Join and register at ${MEMBER_PORTAL}`
+        `Dear friend,\n\nIf you have not yet joined the OLD Students of Asuofua JHS A (OSAJA) Welfare Group, we warmly encourage you to join today. The welfare scheme is here to support all of us, and that support depends on our collective commitment.\n\nJoin the welfare group, pay your monthly dues, and be an active part of our support system.\n\nJoin and register at ${MEMBER_PORTAL}\n\nThank you,\nOSAJA Welfare Team`
       );
     } else if (trigger === "birthday") {
       setMessage(
-        "Happy Birthday from OSAJA'20 Welfare! Wishing you joy, health, and a wonderful year ahead."
+        "Dear member,\n\nHappy Birthday from the OSAJA Welfare family! We wish you joy, good health, and a wonderful year ahead.\n\nThank you,\nOSAJA Welfare Team"
       );
     }
   }, [trigger]);
