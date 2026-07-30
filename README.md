@@ -1,6 +1,6 @@
 # OSAJA'20 Welfare Platform
 
-**Asuofua D/A JHS Block A Batch 2020** — A premium digital welfare ecosystem for member management, contributions, welfare cases, voting, celebrations, and community governance.
+**Asuofua D/A JHS Block A Batch 2020** — A premium digital welfare ecosystem for member management, contributions, welfare cases, voting, celebrations, SMS campaigns, and community governance.
 
 ## Stack
 
@@ -9,7 +9,8 @@
 | Web | Next.js 15, TypeScript, Tailwind CSS |
 | API | FastAPI, Python 3.12 |
 | Database | PostgreSQL (Supabase) |
-| Auth | Supabase Auth (JWT) |
+| Auth | Supabase Auth (JWT) / local JWT for development |
+| SMS | Arkesel SMS API v2 |
 | Notifications | In-app + Web Push (no Celery) |
 
 ## Monorepo Structure
@@ -19,10 +20,13 @@ apps/
   api/v1/              FastAPI REST API
   web/member-app/      Member portal (port 3000)
   web/admin-portal/    Admin dashboard (port 3001)
+  web/landing/         Public marketing site (port 3002)
+  web/sms-portal/      SMS campaigns portal (port 3003)
 packages/
   types/               Shared domain types
   utils/               Data structure algorithms
   config/              Platform constants
+  ui/                  Shared UI + nav configs
 infrastructure/docker/   PostgreSQL + Redis
 docs/                  Architecture & setup guides
 ```
@@ -49,11 +53,14 @@ cd infrastructure/docker && docker compose up -d postgres redis
 ./scripts/setup-api-venv.sh     # macOS/Linux
 .\scripts\run-api.ps1
 
-npx pnpm dev:member
-npx pnpm dev:admin
+npx pnpm dev:member   # http://localhost:3000
+npx pnpm dev:admin    # http://localhost:3001
+npx pnpm dev:landing  # http://localhost:3002
+npx pnpm dev:sms      # http://localhost:3003
 ```
 
-See [docs/setup/Installation.md](docs/setup/Installation.md) for full setup instructions.
+See [docs/setup/Installation.md](docs/setup/Installation.md) for full setup instructions.  
+SMS portal product spec: [docs/sms/sms_portal.md](docs/sms/sms_portal.md).
 
 ## API Endpoints
 
@@ -65,6 +72,7 @@ See [docs/setup/Installation.md](docs/setup/Installation.md) for full setup inst
 | Contributions | `/api/v1/contributions` |
 | Voting | `/api/v1/voting` |
 | Dashboard | `/api/v1/dashboard` |
+| SMS | `/api/v1/sms` |
 
 Interactive docs at `http://localhost:8000/docs`.
 

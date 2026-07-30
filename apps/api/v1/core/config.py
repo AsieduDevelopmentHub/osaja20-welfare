@@ -71,9 +71,34 @@ class Settings(BaseSettings):
     # Optional cap (GHS). Leave unset for Ghana local pricing (percentage only).
     paystack_fee_cap_ghs: float | None = None
 
+    # Arkesel SMS — Sender ID max 11 chars (Arkesel API rejects longer values)
+    arkesel_api_key: str = ""
+    arkesel_sender_id: str = "OSAJA20"
+    arkesel_base_url: str = "https://sms.arkesel.com/api/v2"
+    arkesel_sandbox: bool = False
+    # Public API origin for Arkesel delivery callbacks (no trailing slash), e.g. https://api.osajawelfare.org
+    # Localhost will not work — use a Cloudflare tunnel URL while developing.
+    public_api_url: str = ""
+
     @property
     def paystack_enabled(self) -> bool:
         return bool(self.paystack_secret_key.strip())
+
+    @property
+    def arkesel_enabled(self) -> bool:
+        return bool(self.arkesel_api_key.strip())
+
+    @property
+    def arkesel_sender(self) -> str:
+        """Approved Arkesel Sender ID (max 11 characters)."""
+        return (self.arkesel_sender_id.strip() or "OSAJA20")[:11]
+
+    @property
+    def arkesel_callback_url(self) -> str | None:
+        base = self.public_api_url.strip().rstrip("/")
+        if not base or "localhost" in base or "127.0.0.1" in base:
+            return None
+        return f"{base}/api/v1/sms/webhooks/arkesel"
 
     @field_validator("paystack_fee_cap_ghs", mode="before")
     @classmethod

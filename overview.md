@@ -19,7 +19,7 @@ The platform will serve as the official operational environment for:
 * Member Management
 * Welfare Administration
 * Contributions
-* Communication
+* Communication (in-app, push, SMS)
 * Celebrations
 * Notifications
 * Governance
@@ -43,7 +43,7 @@ The platform must:
 * Digitize welfare operations
 * Increase transparency
 * Improve participation
-* Strengthen communication
+* Strengthen communication (including executive SMS campaigns)
 * Automate repetitive operations
 * Enable governance and voting
 * Support financial tracking
@@ -138,7 +138,9 @@ apps/
 ├── web/
 │
 │   ├── member-app/
-│   └── admin-portal/
+│   ├── admin-portal/
+│   ├── landing/
+│   └── sms-portal/
 │
 ├── mobile/
 │
@@ -156,7 +158,8 @@ apps/
         ├── announcements/
         ├── voting/
         ├── reports/
-        └── dashboard/
+        ├── dashboard/
+        └── sms/
 
 
 packages/
@@ -189,6 +192,7 @@ docs/
 ├── deployment/
 ├── setup/
 ├── security/
+├── sms/
 ├── workflows/
 └── user-guides/
 
@@ -270,6 +274,14 @@ Services:
 
 * Email Service
 * Queue Processing
+* Web Push (VAPID)
+
+---
+
+## SMS
+
+* Arkesel SMS API v2
+* Dedicated SMS portal (`apps/web/sms-portal`)
 
 ---
 
@@ -560,7 +572,26 @@ Manage:
 
 ---
 
-# 12. Voting & Decision Management
+# 12. SMS Portal
+
+Executive-only SMS campaigns via **Arkesel**.
+
+Features:
+
+* Compose (groups, templates, manual/yet-to-join contacts)
+* Cost estimate and schedule / sandbox send
+* Campaigns, scheduled sends, delivery history
+* Templates CRUD
+* Balance (SMS credits + GHS wallet)
+* Delivery webhooks when `PUBLIC_API_URL` is set
+
+Auth: same executive / administrator roles as the admin portal.
+
+Spec: `docs/sms/sms_portal.md`
+
+---
+
+# 13. Voting & Decision Management
 
 ## Purpose
 
@@ -875,6 +906,8 @@ Installation.md
 Deployment.md
 
 Security.md
+
+sms/sms_portal.md
 
 Workflows.md
 

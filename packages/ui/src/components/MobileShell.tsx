@@ -50,6 +50,9 @@ export function MobileShell({
 
   useEffect(() => {
     setMoreOpen(false);
+    window.scrollTo(0, 0);
+    const main = document.getElementById("main-content");
+    if (main) main.scrollTop = 0;
   }, [pathname]);
 
   useEffect(() => {

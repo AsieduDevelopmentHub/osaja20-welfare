@@ -322,3 +322,83 @@ class PushSubscription(Base):
     auth_key: Mapped[str] = mapped_column(String(255), nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SmsCampaignStatus(str, enum.Enum):
+    DRAFT = "draft"
+    QUEUED = "queued"
+    SENDING = "sending"
+    SENT = "sent"
+    SCHEDULED = "scheduled"
+    FAILED = "failed"
+    PARTIAL = "partial"
+    CANCELLED = "cancelled"
+
+
+class SmsDeliveryStatus(str, enum.Enum):
+    PENDING = "pending"
+    SUBMITTED = "submitted"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+    INVALID = "invalid"
+    SCHEDULED = "scheduled"
+
+
+class SmsCampaign(Base):
+    __tablename__ = "sms_campaigns"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    recipient_group: Mapped[str] = mapped_column(String(50), default="custom", index=True)
+    recipient_count: Mapped[int] = mapped_column(default=0)
+    status: Mapped[str] = mapped_column(String(20), default=SmsCampaignStatus.DRAFT.value, index=True)
+    provider: Mapped[str] = mapped_column(String(30), default="arkesel")
+    sender_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    estimated_units: Mapped[int] = mapped_column(default=0)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
+    provider_response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    sandbox: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    messages: Mapped[list["SmsMessage"]] = relationship(back_populates="campaign")
+
+
+class SmsMessage(Base):
+    __tablename__ = "sms_messages"
+    __table_args__ = (Index("idx_sms_message_campaign_status", "campaign_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sms_campaigns.id"), nullable=False, index=True)
+    member_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True, index=True)
+    recipient_phone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default=SmsDeliveryStatus.PENDING.value, index=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    provider_response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    cost_units: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    campaign: Mapped["SmsCampaign"] = relationship(back_populates="messages")
+
+
+class SmsTemplate(Base):
+    __tablename__ = "sms_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(50), default="general", index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

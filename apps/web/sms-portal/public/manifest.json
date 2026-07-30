@@ -1,0 +1,41 @@
+{
+  "id": "/",
+  "name": "OSAJA'20 SMS Portal",
+  "short_name": "OSAJA SMS",
+  "description": "SMS campaigns and messaging for OSAJA'20 Welfare",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#061d47",
+  "theme_color": "#061d47",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "communication"],
+  "icons": [
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

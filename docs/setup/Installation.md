@@ -55,6 +55,26 @@ cp apps/api/.env.example apps/api/.env
 
 Edit `apps/api/.env` with your database and optional Supabase credentials.
 
+For the SMS portal (Arkesel), also set:
+
+```env
+ARKESEL_API_KEY=your_arkesel_api_key
+ARKESEL_SENDER_ID=OSAJA20
+ARKESEL_BASE_URL=https://sms.arkesel.com/api/v2
+ARKESEL_SANDBOX=false
+# Public API origin for delivery webhooks (not localhost)
+# PUBLIC_API_URL=https://your-api.example.com
+```
+
+`ARKESEL_SENDER_ID` must be **≤ 11 characters** and approved in the Arkesel dashboard.  
+`sms_balance` from Arkesel is SMS **credits**; `main_balance` is GHS wallet money.
+
+Include the SMS portal origin in CORS for local multi-app work:
+
+```env
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003
+```
+
 ## 5. Run database migrations (optional)
 
 With venv activated:
@@ -65,6 +85,15 @@ alembic upgrade head
 ```
 
 On first run, tables are also created automatically via `init_database()` at API startup.
+
+**Fresh local Postgres:** Alembic revisions are incremental (no full baseline). Prefer:
+
+```bash
+python scripts/seed_admin.py   # create_all + seed admin
+alembic stamp head             # mark migrations applied
+```
+
+Do not run `alembic upgrade head` on an empty database first — later revisions expect core tables such as `members` to already exist.
 
 ## 6. Seed admin account (optional)
 
@@ -104,6 +133,8 @@ Copy the example files and edit payment details, API URL, etc.:
 ```bash
 cp apps/web/member-app/.env.local.example apps/web/member-app/.env.local
 cp apps/web/admin-portal/.env.local.example apps/web/admin-portal/.env.local
+cp apps/web/landing/.env.local.example apps/web/landing/.env.local
+cp apps/web/sms-portal/.env.local.example apps/web/sms-portal/.env.local
 ```
 
 Key variables (all `NEXT_PUBLIC_*` are exposed to the browser):
@@ -111,19 +142,27 @@ Key variables (all `NEXT_PUBLIC_*` are exposed to the browser):
 | Variable | Purpose |
 |----------|---------|
 | `NEXT_PUBLIC_API_URL` | API base (leave empty for auto-detect + tunnel proxy) |
+| `API_PROXY_TARGET` | Server-side proxy to FastAPI (`http://127.0.0.1:8000`) |
 | `NEXT_PUBLIC_MONTHLY_DUES_AMOUNT` | Displayed dues amount (default `30`) |
 | `NEXT_PUBLIC_MOMO_NUMBER` | MoMo payment number |
 | `NEXT_PUBLIC_MOMO_ACCOUNT_NAME` | MoMo account display name |
 | `NEXT_PUBLIC_BANK_NAME` | Bank name |
 | `NEXT_PUBLIC_BANK_ACCOUNT_NAME` | Bank account holder |
 | `NEXT_PUBLIC_BANK_ACCOUNT_NUMBER` | Bank account number |
+| `NEXT_PUBLIC_ADMIN_APP_URL` | SMS/admin cross-links between portals |
+| `NEXT_PUBLIC_MEMBER_APP_URL` | Admin/SMS links to member portal |
+| `NEXT_PUBLIC_SMS_APP_URL` | Admin link to SMS portal (if set) |
 
 Restart the dev server after editing `.env.local`.
 
 ```bash
-npx pnpm dev:member   # http://localhost:3000
-npx pnpm dev:admin    # http://localhost:3001
+npx pnpm dev:member   # http://localhost:3000 — member portal
+npx pnpm dev:admin    # http://localhost:3001 — admin portal
+npx pnpm dev:landing  # http://localhost:3002 — public site
+npx pnpm dev:sms      # http://localhost:3003 — SMS portal (executives)
 ```
+
+SMS portal login uses the same executive/admin credentials as the admin portal (`admin@osaja20.local` / `Admin@OSAJA20` after seeding). Product overview: [docs/sms/sms_portal.md](../sms/sms_portal.md).
 
 ### Cloudflare tunnel (share dev build publicly)
 
@@ -217,3 +256,10 @@ uvicorn v1.main:app --reload
 ```
 
 Members enable push under **Settings → Browser push notifications**, then use **Send test** to verify delivery.
+
+## Related
+
+- [Architecture](../architecture/Architecture.md)
+- [SMS portal](../sms/sms_portal.md)
+- [Deployment](../deployment/Deployment.md)
+- [Security](../security/Security.md)

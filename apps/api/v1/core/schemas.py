@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -203,6 +204,82 @@ class SupportInquiryCreate(BaseModel):
 
 class SupportInquiryReply(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
+
+
+class SmsComposeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    name: str | None = Field(default=None, max_length=200)
+    recipient_group: str = Field(default="custom", max_length=80)
+    member_ids: list[UUID] = Field(default_factory=list)
+    phones: list[str] = Field(default_factory=list)
+    schedule_at: datetime | None = None
+    sandbox: bool | None = None
+
+
+class SmsEstimateRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    recipient_group: str = Field(default="custom", max_length=80)
+    member_ids: list[UUID] = Field(default_factory=list)
+    phones: list[str] = Field(default_factory=list)
+
+
+class SmsTemplateCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=1000)
+    category: str = Field(default="general", max_length=50)
+    linked_trigger: str | None = Field(default=None, max_length=50)
+
+
+class SmsTemplateUpdate(BaseModel):
+    linked_trigger: str | None = Field(default=None, max_length=50)
+
+
+class SmsWorkflowCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    trigger: str = Field(
+        description="birthday | outstanding_dues | dues_month_end | members_yet_to_join | manual"
+    )
+    recipient_group: str | None = Field(default=None, max_length=80)
+    message: str = Field(min_length=1, max_length=1000)
+    enabled: bool = True
+    template_id: str | None = None
+
+
+class SmsWorkflowUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=120)
+    message: str | None = Field(default=None, max_length=1000)
+    enabled: bool | None = None
+    template_id: str | None = None
+    clear_template: bool = False
+
+
+class SmsWorkflowRun(BaseModel):
+    phones: list[str] = Field(default_factory=list)
+
+
+class SmsCustomGroupCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    contacts: list[dict] = Field(default_factory=list)
+
+
+class SmsCampaignUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    message: str | None = Field(default=None, max_length=1000)
+    schedule_at: datetime | None = None
+
+
+class SmsAutomationUpdate(BaseModel):
+    birthday_enabled: bool | None = None
+    dues_reminder_enabled: bool | None = None
+    welcome_enabled: bool | None = None
+    birthday_message: str | None = Field(default=None, max_length=1000)
+    dues_message: str | None = Field(default=None, max_length=1000)
+    welcome_message: str | None = Field(default=None, max_length=1000)
+
+
+class SmsAutomationRun(BaseModel):
+    job: str = Field(description="birthday | dues")
+    sandbox: bool | None = None
 
 
 class ApiResponse(BaseModel):

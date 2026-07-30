@@ -65,7 +65,8 @@
 | `RATE_LIMIT_AUTH_PER_MINUTE` | `10` | Auth endpoint rate limit |
 | `RATE_LIMIT_PUSH_TEST_PER_MINUTE` | `5` | Push test rate limit |
 | `ALLOW_TUNNEL_CORS` | `true` | Cloudflare tunnel CORS regex (disable in prod) |
-| `NEXT_PUBLIC_MEMBER_APP_URL` | `http://localhost:3000` | Admin login member portal link |
+| `NEXT_PUBLIC_MEMBER_APP_URL` | `http://localhost:3000` | Admin/SMS login member portal link |
+| SMS portal | `apps/web/sms-portal` | `pnpm dev:sms` on `:3003`; Arkesel via `/api/v1/sms` |
 | `JOB_WORKER_ENABLED` | `true` | Background Redis job worker in API process |
 | `EMAIL_ENABLED` + SMTP_* | off | Weekly email digest delivery |
 

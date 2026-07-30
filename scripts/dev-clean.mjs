@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Stop dev port, wipe .next, rebuild packages, start Next dev.
- * Usage: node scripts/dev-clean.mjs member|admin
+ * Usage: node scripts/dev-clean.mjs member|admin|sms
  */
 
 import { spawnSync } from "node:child_process";
@@ -16,11 +16,12 @@ const target = process.argv[2] ?? "member";
 const apps = {
   member: { port: 3000, dir: "apps/web/member-app", script: "dev:member" },
   admin: { port: 3001, dir: "apps/web/admin-portal", script: "dev:admin" },
+  sms: { port: 3003, dir: "apps/web/sms-portal", script: "dev:sms" },
 };
 
 const app = apps[target];
 if (!app) {
-  console.error("Usage: node scripts/dev-clean.mjs member|admin");
+  console.error("Usage: node scripts/dev-clean.mjs member|admin|sms");
   process.exit(1);
 }
 

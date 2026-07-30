@@ -17,4 +17,6 @@ System reviews and gap analyses for the OSAJA'20 Welfare Platform.
 
 - [Installation](../setup/Installation.md)
 - [Architecture](../architecture/Architecture.md)
+- [SMS portal](../sms/sms_portal.md)
+- [Deployment](../deployment/Deployment.md)
 - [Repository README](../../README.md)

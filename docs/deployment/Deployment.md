@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Production deployment for **OSAJA'20 Welfare**: API on Render, member + admin apps on Vercel, database on Supabase.
+Production deployment for **OSAJA'20 Welfare**: API on Render; member, admin, landing, and SMS apps on Vercel; database on Supabase; SMS via Arkesel.
 
 ## Overview
 
@@ -10,7 +10,9 @@ Production deployment for **OSAJA'20 Welfare**: API on Render, member + admin ap
 | API (FastAPI) | Render | `apps/api` | `https://api.osaja2020welfare.org` |
 | Member app | Vercel | `apps/web/member-app` | `https://member.osaja2020welfare.org` |
 | Admin portal | Vercel | `apps/web/admin-portal` | `https://admin.osaja2020welfare.org` |
+| SMS portal | Vercel | `apps/web/sms-portal` | `https://sms.osaja2020welfare.org` |
 | Database | Supabase | — | PostgreSQL session pooler `:5432` |
+| SMS provider | Arkesel | — | `https://sms.arkesel.com/api/v2` |
 
 **Deploy in this order:**
 
@@ -19,10 +21,11 @@ Production deployment for **OSAJA'20 Welfare**: API on Render, member + admin ap
 3. **Landing site** on Vercel (apex domain) → note the public URL
 4. **Member app** on Vercel → note the member URL
 5. **Admin portal** on Vercel
-6. Update API env (`CORS_ORIGINS`, `MEMBER_PORTAL_URL`) and redeploy API
-7. Supabase auth redirect URLs + Paystack webhook (if used)
+6. **SMS portal** on Vercel
+7. Update API env (`CORS_ORIGINS`, `MEMBER_PORTAL_URL`, `PUBLIC_API_URL`, Arkesel keys) and redeploy API
+8. Supabase auth redirect URLs + Paystack webhook (if used)
 
-Both Next.js apps proxy `/api/v1` and `/uploads` to the API using `API_PROXY_TARGET` (server-side). The browser usually talks to the same origin as the app, not Render directly.
+Member, admin, and SMS Next.js apps proxy `/api/v1` and `/uploads` to the API using `API_PROXY_TARGET` (server-side). The browser usually talks to the same origin as the app, not Render directly.
 
 ---
 
@@ -57,8 +60,13 @@ Copy from `apps/api/.env.example`. Minimum for production:
 | `USE_LOCAL_AUTH` | `true` for bcrypt login, or `false` + Supabase keys |
 | `REGISTRATION_AUTO_APPROVE` | `false` if executives must approve signups |
 | `ALLOW_TUNNEL_CORS` | `false` |
-| `CORS_ORIGINS` | Comma-separated, no quotes: `https://member.vercel.app,https://admin.vercel.app`. **Do not leave blank** — delete the var until URLs exist, or the API will crash on startup. |
+| `CORS_ORIGINS` | Comma-separated, no quotes: `https://member…,https://admin…,https://sms…`. **Do not leave blank** — delete the var until URLs exist, or the API will crash on startup. |
 | `MEMBER_PORTAL_URL` | `https://YOUR-MEMBER.vercel.app` (Paystack callback + password reset) |
+| `PUBLIC_API_URL` | Public API origin for Arkesel SMS delivery webhooks (e.g. `https://api.osaja2020welfare.org`) — not localhost |
+| `ARKESEL_API_KEY` | Arkesel dashboard API key |
+| `ARKESEL_SENDER_ID` | Approved sender ID, max 11 characters (e.g. `OSAJA20`) |
+| `ARKESEL_BASE_URL` | `https://sms.arkesel.com/api/v2` |
+| `ARKESEL_SANDBOX` | `false` in production |
 | `WHATSAPP_NUMBER` | e.g. `233531273626/233532918613` (contact FAB + `/settings/contact`) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` |
 | `VAPID_CONTACT_EMAIL` | `admin@osaja.com` |
@@ -101,7 +109,7 @@ python scripts/create_admin.py
 
 ## 2. Landing site on Vercel
 
-Public marketing site for the welfare organisation — vision, mission, gallery, and links to the member and admin portals.
+Public marketing site for the welfare organisation — vision, mission, gallery, and links to the member, admin, and SMS portals.
 
 ### Create the project
 
@@ -118,6 +126,7 @@ Public marketing site for the welfare organisation — vision, mission, gallery,
 | `NEXT_PUBLIC_SITE_URL` | Recommended | `https://osaja2020welfare.org` (or your apex domain) |
 | `NEXT_PUBLIC_MEMBER_URL` | Recommended | `https://member.osaja2020welfare.org` |
 | `NEXT_PUBLIC_ADMIN_URL` | Optional | `https://admin.osaja2020welfare.org` |
+| `NEXT_PUBLIC_SMS_URL` | Optional | `https://sms.osaja2020welfare.org` |
 
 The landing app does **not** need `API_PROXY_TARGET` — it is static marketing content only.
 
@@ -237,13 +246,53 @@ Full list: `apps/web/admin-portal/.env.local.example`.
 
 ---
 
-## 5. Wire URLs back to the API
+## 5. SMS portal on Vercel
 
-After both Vercel URLs exist, update **Render** env and redeploy API:
+Executive-only SMS campaigns portal (Arkesel). Same auth rules as admin (administrator / executive).
+
+### Create the project
+
+1. Vercel → **Add New** → **Project** → same repo.
+2. **Project name:** e.g. `osaja-sms`.
+3. **Root Directory:** `apps/web/sms-portal`.
+4. Leave Install/Build empty (uses `apps/web/sms-portal/vercel.json`).
+5. **Deploy**.
+
+### Environment variables
+
+| Variable | Required | Value |
+|----------|----------|--------|
+| `API_PROXY_TARGET` | **Yes** | `https://YOUR-API.onrender.com` |
+| `NEXT_PUBLIC_SITE_URL` | Recommended | `https://YOUR-SMS.vercel.app` |
+| `NEXT_PUBLIC_ADMIN_APP_URL` | Recommended | `https://YOUR-ADMIN.vercel.app` |
+| `NEXT_PUBLIC_MEMBER_APP_URL` | Recommended | `https://YOUR-MEMBER.vercel.app` |
+| `NEXT_PUBLIC_APP_NAME` | Optional | `OSAJA'20 SMS Portal` |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | Optional | Same as API |
+
+Full list: `apps/web/sms-portal/.env.local.example`.
+
+### Verify SMS portal
+
+1. Open `https://YOUR-SMS.vercel.app/login`
+2. Log in as executive/admin (same credentials as admin portal)
+3. Check **Dashboard** SMS credits (`sms_balance`), **Compose**, **Templates**, **History**
+4. Confirm API has `ARKESEL_*` set and sender ID approved in Arkesel
+
+Arkesel delivery webhooks: `GET/POST https://YOUR-API/api/v1/sms/webhooks/arkesel?sms_id=…&status=…`  
+Requires `PUBLIC_API_URL` on the API (public HTTPS origin).
+
+Product spec: [docs/sms/sms_portal.md](../sms/sms_portal.md).
+
+---
+
+## 6. Wire URLs back to the API
+
+After Vercel URLs exist, update **Render** env and redeploy API:
 
 ```env
-CORS_ORIGINS=https://YOUR-MEMBER.vercel.app,https://YOUR-ADMIN.vercel.app
+CORS_ORIGINS=https://YOUR-MEMBER.vercel.app,https://YOUR-ADMIN.vercel.app,https://YOUR-SMS.vercel.app
 MEMBER_PORTAL_URL=https://YOUR-MEMBER.vercel.app
+PUBLIC_API_URL=https://YOUR-API.onrender.com
 ```
 
 Paystack (if used): webhook URL
@@ -252,31 +301,38 @@ Paystack (if used): webhook URL
 https://YOUR-API.onrender.com/api/v1/payments/webhook
 ```
 
+SMS delivery webhook (Arkesel callback):
+
+```text
+https://YOUR-API.onrender.com/api/v1/sms/webhooks/arkesel
+```
+
 ---
 
-## 6. Custom domains (optional)
+## 7. Custom domains (optional)
 
 | App | Suggested |
 |-----|-----------|
 | Landing | `osaja2020welfare.org` or `osaja2020.org` (apex / `www`) |
 | Member | `member.osaja2020welfare.org` |
 | Admin | `admin.osaja2020welfare.org` |
+| SMS | `sms.osaja2020welfare.org` |
 | API | `api.osaja2020welfare.org` (CNAME to Render) |
 
-Update `CORS_ORIGINS`, `MEMBER_PORTAL_URL`, landing `NEXT_PUBLIC_*_URL`, member/admin `NEXT_PUBLIC_SITE_URL`, and Supabase redirect URLs to match.
+Update `CORS_ORIGINS`, `MEMBER_PORTAL_URL`, `PUBLIC_API_URL`, landing `NEXT_PUBLIC_*_URL`, member/admin/SMS `NEXT_PUBLIC_SITE_URL`, and Supabase redirect URLs to match.
 
 ---
 
 ## Database migrations
 
-- **First deploy:** API runs `create_all` + incremental fixes in `init_db.py`.
+- **First deploy:** API runs `create_all` + incremental fixes in `init_db.py` (includes SMS tables when models are loaded).
 - **Schema updates:** from `apps/api`:
 
 ```bash
 alembic upgrade head
 ```
 
-Run once against production `DATABASE_URL` before or after deploy when models change.
+Run once against production `DATABASE_URL` before or after deploy when models change. SMS schema revision: `20260729_sms_portal`.
 
 ---
 
@@ -288,6 +344,7 @@ pnpm --filter "./packages/*" build
 pnpm --filter @osaja/member-app build
 pnpm --filter @osaja/admin-portal build
 pnpm --filter @osaja/landing build
+pnpm --filter @osaja/sms-portal build
 ```
 
 ---
@@ -301,7 +358,7 @@ Build succeeded but uvicorn exits immediately. Usually `CORS_ORIGINS` is **empty
 **Fix (immediate, no code change):** In Render → Environment, either **delete** `CORS_ORIGINS` (uses localhost defaults until you add Vercel URLs) or set:
 
 ```text
-https://YOUR-MEMBER.vercel.app,https://YOUR-ADMIN.vercel.app
+https://YOUR-MEMBER.vercel.app,https://YOUR-ADMIN.vercel.app,https://YOUR-SMS.vercel.app
 ```
 
 Comma-separated — not JSON, no surrounding quotes. After the config fix is deployed, this format is fully supported.
@@ -312,13 +369,20 @@ Render is using **Python 3.14**. Set `PYTHON_VERSION=3.12.8` and redeploy. Repo 
 
 ### Vercel: `No Next.js version detected`
 
-Wrong install command (`npm install --prefix=...`) or wrong root directory. Use root `apps/web/member-app` or `apps/web/admin-portal` and repo `vercel.json` with **pnpm**.
+Wrong install command (`npm install --prefix=...`) or wrong root directory. Use root `apps/web/member-app`, `apps/web/admin-portal`, or `apps/web/sms-portal` and repo `vercel.json` with **pnpm**.
 
-### Member/admin: API 502 or login fails
+### Member/admin/SMS: API 502 or login fails
 
 - Check `API_PROXY_TARGET` points to live Render URL (https, no typo).
 - Hit `https://YOUR-API.onrender.com/health` directly.
 - Free Render services sleep — first request may be slow.
+
+### SMS: Arkesel "Invalid key" or no delivery
+
+- Confirm `ARKESEL_API_KEY` matches the Arkesel dashboard key.
+- Sender ID ≤ 11 chars and **approved** on Arkesel (`ARKESEL_SENDER_ID`).
+- Dashboard **SMS credits** = `sms_balance` (units you can send); **Wallet** = `main_balance` (GHS).
+- Delivery webhooks need `PUBLIC_API_URL` pointing at the public API (not localhost).
 
 ### CORS errors in browser
 
@@ -354,11 +418,12 @@ pnpm ci:local   # full (includes build + e2e)
 
 ## Client handover
 
-After all three services are live, complete [Handover.md](./Handover.md) with the welfare executives (admin account, smoke tests, Paystack, ongoing ops).
+After all services are live (API + member + admin + SMS + landing), complete [Handover.md](./Handover.md) with the welfare executives (admin account, smoke tests, Paystack, SMS, ongoing ops).
 
 ## Related
 
 - [Handover checklist](./Handover.md)
+- [SMS portal](../sms/sms_portal.md)
 - [Installation](../setup/Installation.md) — local dev setup
 - [Security](../security/Security.md)
 - [System audit](../audit/SYSTEM_AUDIT.md)

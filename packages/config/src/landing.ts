@@ -28,6 +28,7 @@ export type LandingPillar = {
 export const LANDING_PORTAL_URLS = {
   member: "https://member.osaja2020welfare.org",
   admin: "https://admin.osaja2020welfare.org",
+  sms: "https://sms.osaja2020welfare.org",
   api: "https://api.osaja2020welfare.org",
 } as const;
 
