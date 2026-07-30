@@ -916,6 +916,13 @@ class SmsService:
             "callback_url": settings.arkesel_callback_url,
         }
 
+    async def settings_public_async(self) -> dict:
+        from v1.core.redis_cache import redis_cache
+
+        data = self.settings_public()
+        data["redis_cache_enabled"] = await redis_cache.is_available()
+        return data
+
     async def reports_summary(self, db: AsyncSession) -> dict:
         now = datetime.now(timezone.utc)
         start_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

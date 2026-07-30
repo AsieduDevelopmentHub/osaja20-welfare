@@ -13,6 +13,7 @@ interface SmsSettings {
   delivery_webhook_enabled: boolean;
   public_api_url: string | null;
   callback_url: string | null;
+  redis_cache_enabled?: boolean;
 }
 
 export default function SettingsPage() {
@@ -60,6 +61,12 @@ export default function SettingsPage() {
             <dt className="text-xs text-slate-500">Delivery webhook</dt>
             <dd className="text-sm font-semibold text-white">
               {data?.delivery_webhook_enabled ? "Enabled" : "Disabled"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Redis cache</dt>
+            <dd className="text-sm font-semibold text-white">
+              {data?.redis_cache_enabled ? "Connected" : "Unavailable (direct reads)"}
             </dd>
           </div>
           <div>

@@ -504,7 +504,8 @@ The SMS Portal is implemented in this monorepo on branch `feature/sms-portal` (a
 - Default automations seeded: birthday, outstanding dues, month-end unpaid dues — editable/removable/creatable
 - Reports (monthly usage, delivery breakdown, Excel/CSV export)
 - Sender ID: Arkesel enforces **max 11 characters** (use `OSAJA20`)
-- PWA install banner + service worker (same pattern as admin/member)
+- Redis caching for SMS dashboard / balance / recipient groups (graceful fallback if Redis is down)
+- PWA: `public/sw.js`, `public/manifest.json`, install banner + service worker registration
 - Phone sanitize: `055…`, `+233…`, `233…`, `2330…`
 - Delivery webhook: `/api/v1/sms/webhooks/arkesel` when `PUBLIC_API_URL` is public HTTPS
 

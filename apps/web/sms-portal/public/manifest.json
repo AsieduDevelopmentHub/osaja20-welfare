@@ -1,6 +1,6 @@
 {
   "id": "/",
-  "name": "OSAJA'20 SMS",
+  "name": "OSAJA'20 SMS Portal",
   "short_name": "OSAJA SMS",
   "description": "SMS campaigns and messaging for OSAJA'20 Welfare",
   "start_url": "/",
@@ -9,6 +9,8 @@
   "orientation": "portrait-primary",
   "background_color": "#061d47",
   "theme_color": "#061d47",
+  "lang": "en",
+  "dir": "ltr",
   "categories": ["business", "communication"],
   "icons": [
     {

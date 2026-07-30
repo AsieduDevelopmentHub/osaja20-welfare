@@ -34,14 +34,25 @@ async def sms_dashboard(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Member, Depends(require_executive)],
 ):
+    from v1.core.redis_cache import SMS_DASHBOARD_KEY, SMS_DASHBOARD_TTL, redis_cache
+
+    cached = await redis_cache.get_json(SMS_DASHBOARD_KEY)
+    if isinstance(cached, dict):
+        return ApiResponse(success=True, data={**cached, "cache": "hit"})
     data = await sms_service.dashboard_stats(db)
-    return ApiResponse(success=True, data=data)
+    await redis_cache.set_json(SMS_DASHBOARD_KEY, data, ttl_seconds=SMS_DASHBOARD_TTL)
+    return ApiResponse(success=True, data={**data, "cache": "miss"})
 
 
 @router.get("/balance", response_model=ApiResponse)
 async def sms_balance(
     _: Annotated[Member, Depends(require_executive)],
 ):
+    from v1.core.redis_cache import SMS_BALANCE_KEY, SMS_BALANCE_TTL, redis_cache
+
+    cached = await redis_cache.get_json(SMS_BALANCE_KEY)
+    if isinstance(cached, dict):
+        return ApiResponse(success=True, data={**cached, "cache": "hit"})
     try:
         from v1.core import arkesel_client
 
@@ -50,12 +61,13 @@ async def sms_balance(
         upstream = exc.status_code or 502
         status_code = 502 if upstream in (401, 403) else (upstream if 400 <= upstream < 600 else 502)
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
-    return ApiResponse(success=True, data=data)
+    await redis_cache.set_json(SMS_BALANCE_KEY, data, ttl_seconds=SMS_BALANCE_TTL)
+    return ApiResponse(success=True, data={**data, "cache": "miss"})
 
 
 @router.get("/settings", response_model=ApiResponse)
 async def sms_settings(_: Annotated[Member, Depends(require_executive)]):
-    return ApiResponse(success=True, data=sms_service.settings_public())
+    return ApiResponse(success=True, data=await sms_service.settings_public_async())
 
 
 @router.get("/recipients/groups", response_model=ApiResponse)
@@ -63,8 +75,17 @@ async def list_recipient_groups(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Member, Depends(require_executive)],
 ):
+    from v1.core.redis_cache import SMS_RECIPIENT_GROUPS_KEY, SMS_RECIPIENT_GROUPS_TTL, redis_cache
+
+    cached = await redis_cache.get_json(SMS_RECIPIENT_GROUPS_KEY)
+    if isinstance(cached, list):
+        return ApiResponse(success=True, data=cached, message="cache:hit")
     data = await sms_service.list_recipient_groups(db)
-    return ApiResponse(success=True, data=data)
+    await redis_cache.set_json(
+        SMS_RECIPIENT_GROUPS_KEY, data, ttl_seconds=SMS_RECIPIENT_GROUPS_TTL
+    )
+    return ApiResponse(success=True, data=data, message="cache:miss")
+
 
 
 @router.get("/recipients", response_model=ApiResponse)
@@ -144,6 +165,9 @@ async def compose_sms(
         else:
             status_code = 502
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    from v1.core.redis_cache import invalidate_sms_caches
+
+    await invalidate_sms_caches()
     return ApiResponse(success=True, data=data, message="SMS campaign submitted")
 
 
@@ -349,6 +373,9 @@ async def run_workflow(
         if upstream == 422:
             status_code = 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    from v1.core.redis_cache import invalidate_sms_caches
+
+    await invalidate_sms_caches()
     return ApiResponse(success=True, data=data, message="Workflow submitted")
 
 
@@ -439,6 +466,9 @@ async def create_recipient_group(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    from v1.core.redis_cache import invalidate_sms_caches
+
+    await invalidate_sms_caches()
     return ApiResponse(success=True, data=data, message="Recipient group created")
 
 
@@ -448,6 +478,9 @@ async def restore_builtin_recipient_groups(
     _: Annotated[Member, Depends(require_executive)],
 ):
     data = await sms_service.restore_builtin_groups(db)
+    from v1.core.redis_cache import invalidate_sms_caches
+
+    await invalidate_sms_caches()
     return ApiResponse(success=True, data=data, message="Built-in groups restored")
 
 
@@ -461,6 +494,9 @@ async def delete_recipient_group(
         await sms_service.delete_custom_group(db, group_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from v1.core.redis_cache import invalidate_sms_caches
+
+    await invalidate_sms_caches()
     return ApiResponse(success=True, message="Recipient group removed")
 
 

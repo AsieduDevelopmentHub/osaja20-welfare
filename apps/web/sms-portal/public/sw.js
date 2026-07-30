@@ -1,6 +1,6 @@
 /* OSAJA'20 SMS portal service worker */
 
-const CACHE_VERSION = "osaja-sms-v1";
+const CACHE_VERSION = "osaja-sms-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
@@ -12,6 +12,7 @@ const PRECACHE_URLS = [
   "/icons/icon-512.png",
   "/icons/icon-maskable-512.png",
   "/brand/batch-logo.jpg",
+  "/brand/welfare-logo.jpg",
 ];
 
 const OFFLINE_HTML = `<!DOCTYPE html>
@@ -78,8 +79,18 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
+  // Never intercept the service worker script or Next internals that must stay fresh
+  if (url.pathname === "/sw.js" || url.pathname.startsWith("/_next/webpack")) {
+    return;
+  }
+
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/uploads/")) {
     event.respondWith(networkOnly(request));
+    return;
+  }
+
+  if (url.pathname === "/manifest.json") {
+    event.respondWith(networkFirstShell(request));
     return;
   }
 
@@ -90,7 +101,6 @@ self.addEventListener("fetch", (event) => {
 
   if (isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirst(request));
-    return;
   }
 });
 
@@ -100,8 +110,8 @@ function isStaticAsset(pathname) {
     pathname.startsWith("/brand/") ||
     pathname.startsWith("/_next/static/") ||
     pathname.endsWith(".css") ||
-    pathname.endsWith(".js") ||
-    pathname.endsWith(".woff2")
+    pathname.endsWith(".woff2") ||
+    (pathname.endsWith(".js") && pathname !== "/sw.js")
   );
 }
 
@@ -144,6 +154,8 @@ async function networkFirstShell(request) {
     }
     return response;
   } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
     return offlinePage();
   }
 }
