@@ -692,6 +692,9 @@ class PlatformService:
         page: int = 1,
         page_size: int = 20,
         member_id: UUID | None = None,
+        period_year: int | None = None,
+        period_month: int | None = None,
+        contribution_type: str | None = None,
     ) -> dict:
         if not registry._loaded:
             await registry.rebuild(db)
@@ -707,6 +710,15 @@ class PlatformService:
         if member_id:
             query = query.where(Contribution.member_id == member_id)
             count_query = count_query.where(Contribution.member_id == member_id)
+        if period_year is not None:
+            query = query.where(Contribution.period_year == period_year)
+            count_query = count_query.where(Contribution.period_year == period_year)
+        if period_month is not None:
+            query = query.where(Contribution.period_month == period_month)
+            count_query = count_query.where(Contribution.period_month == period_month)
+        if contribution_type:
+            query = query.where(Contribution.type == contribution_type)
+            count_query = count_query.where(Contribution.type == contribution_type)
 
         total = await db.scalar(count_query) or 0
         result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
@@ -723,6 +735,121 @@ class PlatformService:
             "page": page,
             "page_size": page_size,
             "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+        }
+
+    async def list_owing_members(
+        self,
+        db: AsyncSession,
+        *,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict:
+        """Active members with unpaid current dues and/or arrears."""
+        if not registry._loaded:
+            await registry.rebuild(db)
+
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        monthly = await get_monthly_dues_amount(db)
+
+        active = list(
+            (
+                await db.execute(
+                    select(Member)
+                    .where(Member.status == MemberStatus.ACTIVE.value)
+                    .order_by(Member.full_name.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not active:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": 1,
+                "summary": {"owing_count": 0, "total_outstanding": 0.0},
+            }
+
+        dues_rows = (
+            await db.execute(
+                select(Contribution).where(Contribution.type == "dues")
+            )
+        ).scalars().all()
+
+        paid_by_member: dict[UUID, list[dict]] = {}
+        for c in dues_rows:
+            year = c.period_year or c.created_at.year
+            month = c.period_month or c.created_at.month
+            paid_by_member.setdefault(c.member_id, []).append(
+                {"year": year, "month": month, "amount": float(c.amount)}
+            )
+
+        owing: list[dict] = []
+        total_outstanding = 0.0
+        for member in active:
+            since = member.registration_date or member.created_at
+            summary = compute_dues_summary(
+                since,
+                paid_by_member.get(member.id, []),
+                monthly_amount=monthly,
+            )
+            arrears = float(summary.get("total_owed") or 0)
+            current_status = str(summary.get("current_status") or "due")
+            current_month = summary.get("current_month") or {}
+            periods = summary.get("periods") or []
+            current_period = next(
+                (
+                    p
+                    for p in periods
+                    if int(p.get("year", 0)) == int(current_month.get("year", 0))
+                    and int(p.get("month", 0)) == int(current_month.get("month", 0))
+                ),
+                None,
+            )
+            current_due = 0.0
+            if current_period and str(current_period.get("status")) in ("due", "overdue"):
+                paid_amount = float(current_period.get("paid_amount") or 0)
+                current_due = max(0.0, float(monthly) - paid_amount)
+            outstanding = round(arrears + current_due, 2)
+            if outstanding <= 0:
+                continue
+            total_outstanding += outstanding
+            owing.append(
+                {
+                    "member_id": str(member.id),
+                    "member_name": member.full_name,
+                    "membership_id": member.membership_id,
+                    "email": member.email,
+                    "phone_number": member.phone_number,
+                    "arrears_count": int(summary.get("arrears_count") or 0),
+                    "total_owed": arrears,
+                    "current_due": round(current_due, 2),
+                    "outstanding": outstanding,
+                    "current_status": current_status,
+                    "current_month": current_month,
+                    "monthly_amount": monthly,
+                    "total_paid_months": int(summary.get("total_paid_months") or 0),
+                }
+            )
+
+        owing.sort(key=lambda row: (-float(row["outstanding"]), str(row["member_name"]).lower()))
+        total = len(owing)
+        start = (page - 1) * page_size
+        page_items = owing[start : start + page_size]
+
+        return {
+            "items": page_items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size) if total else 1,
+            "summary": {
+                "owing_count": total,
+                "total_outstanding": round(total_outstanding, 2),
+            },
         }
 
     async def get_member_balance(self, db: AsyncSession, member_id: UUID) -> dict:

@@ -86,6 +86,30 @@ export interface ContributionItem {
   period_year?: number;
   period_month?: number;
   created_at: string;
+  balance?: number;
+}
+
+export interface OwingMemberItem {
+  member_id: string;
+  member_name: string;
+  membership_id: string;
+  email: string;
+  phone_number: string;
+  arrears_count: number;
+  total_owed: number;
+  current_due: number;
+  outstanding: number;
+  current_status: "paid" | "due" | "overdue";
+  current_month: { year: number; month: number; label: string };
+  monthly_amount: number;
+  total_paid_months: number;
+}
+
+export interface OwingListResponse extends PaginatedResponse<OwingMemberItem> {
+  summary: {
+    owing_count: number;
+    total_outstanding: number;
+  };
 }
 
 export interface AnnouncementItem {

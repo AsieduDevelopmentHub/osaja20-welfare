@@ -1,12 +1,12 @@
 "use client";
 
 import { formatCurrency } from "@osaja/utils";
-import { ContributionLedger, ListRowsSkeleton, type LedgerItem } from "@osaja/ui";
-import { Receipt, Search, Wallet } from "lucide-react";
+import { Receipt, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { ContributionTrackingPanel } from "@/components/ContributionTrackingPanel";
 import { apiFetch } from "@/lib/api";
-import { mapMember, type ContributionItem, type PaginatedResponse, type PaymentSettings } from "@/lib/types";
+import { mapMember, type PaymentSettings } from "@/lib/types";
 import type { Member } from "@osaja/types";
 
 type Tab = "record" | "ledger";
@@ -25,8 +25,6 @@ export default function ContributionsPage() {
   const [monthlyAmount, setMonthlyAmount] = useState(30);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [ledger, setLedger] = useState<ContributionItem[]>([]);
-  const [ledgerLoading, setLedgerLoading] = useState(false);
 
   useEffect(() => {
     apiFetch<{ total_contributions: number }>("/contributions/summary")
@@ -38,22 +36,6 @@ export default function ContributionsPage() {
       })
       .catch(() => {});
   }, []);
-
-  const loadLedger = useCallback(async () => {
-    setLedgerLoading(true);
-    try {
-      const res = await apiFetch<PaginatedResponse<ContributionItem>>("/contributions?page=1&page_size=50");
-      setLedger(res.data?.items ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load ledger");
-    } finally {
-      setLedgerLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (tab === "ledger") loadLedger();
-  }, [tab, loadLedger]);
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -90,7 +72,6 @@ export default function ContributionsPage() {
       setReference("");
       const summary = await apiFetch<{ total_contributions: number }>("/contributions/summary");
       setTotalFund(summary.data?.total_contributions ?? 0);
-      if (tab === "ledger") await loadLedger();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record");
     } finally {
@@ -127,7 +108,7 @@ export default function ContributionsPage() {
               tab === t ? "bg-brand-gold text-brand-navy-dark" : "bg-white/10 text-slate-300"
             }`}
           >
-            {t === "record" ? "Record dues" : "Ledger"}
+            {t === "record" ? "Record dues" : "Tracking"}
           </button>
         ))}
       </div>
@@ -252,29 +233,7 @@ export default function ContributionsPage() {
           </section>
         </div>
       ) : (
-        <section className="p-0">
-          {ledgerLoading ? (
-            <ListRowsSkeleton rows={6} variant="dark" />
-          ) : ledger.length === 0 ? (
-            <p className="text-sm text-slate-400">No contributions recorded yet.</p>
-          ) : (
-            <ContributionLedger
-              variant="dark"
-              title="Contribution ledger"
-              items={ledger.map(
-                (c): LedgerItem => ({
-                  id: c.id,
-                  date: new Date(c.created_at).toLocaleDateString("en-GH"),
-                  amount: c.amount,
-                  type: c.type,
-                  reference: c.reference,
-                  period: c.period_month && c.period_year ? `${c.period_month}/${c.period_year}` : undefined,
-                  subtitle: c.member_name ? `${c.member_name} (${c.membership_id})` : c.membership_id,
-                })
-              )}
-            />
-          )}
-        </section>
+        <ContributionTrackingPanel onError={setError} />
       )}
     </div>
   );

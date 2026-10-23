@@ -20,9 +20,18 @@ async def list_contributions(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     member_id: UUID | None = None,
+    period_year: int | None = Query(default=None, ge=2000, le=2100),
+    period_month: int | None = Query(default=None, ge=1, le=12),
+    contribution_type: str | None = Query(default=None, alias="type"),
 ):
     data = await platform_service.list_contributions(
-        db, page=page, page_size=page_size, member_id=member_id
+        db,
+        page=page,
+        page_size=page_size,
+        member_id=member_id,
+        period_year=period_year,
+        period_month=period_month,
+        contribution_type=contribution_type,
     )
     return ApiResponse(success=True, data=data)
 
@@ -58,3 +67,14 @@ async def contribution_summary(
 ):
     summary = await platform_service.get_contribution_summary(db)
     return ApiResponse(success=True, data=summary)
+
+
+@router.get("/owing", response_model=ApiResponse)
+async def list_owing_members(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+):
+    data = await platform_service.list_owing_members(db, page=page, page_size=page_size)
+    return ApiResponse(success=True, data=data)
