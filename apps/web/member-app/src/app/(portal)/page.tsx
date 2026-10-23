@@ -1,19 +1,20 @@
 "use client";
 
 import { DashboardPageSkeleton, StatCard } from "@osaja/ui";
-import { formatCurrency } from "@osaja/utils";
+import { formatCurrency, formatDate } from "@osaja/utils";
 import { Bell, Cake, ChevronRight, HeartHandshake, Receipt, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DuesStatusBanner } from "@/components/DuesStatusBanner";
+import { EmptyState } from "@/components/EmptyState";
 import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
 import { PageHeader } from "@/components/PageHeader";
+import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
+import { Alert } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
-import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
 import { mapContribution, mapDuesSummary, type NotificationItem } from "@/lib/types";
 import type { Contribution, DuesSummary, WelfareCase, WelfareStatus } from "@osaja/types";
-import { formatDate } from "@osaja/utils";
 
 export default function DashboardPage() {
   const { member } = useAuth();
@@ -118,12 +119,12 @@ export default function DashboardPage() {
       />
 
       {loadError ? (
-        <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {loadError}
-          <button type="button" onClick={loadDashboard} className="ml-2 font-semibold underline">
+        <Alert tone="error">
+          {loadError}{" "}
+          <button type="button" onClick={loadDashboard} className="font-semibold underline">
             Retry
           </button>
-        </div>
+        </Alert>
       ) : null}
 
       {dues ? <DuesStatusBanner dues={dues} compact /> : null}
@@ -157,21 +158,21 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className={compact ? "grid gap-4" : "grid gap-6 lg:grid-cols-2"}>
-        <section className="glass-card p-4 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Recent notifications</h3>
+      <div className={compact ? "grid gap-5" : "grid gap-8 lg:grid-cols-2"}>
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="section-title">Recent notifications</h3>
             <Link href="/notifications" className="flex items-center gap-1 text-sm font-medium text-brand-navy hover:underline">
               View all
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
           {notifications.length === 0 ? (
-            <p className="text-sm text-slate-500">No notifications yet.</p>
+            <EmptyState icon={Bell} title="No notifications yet" />
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-slate-200/70">
               {notifications.map((n) => (
-                <li key={n.id} className="flex gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                <li key={n.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                   <div className={`mt-2 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-slate-300" : "bg-brand-500"}`} />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1">
@@ -189,22 +190,29 @@ export default function DashboardPage() {
         </section>
 
         {!compact ? (
-          <section className="glass-card p-4 sm:p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Recent payments</h3>
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="section-title">Recent payments</h3>
               <Link href="/contributions" className="flex items-center gap-1 text-sm font-medium text-brand-navy hover:underline">
                 View all
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
             {recentPayments.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No payments recorded yet. Pay your monthly dues online on the Contributions page.
-              </p>
+              <EmptyState
+                icon={Receipt}
+                title="No payments yet"
+                description="Pay your monthly dues on the Contributions page."
+                action={
+                  <Link href="/contributions" className="btn-primary text-xs">
+                    Go to contributions
+                  </Link>
+                }
+              />
             ) : (
-              <ul className="space-y-3">
+              <ul className="divide-y divide-slate-200/70">
                 {recentPayments.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                  <li key={c.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div>
                       <p className="text-sm font-medium capitalize text-slate-800">{c.type}</p>
                       <p className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleDateString("en-GH")}</p>
@@ -219,17 +227,17 @@ export default function DashboardPage() {
       </div>
 
       {welfareCases.length > 0 ? (
-        <section className="glass-card p-4 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Welfare cases</h3>
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="section-title">Welfare cases</h3>
             <Link href="/welfare" className="flex items-center gap-1 text-sm font-medium text-brand-navy hover:underline">
               View all
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
-          <ul className="space-y-3">
+          <ul className="divide-y divide-slate-200/70">
             {welfareCases.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+              <li key={c.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-800">{c.title}</p>
                   <p className="text-xs text-slate-500">{formatDate(c.updatedAt)}</p>
@@ -243,8 +251,8 @@ export default function DashboardPage() {
         </section>
       ) : !compact ? (
         <Link href="/welfare" className="glass-card flex items-center gap-4 p-4 transition hover:shadow-lg sm:p-5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50">
-            <HeartHandshake className="h-6 w-6 text-purple-600" strokeWidth={1.75} />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-navy/10">
+            <HeartHandshake className="h-6 w-6 text-brand-navy" strokeWidth={1.75} />
           </div>
           <div className="flex-1">
             <p className="font-semibold text-slate-900">Welfare support</p>
@@ -257,7 +265,7 @@ export default function DashboardPage() {
       {voteResults.length > 0 ? (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Vote results</h3>
+            <h3 className="section-title">Vote results</h3>
             <Link href="/voting" className="text-sm font-medium text-brand-navy hover:underline">
               All votes
             </Link>
@@ -277,7 +285,9 @@ export default function DashboardPage() {
             <Cake className="h-6 w-6 text-amber-600" strokeWidth={1.75} />
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-slate-900">{birthdays} birthday{birthdays === 1 ? "" : "s"} this month</p>
+            <p className="font-semibold text-slate-900">
+              {birthdays} birthday{birthdays === 1 ? "" : "s"} this month
+            </p>
             <p className="text-sm text-slate-500">Celebrate with the OSAJA&apos;20 family</p>
           </div>
           <ChevronRight className="h-5 w-5 text-slate-400" />

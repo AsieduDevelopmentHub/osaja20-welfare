@@ -5,7 +5,7 @@
 :root {
   --brand-navy: #0a2d6e;
   --brand-gold: #c9a227;
-  --background: #faf8f5;
+  --background: #f4f7fb;
   --foreground: #031025;
 }
 
@@ -21,7 +21,10 @@ html {
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 90% 50% at 10% -10%, rgba(43, 108, 176, 0.14), transparent 55%),
+    radial-gradient(ellipse 70% 40% at 90% 20%, rgba(201, 162, 39, 0.12), transparent 50%),
+    linear-gradient(165deg, #eef4fc 0%, #f7f5f0 42%, #fff9eb 100%);
   min-height: 100vh;
   -webkit-tap-highlight-color: transparent;
 }
@@ -36,7 +39,7 @@ body {
   }
 
   .section-title {
-    @apply mt-3 text-3xl font-bold tracking-tight text-brand-navy sm:text-4xl lg:text-[2.75rem] lg:leading-tight;
+    @apply mt-3 font-display text-3xl font-semibold tracking-tight text-brand-navy sm:text-4xl lg:text-[2.75rem] lg:leading-tight;
   }
 
   .glass-card {
@@ -53,5 +56,9 @@ body {
 
   .btn-outline {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-brand-navy/15 bg-white/80 px-5 py-3 text-sm font-semibold text-brand-navy transition hover:border-brand-navy/30 hover:bg-white active:scale-[0.98];
+  }
+
+  .btn-outline-light {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20 active:scale-[0.98];
   }
 }

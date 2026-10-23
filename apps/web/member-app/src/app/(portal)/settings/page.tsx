@@ -2,12 +2,13 @@
 
 import type { Member, MemberPreferences } from "@osaja/types";
 import { DEFAULT_MEMBER_PREFERENCES } from "@/lib/profile";
-import { Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { PushSettings } from "@/components/PushSettings";
 import { SettingsToggle } from "@/components/SettingsToggle";
+import { Alert } from "@/components/ui";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { mapMember } from "@/lib/types";
@@ -104,18 +105,22 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      <PageHeader title="Settings" description="Update your profile, photo, and notification preferences." />
+      <PageHeader
+        icon={Settings}
+        title="Settings"
+        description="Update your profile, photo, and notification preferences."
+      />
 
-      <div aria-live="polite" aria-atomic="true">
+      <div aria-live="polite" aria-atomic="true" className="space-y-3">
         {message ? (
-          <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
+          <Alert tone="success" onDismiss={() => setMessage("")}>
             {message}
-          </p>
+          </Alert>
         ) : null}
         {error ? (
-          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <Alert tone="error" onDismiss={() => setError("")}>
             {error}
-          </p>
+          </Alert>
         ) : null}
       </div>
 

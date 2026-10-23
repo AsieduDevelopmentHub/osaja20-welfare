@@ -20,7 +20,7 @@ export function LandingHeader() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
+    const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -33,20 +33,34 @@ export function LandingHeader() {
     };
   }, [open]);
 
+  const onDark = !scrolled && !open;
+
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled ? "border-b border-brand-navy/10 bg-white/90 shadow-sm backdrop-blur-md" : "bg-transparent"
+        scrolled || open
+          ? "border-b border-brand-navy/10 bg-white/90 shadow-sm backdrop-blur-md"
+          : "bg-transparent"
       }`}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <a href="#" className="flex min-w-0 items-center gap-3">
           <BrandLogo src={BRAND_PATHS.welfareLogo} alt={`${BRAND_COPY.name} logo`} size="sm" priority />
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-brand-navy sm:text-base">
+            <p
+              className={`truncate text-sm font-bold sm:text-base ${
+                onDark ? "text-white" : "text-brand-navy"
+              }`}
+            >
               {BRAND_COPY.name} {BRAND_COPY.welfare}
             </p>
-            <p className="hidden truncate text-xs text-slate-500 sm:block">{BRAND_COPY.tagline}</p>
+            <p
+              className={`hidden truncate text-xs sm:block ${
+                onDark ? "text-slate-300" : "text-slate-500"
+              }`}
+            >
+              {BRAND_COPY.tagline}
+            </p>
           </div>
         </a>
 
@@ -55,7 +69,11 @@ export function LandingHeader() {
             <a
               key={item.href}
               href={item.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-brand-navy/80 transition hover:bg-brand-navy/5 hover:text-brand-navy"
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                onDark
+                  ? "text-white/85 hover:bg-white/10 hover:text-white"
+                  : "text-brand-navy/80 hover:bg-brand-navy/5 hover:text-brand-navy"
+              }`}
             >
               {item.label}
             </a>
@@ -67,7 +85,9 @@ export function LandingHeader() {
 
         <button
           type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-brand-navy md:hidden"
+          className={`flex h-10 w-10 items-center justify-center rounded-xl md:hidden ${
+            onDark ? "text-white" : "text-brand-navy"
+          }`}
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
           onClick={() => setOpen((v) => !v)}
@@ -83,16 +103,16 @@ export function LandingHeader() {
               <a
                 key={item.href}
                 href={item.href}
-                className="rounded-xl px-3 py-3 text-sm font-medium text-brand-navy"
                 onClick={() => setOpen(false)}
+                className="rounded-xl px-3 py-3 text-sm font-medium text-brand-navy hover:bg-brand-navy/5"
               >
                 {item.label}
               </a>
             ))}
             <Link
               href={portalUrls.member}
-              className="btn-gold mt-2 w-full"
               onClick={() => setOpen(false)}
+              className="btn-gold mt-2 justify-center"
             >
               Member portal
             </Link>

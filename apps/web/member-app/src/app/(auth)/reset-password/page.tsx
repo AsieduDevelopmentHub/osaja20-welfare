@@ -77,8 +77,7 @@ export default function ResetPasswordPage() {
     }
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20";
+  const inputClass = "input-field py-3 text-base";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">

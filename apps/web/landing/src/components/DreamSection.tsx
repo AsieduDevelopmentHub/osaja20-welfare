@@ -15,7 +15,7 @@ export function DreamSection() {
                 <Sparkles className="h-3.5 w-3.5" />
                 {dream.title}
               </div>
-              <h2 className="mt-5 text-3xl font-bold leading-tight sm:text-4xl">{dream.lead}</h2>
+              <h2 className="mt-5 font-display text-3xl font-semibold leading-tight sm:text-4xl">{dream.lead}</h2>
               <p className="mt-5 text-base leading-relaxed text-slate-200 sm:text-lg">{dream.body}</p>
             </div>
 

@@ -4,7 +4,9 @@ import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
 import { Megaphone } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 
 interface AnnouncementItem {
@@ -39,32 +41,36 @@ export default function AnnouncementsPage() {
   }, [load]);
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
+        icon={Megaphone}
         title="Announcements"
         description="Official updates from the welfare executive team."
       />
 
       {error ? (
-        <div className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          {error}
-          <button type="button" onClick={load} className="ml-2 font-semibold underline">
+        <Alert tone="error">
+          {error}{" "}
+          <button type="button" onClick={load} className="font-semibold underline">
             Retry
           </button>
-        </div>
+        </Alert>
       ) : null}
 
       {loading ? (
         <ListRowsSkeleton variant="light" rows={5} />
       ) : items.length === 0 ? (
-        <div className="glass-card flex flex-col items-center gap-2 p-10 text-slate-500">
-          <Megaphone className="h-10 w-10 text-slate-300" strokeWidth={1.5} />
-          <p>No announcements yet.</p>
+        <div className="glass-card">
+          <EmptyState
+            icon={Megaphone}
+            title="No announcements yet"
+            description="When the executive team publishes an update, it will appear here."
+          />
         </div>
       ) : (
-        <ul className="space-y-4">
+        <div className="glass-card divide-y divide-slate-100">
           {items.map((item) => (
-            <li key={item.id} className="glass-card p-4 sm:p-6">
+            <article key={item.id} className="px-4 py-5 sm:px-6">
               <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
               <p className="mt-1 text-xs text-slate-500">
                 {item.published_at ? formatDate(item.published_at) : formatDate(item.created_at)}
@@ -72,9 +78,9 @@ export default function AnnouncementsPage() {
               <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
                 {item.content}
               </p>
-            </li>
+            </article>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

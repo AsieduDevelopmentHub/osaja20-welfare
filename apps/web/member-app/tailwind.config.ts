@@ -44,6 +44,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-inter)", "Georgia", "serif"],
       },
       boxShadow: {
         glass: "0 8px 32px rgba(10, 45, 110, 0.08)",

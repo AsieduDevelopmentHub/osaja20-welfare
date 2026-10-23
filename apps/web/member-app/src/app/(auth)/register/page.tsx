@@ -52,8 +52,7 @@ export default function RegisterPage() {
     }
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base outline-none focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20";
+  const inputClass = "input-field py-3 text-base";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
@@ -69,12 +68,12 @@ export default function RegisterPage() {
           />
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-card space-y-3 p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="glass-card space-y-5 p-6 sm:p-8">
           {error ? (
-            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{error}</p>
           ) : null}
           {success ? (
-            <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
               <p>{success}</p>
               <Link href="/login" className="mt-2 inline-block font-semibold text-brand-navy hover:underline">
                 Go to sign in
@@ -82,63 +81,70 @@ export default function RegisterPage() {
             </div>
           ) : null}
 
-          <div>
-            <label htmlFor="full_name" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Full name
-            </label>
-            <input id="full_name" name="full_name" required className={inputClass} />
-          </div>
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} />
-          </div>
-          <div>
-            <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Username <span className="font-normal text-slate-500">(optional)</span>
-            </label>
-            <input
-              id="username"
-              name="username"
-              minLength={3}
-              maxLength={30}
-              pattern="[a-z0-9_]{3,30}"
-              title="Lowercase letters, numbers, underscores only"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <PasswordInput
-              id="password"
-              name="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              inputClassName={inputClass}
-            />
-          </div>
-          <div>
-            <label htmlFor="phone_number" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Phone number
-            </label>
-            <input id="phone_number" name="phone_number" required autoComplete="tel" className={inputClass} />
-          </div>
-          <div>
-            <label htmlFor="date_of_birth" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Date of birth
-            </label>
-            <input id="date_of_birth" name="date_of_birth" type="date" required className={inputClass} />
-          </div>
+          <fieldset className="space-y-3">
+            <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Account</legend>
+            <div>
+              <label htmlFor="full_name" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Full name
+              </label>
+              <input id="full_name" name="full_name" required className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Email
+              </label>
+              <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Username <span className="font-normal text-slate-500">(optional)</span>
+              </label>
+              <input
+                id="username"
+                name="username"
+                minLength={3}
+                maxLength={30}
+                pattern="[a-z0-9_]{3,30}"
+                title="Lowercase letters, numbers, underscores only"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Password
+              </label>
+              <PasswordInput
+                id="password"
+                name="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                inputClassName={inputClass}
+              />
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-3 border-t border-slate-100 pt-4">
+            <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Contact</legend>
+            <div>
+              <label htmlFor="phone_number" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Phone number
+              </label>
+              <input id="phone_number" name="phone_number" required autoComplete="tel" className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="date_of_birth" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Date of birth
+              </label>
+              <input id="date_of_birth" name="date_of_birth" type="date" required className={inputClass} />
+            </div>
+          </fieldset>
 
           <p className="text-xs text-slate-500">
             Your member ID will be assigned automatically after registration.
           </p>
 
-          <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-3">
+          <button type="submit" disabled={loading} className="btn-primary w-full py-3">
             <UserPlus className="h-5 w-5" />
             {loading ? "Creating account..." : "Create account"}
           </button>

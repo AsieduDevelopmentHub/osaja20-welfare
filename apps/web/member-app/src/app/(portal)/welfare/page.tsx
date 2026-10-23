@@ -7,6 +7,7 @@ import { HeartHandshake, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -20,8 +21,8 @@ const STATUS_LABELS: Record<WelfareStatus, string> = {
 
 const STATUS_COLORS: Record<WelfareStatus, string> = {
   pending: "bg-amber-50 text-amber-800 ring-amber-200",
-  approved: "bg-blue-50 text-blue-800 ring-blue-200",
-  allocated: "bg-purple-50 text-purple-800 ring-purple-200",
+  approved: "bg-sky-50 text-sky-800 ring-sky-200",
+  allocated: "bg-brand-gold/15 text-brand-gold-dark ring-brand-gold/30",
   resolved: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   archived: "bg-slate-100 text-slate-600 ring-slate-200",
 };
@@ -94,37 +95,37 @@ export default function WelfarePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <PageHeader
-          title="Welfare"
-          description="Track your support requests and see how your case is progressing."
-        />
-        <button
-          type="button"
-          onClick={() => setShowForm((v) => !v)}
-          className="btn-primary flex shrink-0 items-center gap-2 self-start"
-        >
-          <Plus className="h-4 w-4" />
-          New request
-        </button>
-      </div>
+      <PageHeader
+        icon={HeartHandshake}
+        title="Welfare"
+        description="Track your support requests and see how your case is progressing."
+        action={
+          <button type="button" onClick={() => setShowForm((v) => !v)} className="btn-primary">
+            <Plus className="h-4 w-4" />
+            {showForm ? "Close" : "New request"}
+          </button>
+        }
+      />
 
-      <div aria-live="polite" aria-atomic="true">
+      <div aria-live="polite" aria-atomic="true" className="space-y-3">
         {message ? (
-          <p className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">
+          <Alert tone="success" onDismiss={() => setMessage("")}>
             {message}
-          </p>
+          </Alert>
         ) : null}
         {error ? (
-          <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <Alert tone="error" onDismiss={() => setError("")}>
             {error}
-          </p>
+          </Alert>
         ) : null}
       </div>
 
       {showForm ? (
-        <form onSubmit={submit} className="glass-card space-y-4 p-5 sm:p-6">
-          <h2 className="font-semibold text-slate-900">Submit a welfare request</h2>
+        <form onSubmit={submit} className="glass-card space-y-5 p-5 sm:p-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Step 1</p>
+            <h2 className="mt-1 font-semibold text-slate-900">Request details</h2>
+          </div>
           <div>
             <label htmlFor="welfare-title" className="mb-1.5 block text-sm font-medium text-slate-700">
               Title
@@ -136,7 +137,7 @@ export default function WelfarePage() {
               required
               minLength={3}
               placeholder="e.g. Medical support"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900"
+              className="input-field"
             />
           </div>
           <div>
@@ -151,10 +152,10 @@ export default function WelfarePage() {
               minLength={10}
               rows={4}
               placeholder="Describe your situation and what support you need..."
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900"
+              className="input-field"
             />
           </div>
-          <button type="submit" disabled={busy} className="btn-primary disabled:opacity-50">
+          <button type="submit" disabled={busy} className="btn-primary">
             {busy ? "Submitting..." : "Submit request"}
           </button>
         </form>

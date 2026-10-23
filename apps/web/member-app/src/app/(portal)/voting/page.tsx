@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
+import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { mapVote } from "@/lib/types";
 import type { MemberVote } from "@osaja/types";
@@ -76,12 +77,21 @@ export default function VotingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon={Vote}
         title="Voting"
         description="Participate in community decisions. Each vote is locked after you confirm your choice."
       />
 
-      {error ? <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
-      {success ? <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p> : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
+      ) : null}
+      {success ? (
+        <Alert tone="success" onDismiss={() => setSuccess("")}>
+          {success}
+        </Alert>
+      ) : null}
 
       {pending ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">

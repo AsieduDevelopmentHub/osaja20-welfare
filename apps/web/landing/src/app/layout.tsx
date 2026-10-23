@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import { BRAND, SITE_META, resolveSiteUrl } from "@osaja/config";
 import { AosInit } from "@/components/AosInit";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+});
 const meta = SITE_META.landing;
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL, meta.defaultUrl);
 
@@ -58,7 +62,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${display.variable} font-sans antialiased`}>
         <AosInit />
         {children}
       </body>
