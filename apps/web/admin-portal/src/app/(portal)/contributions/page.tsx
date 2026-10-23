@@ -1,21 +1,21 @@
 "use client";
 
+import type { Member } from "@osaja/types";
 import { formatCurrency } from "@osaja/utils";
-import { Receipt, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Receipt, Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { ContributionTrackingPanel } from "@/components/ContributionTrackingPanel";
+import { MemberSearchInput } from "@/components/MemberSearchInput";
+import { AdminPanel, Alert, FilterPills, FormSection } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
-import { mapMember, type PaymentSettings } from "@/lib/types";
-import type { Member } from "@osaja/types";
+import type { PaymentSettings } from "@/lib/types";
 
 type Tab = "record" | "ledger";
 
 export default function ContributionsPage() {
   const now = new Date();
   const [tab, setTab] = useState<Tab>("record");
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Member[]>([]);
   const [selected, setSelected] = useState<Member | null>(null);
   const [periodYear, setPeriodYear] = useState(now.getFullYear());
   const [periodMonth, setPeriodMonth] = useState(now.getMonth() + 1);
@@ -36,19 +36,6 @@ export default function ContributionsPage() {
       })
       .catch(() => {});
   }, []);
-
-  const search = useCallback(async () => {
-    if (!query.trim()) return;
-    setError("");
-    try {
-      const res = await apiFetch<Record<string, unknown>[]>(
-        `/members/search?q=${encodeURIComponent(query.trim())}&limit=8`
-      );
-      setResults((res.data ?? []).map((m) => mapMember(m)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed");
-    }
-  }, [query]);
 
   const recordDues = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +74,7 @@ export default function ContributionsPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={Wallet}
         title="Contributions"
         description={
           totalFund != null
@@ -95,142 +83,108 @@ export default function ContributionsPage() {
         }
       />
 
-      {message ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{message}</p> : null}
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+      {message ? (
+        <Alert tone="success" onDismiss={() => setMessage("")}>
+          {message}
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
+      ) : null}
 
-      <div className="flex gap-2">
-        {(["record", "ledger"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium ${
-              tab === t ? "bg-brand-gold text-brand-navy-dark" : "bg-white/10 text-slate-300"
-            }`}
-          >
-            {t === "record" ? "Record dues" : "Tracking"}
-          </button>
-        ))}
-      </div>
+      <FilterPills<Tab>
+        size="md"
+        options={[
+          { value: "record", label: "Record dues" },
+          { value: "ledger", label: "Tracking" },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {tab === "record" ? (
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
-            <h2 className="mb-4 font-semibold text-white">Find member</h2>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                search();
-              }}
-              className="flex gap-2"
+          <AdminPanel>
+            <FormSection
+              step={1}
+              title="Find member"
+              description="Search by name, email, or membership ID."
             >
-              <div className="relative min-w-0 flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Name, email, or member ID..."
-                  className="w-full rounded-xl border border-slate-600 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-brand-gold"
-                />
-              </div>
-              <button type="submit" className="rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark">
-                Search
-              </button>
-            </form>
+              <MemberSearchInput
+                selected={selected}
+                onSelect={setSelected}
+                onClear={() => setSelected(null)}
+              />
+            </FormSection>
+          </AdminPanel>
 
-            {results.length > 0 ? (
-              <ul className="mt-4 divide-y divide-white/5 rounded-xl border border-white/10">
-                {results.map((m) => (
-                  <li key={m.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelected(m)}
-                      className={`w-full px-4 py-3 text-left transition hover:bg-white/5 ${
-                        selected?.id === m.id ? "bg-brand-gold/10" : ""
-                      }`}
+          <AdminPanel>
+            <FormSection
+              step={2}
+              title="Record monthly dues"
+              description={`Fixed amount of ${formatCurrency(monthlyAmount)} from payment settings.`}
+            >
+              <form onSubmit={recordDues} className="space-y-4">
+                {selected ? (
+                  <p className="rounded-xl bg-white/5 px-3 py-2 text-sm text-slate-300 ring-1 ring-white/10">
+                    Recording for <span className="font-semibold text-white">{selected.fullName}</span>
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-500">Select a member first.</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">Month</label>
+                    <select
+                      value={periodMonth}
+                      onChange={(e) => setPeriodMonth(Number(e.target.value))}
+                      className="input-dark"
                     >
-                      <p className="font-medium text-white">{m.fullName}</p>
-                      <p className="text-xs text-slate-400">
-                        {m.membershipId} · {m.email}
-                      </p>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-
-          <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
-            <h2 className="mb-4 flex items-center gap-2 font-semibold text-white">
-              <Receipt className="h-5 w-5 text-brand-gold" />
-              Record monthly dues
-            </h2>
-
-            {selected ? (
-              <p className="mb-4 rounded-xl bg-white/5 px-3 py-2 text-sm text-slate-300">
-                Recording for <span className="font-semibold text-white">{selected.fullName}</span>
-              </p>
-            ) : (
-              <p className="mb-4 text-sm text-slate-500">Select a member from search results.</p>
-            )}
-
-            <form onSubmit={recordDues} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-slate-400">Month</label>
-                  <select
-                    value={periodMonth}
-                    onChange={(e) => setPeriodMonth(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-sm text-white"
-                  >
-                    {months.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
+                      {months.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">Year</label>
+                    <input
+                      type="number"
+                      min={2020}
+                      max={2100}
+                      value={periodYear}
+                      onChange={(e) => setPeriodYear(Number(e.target.value))}
+                      className="input-dark"
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="mb-1 block text-xs text-slate-400">Year</label>
+                  <label className="mb-1 block text-xs text-slate-400">Amount (GHS)</label>
+                  <input readOnly value={monthlyAmount} className="input-dark bg-slate-800 text-slate-300" />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs text-slate-400">Payment reference</label>
                   <input
-                    type="number"
-                    min={2020}
-                    max={2100}
-                    value={periodYear}
-                    onChange={(e) => setPeriodYear(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-sm text-white"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    placeholder="MoMo ref, receipt no., etc."
+                    className="input-dark"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="mb-1 block text-xs text-slate-400">Amount (GHS)</label>
-                <input
-                  readOnly
-                  value={monthlyAmount}
-                  className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-slate-300"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs text-slate-400">Payment reference</label>
-                <input
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="MoMo ref, receipt no., etc."
-                  className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-sm text-white placeholder:text-slate-600"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!selected || loading}
-                className="w-full rounded-xl bg-brand-gold py-3 text-sm font-semibold text-brand-navy-dark disabled:opacity-40"
-              >
-                {loading ? "Recording..." : `Record ${formatCurrency(monthlyAmount)} dues`}
-              </button>
-            </form>
-          </section>
+                <button type="submit" disabled={!selected || loading} className="btn-gold w-full py-3">
+                  <Receipt className="h-4 w-4" />
+                  {loading ? "Recording..." : `Record ${formatCurrency(monthlyAmount)} dues`}
+                </button>
+              </form>
+            </FormSection>
+          </AdminPanel>
         </div>
       ) : (
         <ContributionTrackingPanel onError={setError} />

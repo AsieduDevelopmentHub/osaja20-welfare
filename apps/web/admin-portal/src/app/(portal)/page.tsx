@@ -113,7 +113,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-6">
+      <section className="admin-panel p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-white">Recent members</h2>
           <Link href="/members" className="text-sm font-medium text-brand-gold hover:underline">
@@ -142,7 +142,7 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-6">
+      <section className="admin-panel p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-semibold text-white">Management modules</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {adminModules.map((mod) => {

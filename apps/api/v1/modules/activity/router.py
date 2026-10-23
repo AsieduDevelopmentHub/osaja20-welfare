@@ -19,8 +19,13 @@ async def list_activity(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=100),
     action: str | None = Query(default=None, max_length=100),
+    entity_type: str | None = Query(default=None, max_length=50),
 ):
     data = await platform_service.list_activity_logs(
-        db, page=page, page_size=page_size, action=action
+        db,
+        page=page,
+        page_size=page_size,
+        action=action,
+        entity_type=entity_type,
     )
     return ApiResponse(success=True, data=data)

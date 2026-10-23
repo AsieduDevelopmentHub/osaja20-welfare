@@ -13,7 +13,7 @@ export function VoteResultsPanel({
   const maxCount = Math.max(...data.results.map((r) => r.count), 1);
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+    <div className="admin-panel p-5 sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-brand-gold">Results</p>

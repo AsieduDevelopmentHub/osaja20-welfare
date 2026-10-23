@@ -11,6 +11,18 @@ body {
 
 @layer components {
   .input-dark {
-    @apply w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white placeholder:text-slate-500;
+    @apply w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white placeholder:text-slate-500 outline-none transition focus:border-brand-gold;
+  }
+
+  .admin-panel {
+    @apply overflow-hidden rounded-2xl border border-white/10 bg-brand-navy/55 shadow-glass backdrop-blur-sm;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark transition hover:bg-brand-gold-light disabled:opacity-40;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 disabled:opacity-40;
   }
 }

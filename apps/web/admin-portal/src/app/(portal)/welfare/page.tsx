@@ -2,16 +2,24 @@
 
 import type { Member } from "@osaja/types";
 import { ListRowsSkeleton } from "@osaja/ui";
-import { HeartHandshake, Plus } from "lucide-react";
+import { HeartHandshake, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { MemberSearchInput } from "@/components/MemberSearchInput";
+import { AdminPanel, Alert, EmptyState, FilterPills, FormSection } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import type { PaginatedResponse, WelfareCaseItem } from "@/lib/types";
 import { WELFARE_STATUS_LABELS } from "@/lib/types";
 
-const STATUS_FILTERS = ["", "pending", "approved", "allocated", "resolved", "archived"];
+const STATUS_FILTERS = [
+  { value: "", label: "All" },
+  { value: "pending", label: WELFARE_STATUS_LABELS.pending },
+  { value: "approved", label: WELFARE_STATUS_LABELS.approved },
+  { value: "allocated", label: WELFARE_STATUS_LABELS.allocated },
+  { value: "resolved", label: WELFARE_STATUS_LABELS.resolved },
+  { value: "archived", label: WELFARE_STATUS_LABELS.archived },
+];
 
 export default function WelfarePage() {
   const [cases, setCases] = useState<WelfareCaseItem[]>([]);
@@ -112,6 +120,7 @@ export default function WelfarePage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={HeartHandshake}
         title="Welfare cases"
         description="Review requests, approve support, and track case workflow."
         action={
@@ -122,76 +131,90 @@ export default function WelfarePage() {
               setError("");
               setSuccess("");
             }}
-            className="flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark"
+            className="btn-gold"
           >
-            <Plus className="h-4 w-4" />
-            New case
+            {showCreate ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showCreate ? "Close" : "New case"}
           </button>
         }
       />
 
-      {success ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{success}</p> : null}
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
-
-      {showCreate ? (
-        <div className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
-          <h2 className="font-semibold text-white">Create case for member</h2>
-          <MemberSearchInput onSelect={setCreateMember} selected={createMember} />
-          <form onSubmit={createCase} className="space-y-4">
-            <input
-              value={createTitle}
-              onChange={(e) => setCreateTitle(e.target.value)}
-              required
-              minLength={3}
-              placeholder="Case title"
-              className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
-            />
-            <textarea
-              value={createDesc}
-              onChange={(e) => setCreateDesc(e.target.value)}
-              required
-              minLength={10}
-              rows={4}
-              placeholder="Describe the welfare need..."
-              className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
-            />
-            <button
-              type="submit"
-              disabled={busy || !createMember}
-              className="rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-            >
-              {busy ? "Creating..." : "Create case"}
-            </button>
-          </form>
-        </div>
+      {success ? (
+        <Alert tone="success" onDismiss={() => setSuccess("")}>
+          {success}
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s || "all"}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              statusFilter === s ? "bg-brand-gold text-brand-navy-dark" : "bg-white/10 text-slate-300"
-            }`}
-          >
-            {s ? WELFARE_STATUS_LABELS[s] ?? s : "All"}
-          </button>
-        ))}
-      </div>
+      {showCreate ? (
+        <AdminPanel>
+          <form onSubmit={createCase} className="space-y-5">
+            <FormSection
+              step={1}
+              title="Member"
+              description="Who is this welfare case for?"
+            >
+              <MemberSearchInput
+                onSelect={setCreateMember}
+                selected={createMember}
+                onClear={() => setCreateMember(null)}
+              />
+            </FormSection>
+            <FormSection step={2} title="Case details" description="Keep the title short; add context below.">
+              <div className="space-y-3">
+                <input
+                  value={createTitle}
+                  onChange={(e) => setCreateTitle(e.target.value)}
+                  required
+                  minLength={3}
+                  placeholder="Case title"
+                  className="input-dark"
+                />
+                <textarea
+                  value={createDesc}
+                  onChange={(e) => setCreateDesc(e.target.value)}
+                  required
+                  minLength={10}
+                  rows={4}
+                  placeholder="Describe the welfare need..."
+                  className="input-dark"
+                />
+              </div>
+            </FormSection>
+            <div className="flex flex-wrap gap-2 border-t border-white/5 pt-4">
+              <button type="submit" disabled={busy || !createMember} className="btn-gold">
+                {busy ? "Creating..." : "Create case"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="btn-ghost"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </AdminPanel>
+      ) : null}
+
+      <FilterPills options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
 
       {loading ? (
         <ListRowsSkeleton rows={5} variant="dark" />
       ) : cases.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
-          <HeartHandshake className="mx-auto mb-3 h-10 w-10" />
-          No welfare cases found.
-        </div>
+        <EmptyState
+          icon={HeartHandshake}
+          title="No welfare cases found"
+          description={statusFilter ? "Try another status filter." : "Create a case to get started."}
+        />
       ) : (
         <ul className="space-y-3">
           {cases.map((c) => (
-            <li key={c.id} className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-5">
+            <li key={c.id} className="admin-panel p-4 sm:p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-white">{c.title}</p>

@@ -2,13 +2,23 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
-import { Plus, Vote } from "lucide-react";
+import { Plus, Vote, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { VoteResultsPanel } from "@/components/VoteResultsPanel";
+import { AdminPanel, Alert, EmptyState, FilterPills, FormSection } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import type { PaginatedResponse, VoteItem, VoteResultsData } from "@/lib/types";
 import { VOTE_STATUS_LABELS } from "@/lib/types";
+
+const STATUS_OPTIONS = [
+  { value: "", label: "Active" },
+  { value: "draft", label: VOTE_STATUS_LABELS.draft },
+  { value: "open", label: VOTE_STATUS_LABELS.open },
+  { value: "closed", label: VOTE_STATUS_LABELS.closed },
+  { value: "result_published", label: VOTE_STATUS_LABELS.result_published },
+  { value: "archived", label: VOTE_STATUS_LABELS.archived },
+];
 
 export default function VotingPage() {
   const [votes, setVotes] = useState<VoteItem[]>([]);
@@ -16,7 +26,8 @@ export default function VotingPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
   const [results, setResults] = useState<VoteResultsData | null>(null);
 
   const [title, setTitle] = useState("");
@@ -34,7 +45,7 @@ export default function VotingPage() {
       const res = await apiFetch<PaginatedResponse<VoteItem>>(`/voting/manage?page=1&page_size=50${q}`);
       setVotes(res.data?.items ?? []);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to load votes");
+      setError(err instanceof Error ? err.message : "Failed to load votes");
     } finally {
       setLoading(false);
     }
@@ -47,7 +58,8 @@ export default function VotingPage() {
   const createVote = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    setMessage("");
+    setSuccess("");
+    setError("");
     try {
       await apiFetch("/voting", {
         method: "POST",
@@ -61,91 +73,28 @@ export default function VotingPage() {
           options: options.filter((o) => o.trim()).map((label) => ({ label: label.trim() })),
         }),
       });
-      setMessage("Vote created as draft. Open it when ready.");
+      setSuccess("Vote created as draft. Open it when ready.");
       setShowForm(false);
       setTitle("");
       setDescription("");
       await load();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to create vote");
+      setError(err instanceof Error ? err.message : "Failed to create vote");
     } finally {
       setBusy(false);
     }
   };
 
-  const openVote = async (id: string) => {
+  const runAction = async (fn: () => Promise<void>, okMessage: string) => {
     setBusy(true);
+    setSuccess("");
+    setError("");
     try {
-      await apiFetch(`/voting/${id}/open`, { method: "PATCH" });
-      setMessage("Vote is now open for members.");
+      await fn();
+      setSuccess(okMessage);
       await load();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to open vote");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const closeVote = async (id: string) => {
-    setBusy(true);
-    try {
-      await apiFetch(`/voting/${id}/close`, { method: "PATCH" });
-      setMessage("Vote closed. Publish results when ready for members to see them.");
-      await load();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to close vote");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const publishResults = async (id: string) => {
-    setBusy(true);
-    try {
-      await apiFetch(`/voting/${id}/publish-results`, { method: "PATCH" });
-      setMessage("Results published — members can view for 7 days (auto-hidden after).");
-      await load();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to publish results");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const unarchiveVote = async (id: string) => {
-    setBusy(true);
-    try {
-      await apiFetch(`/voting/${id}/unarchive`, { method: "PATCH" });
-      setMessage("Vote restored from archive.");
-      await load();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to unarchive vote");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const archiveVote = async (id: string) => {
-    setBusy(true);
-    try {
-      await apiFetch(`/voting/${id}/archive`, { method: "PATCH" });
-      setMessage("Vote archived and removed from member views.");
-      await load();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to archive vote");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const unpublishResults = async (id: string) => {
-    setBusy(true);
-    try {
-      await apiFetch(`/voting/${id}/unpublish-results`, { method: "PATCH" });
-      setMessage("Results hidden from members.");
-      await load();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to unpublish results");
+      setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setBusy(false);
     }
@@ -153,11 +102,12 @@ export default function VotingPage() {
 
   const loadResults = async (id: string) => {
     setBusy(true);
+    setError("");
     try {
       const res = await apiFetch<VoteResultsData>(`/voting/${id}/results`);
       setResults(res.data ?? null);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed to load results");
+      setError(err instanceof Error ? err.message : "Failed to load results");
     } finally {
       setBusy(false);
     }
@@ -166,142 +116,151 @@ export default function VotingPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={Vote}
         title="Voting"
         description="Create elections and decisions, open ballots, and view results."
         action={
-          <button
-            type="button"
-            onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark"
-          >
-            <Plus className="h-4 w-4" />
-            New vote
+          <button type="button" onClick={() => setShowForm((v) => !v)} className="btn-gold">
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? "Close" : "New vote"}
           </button>
         }
       />
 
-      {message ? <p className="rounded-xl bg-brand-gold/10 px-4 py-3 text-sm text-brand-gold">{message}</p> : null}
+      {success ? (
+        <Alert tone="success" onDismiss={() => setSuccess("")}>
+          {success}
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
+      ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {["", "draft", "open", "closed", "result_published", "archived"].map((s) => (
-          <button
-            key={s || "all"}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              statusFilter === s ? "bg-brand-gold text-brand-navy-dark" : "bg-white/10 text-slate-300"
-            }`}
-          >
-            {s ? VOTE_STATUS_LABELS[s] ?? s : "Active"}
-          </button>
-        ))}
-      </div>
+      <FilterPills options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
 
       {showForm ? (
-        <form onSubmit={createVote} className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
-          <h2 className="font-semibold text-white">Create vote</h2>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            placeholder="Vote title"
-            className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder="Description (optional)"
-            className="w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2.5 text-white"
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Type</label>
-              <select
-                value={voteType}
-                onChange={(e) => setVoteType(e.target.value)}
-                className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-white"
-              >
-                <option value="decision">Decision</option>
-                <option value="election">Election</option>
-                <option value="multi_choice">Multi-choice</option>
-              </select>
+        <AdminPanel>
+          <form onSubmit={createVote} className="space-y-5">
+            <FormSection step={1} title="Basics" description="Title, type, and optional eligibility.">
+              <div className="space-y-3">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  placeholder="Vote title"
+                  className="input-dark"
+                />
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Description (optional)"
+                  className="input-dark"
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">Type</label>
+                    <select
+                      value={voteType}
+                      onChange={(e) => setVoteType(e.target.value)}
+                      className="input-dark"
+                    >
+                      <option value="decision">Decision</option>
+                      <option value="election">Election</option>
+                      <option value="multi_choice">Multi-choice</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-400">Min. contribution (GHS)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={minContribution}
+                      onChange={(e) => setMinContribution(e.target.value)}
+                      placeholder="Optional"
+                      className="input-dark"
+                    />
+                  </div>
+                </div>
+              </div>
+            </FormSection>
+
+            <FormSection step={2} title="Schedule" description="When ballots open and close.">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs text-slate-400">Opens</label>
+                  <input
+                    type="datetime-local"
+                    value={opensAt}
+                    onChange={(e) => setOpensAt(e.target.value)}
+                    required
+                    className="input-dark"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-slate-400">Closes</label>
+                  <input
+                    type="datetime-local"
+                    value={closesAt}
+                    onChange={(e) => setClosesAt(e.target.value)}
+                    required
+                    className="input-dark"
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <FormSection step={3} title="Options" description="One choice per field. Add more if needed.">
+              <div>
+                {options.map((opt, i) => (
+                  <input
+                    key={i}
+                    value={opt}
+                    onChange={(e) => {
+                      const next = [...options];
+                      next[i] = e.target.value;
+                      setOptions(next);
+                    }}
+                    className="input-dark mb-2"
+                    placeholder={`Option ${i + 1}`}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setOptions((o) => [...o, ""])}
+                  className="text-xs font-medium text-brand-gold hover:underline"
+                >
+                  + Add option
+                </button>
+              </div>
+            </FormSection>
+
+            <div className="flex flex-wrap gap-2 border-t border-white/5 pt-4">
+              <button type="submit" disabled={busy} className="btn-gold">
+                {busy ? "Creating..." : "Create draft vote"}
+              </button>
+              <button type="button" onClick={() => setShowForm(false)} className="btn-ghost">
+                Cancel
+              </button>
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Min. contribution (GHS)</label>
-              <input
-                type="number"
-                min={0}
-                value={minContribution}
-                onChange={(e) => setMinContribution(e.target.value)}
-                placeholder="Optional"
-                className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-white"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Opens</label>
-              <input
-                type="datetime-local"
-                value={opensAt}
-                onChange={(e) => setOpensAt(e.target.value)}
-                required
-                className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-white"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Closes</label>
-              <input
-                type="datetime-local"
-                value={closesAt}
-                onChange={(e) => setClosesAt(e.target.value)}
-                required
-                className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2.5 text-white"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="mb-2 block text-xs text-slate-400">Options (one per line)</label>
-            {options.map((opt, i) => (
-              <input
-                key={i}
-                value={opt}
-                onChange={(e) => {
-                  const next = [...options];
-                  next[i] = e.target.value;
-                  setOptions(next);
-                }}
-                className="mb-2 w-full rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-white"
-              />
-            ))}
-            <button
-              type="button"
-              onClick={() => setOptions((o) => [...o, ""])}
-              className="text-xs text-brand-gold hover:underline"
-            >
-              + Add option
-            </button>
-          </div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-          >
-            {busy ? "Creating..." : "Create draft vote"}
-          </button>
-        </form>
+          </form>
+        </AdminPanel>
       ) : null}
 
       {loading ? (
         <ListRowsSkeleton rows={4} variant="dark" />
       ) : votes.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
-          <Vote className="mx-auto mb-3 h-10 w-10" />
-          No votes yet.
-        </div>
+        <EmptyState
+          icon={Vote}
+          title="No votes yet"
+          description={statusFilter ? "Try another status filter." : "Create a draft vote to get started."}
+        />
       ) : (
         <ul className="space-y-3">
           {votes.map((v) => (
-            <li key={v.id} className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-5">
+            <li key={v.id} className="admin-panel p-4 sm:p-5">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="font-semibold text-white">{v.title}</p>
@@ -319,7 +278,12 @@ export default function VotingPage() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => openVote(v.id)}
+                    onClick={() =>
+                      runAction(
+                        () => apiFetch(`/voting/${v.id}/open`, { method: "PATCH" }).then(() => undefined),
+                        "Vote is now open for members."
+                      )
+                    }
                     className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-300"
                   >
                     Open vote
@@ -329,7 +293,12 @@ export default function VotingPage() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => closeVote(v.id)}
+                    onClick={() =>
+                      runAction(
+                        () => apiFetch(`/voting/${v.id}/close`, { method: "PATCH" }).then(() => undefined),
+                        "Vote closed. Publish results when ready."
+                      )
+                    }
                     className="rounded-lg bg-amber-600/20 px-3 py-1.5 text-xs font-medium text-amber-300"
                   >
                     Close vote
@@ -339,7 +308,15 @@ export default function VotingPage() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => publishResults(v.id)}
+                    onClick={() =>
+                      runAction(
+                        () =>
+                          apiFetch(`/voting/${v.id}/publish-results`, { method: "PATCH" }).then(
+                            () => undefined
+                          ),
+                        "Results published — members can view for 7 days."
+                      )
+                    }
                     className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-300"
                   >
                     Publish results to members
@@ -353,7 +330,15 @@ export default function VotingPage() {
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => unpublishResults(v.id)}
+                      onClick={() =>
+                        runAction(
+                          () =>
+                            apiFetch(`/voting/${v.id}/unpublish-results`, { method: "PATCH" }).then(
+                              () => undefined
+                            ),
+                          "Results hidden from members."
+                        )
+                      }
                       className="rounded-lg bg-red-600/20 px-3 py-1.5 text-xs font-medium text-red-300"
                     >
                       Unpublish
@@ -364,7 +349,12 @@ export default function VotingPage() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => archiveVote(v.id)}
+                    onClick={() =>
+                      runAction(
+                        () => apiFetch(`/voting/${v.id}/archive`, { method: "PATCH" }).then(() => undefined),
+                        "Vote archived."
+                      )
+                    }
                     className="rounded-lg bg-slate-600/30 px-3 py-1.5 text-xs font-medium text-slate-300"
                   >
                     Archive
@@ -374,7 +364,13 @@ export default function VotingPage() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => unarchiveVote(v.id)}
+                    onClick={() =>
+                      runAction(
+                        () =>
+                          apiFetch(`/voting/${v.id}/unarchive`, { method: "PATCH" }).then(() => undefined),
+                        "Vote restored from archive."
+                      )
+                    }
                     className="rounded-lg bg-emerald-600/20 px-3 py-1.5 text-xs font-medium text-emerald-300"
                   >
                     Unarchive

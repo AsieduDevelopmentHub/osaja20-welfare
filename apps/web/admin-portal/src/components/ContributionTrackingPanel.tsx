@@ -3,22 +3,10 @@
 import type { DuesSummary, Member } from "@osaja/types";
 import { ContributionLedger, ListRowsSkeleton, type LedgerItem } from "@osaja/ui";
 import { formatCurrency, formatDate, periodLabel } from "@osaja/utils";
-import {
-  AlertTriangle,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Filter,
-  Minus,
-  RefreshCw,
-  UserRound,
-  Users,
-  Wallet,
-  X,
-} from "lucide-react";
+import { Check, Clock, Filter, Minus, RefreshCw, UserRound, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MemberSearchInput } from "@/components/MemberSearchInput";
+import { FilterPills, PaginationBar } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import type {
   ContributionItem,
@@ -80,50 +68,6 @@ function statusStyles(status: string) {
   if (status === "overdue") return "bg-red-500/15 text-red-300 ring-red-500/30";
   if (status === "due") return "bg-amber-500/15 text-amber-200 ring-amber-500/30";
   return "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30";
-}
-
-function PaginationBar({
-  page,
-  totalPages,
-  total,
-  label,
-  onPageChange,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-  label: string;
-  onPageChange: (page: number) => void;
-}) {
-  if (total === 0) return null;
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs text-slate-400">
-        {total} {label}
-        {total === 1 ? "" : "s"} · Page {page} of {totalPages}
-      </p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-          className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/5 disabled:opacity-40"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-          Prev
-        </button>
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}
-          className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/5 disabled:opacity-40"
-        >
-          Next
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
 }
 
 export function ContributionTrackingPanel({
@@ -342,29 +286,15 @@ export function ContributionTrackingPanel({
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              { id: "all" as const, label: "All contributions", icon: Wallet },
-              { id: "owing" as const, label: "Owing members", icon: AlertTriangle },
-              { id: "member" as const, label: "By member", icon: UserRound },
-            ] as const
-          ).map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => switchView(id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                view === id
-                  ? "bg-brand-gold text-brand-navy-dark"
-                  : "bg-white/10 text-slate-300 hover:bg-white/15"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <FilterPills<TrackingView>
+          options={[
+            { value: "all", label: "All contributions" },
+            { value: "owing", label: "Owing members" },
+            { value: "member", label: "By member" },
+          ]}
+          value={view}
+          onChange={switchView}
+        />
         {view === "owing" && owingSummary.owing_count > 0 ? (
           <p className="text-sm text-slate-400">
             <span className="font-semibold text-amber-200">{owingSummary.owing_count}</span> owing ·{" "}
@@ -377,7 +307,7 @@ export function ContributionTrackingPanel({
       </div>
 
       {view === "owing" ? (
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-brand-navy/60">
+        <section className="admin-panel">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-4 sm:px-6">
             <div>
               <h3 className="font-semibold text-white">Members with outstanding dues</h3>
@@ -385,11 +315,7 @@ export function ContributionTrackingPanel({
                 Arrears plus unpaid current month · tap a row to see their monthly contributions
               </p>
             </div>
-            <button
-              type="button"
-              onClick={loadOwing}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/5"
-            >
+            <button type="button" onClick={loadOwing} className="btn-ghost">
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </button>
@@ -509,7 +435,7 @@ export function ContributionTrackingPanel({
       ) : (
         <div className="space-y-4">
           {view === "member" ? (
-            <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-5">
+            <section className="admin-panel p-4 sm:p-5">
               <div className="mb-3 flex items-center gap-2">
                 <Filter className="h-4 w-4 text-brand-gold" />
                 <h3 className="text-sm font-semibold text-white">Find member</h3>
@@ -520,27 +446,12 @@ export function ContributionTrackingPanel({
                   setSelectedMember(m);
                   setPage(1);
                 }}
+                onClear={() => {
+                  setSelectedMember(null);
+                  setLedger([]);
+                  setMemberDues(null);
+                }}
               />
-              {selectedMember ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <p className="text-xs text-slate-400">
-                    Showing monthly contributions for{" "}
-                    <span className="font-medium text-white">{selectedMember.fullName}</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedMember(null);
-                      setLedger([]);
-                      setMemberDues(null);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:bg-white/15"
-                  >
-                    <X className="h-3 w-3" />
-                    Clear member
-                  </button>
-                </div>
-              ) : null}
             </section>
           ) : null}
 
@@ -549,7 +460,7 @@ export function ContributionTrackingPanel({
           ) : null}
 
           {view === "member" && !selectedMember ? (
-            <div className="rounded-2xl border border-dashed border-white/10 bg-brand-navy/40 px-5 py-12 text-center">
+            <div className="rounded-2xl border border-dashed border-white/10 bg-brand-navy/40 px-5 py-12 text-center backdrop-blur-sm">
               <UserRound className="mx-auto h-8 w-8 text-slate-500" />
               <p className="mt-3 text-sm text-slate-400">
                 Search and select a member to view their monthly contribution history.
@@ -627,7 +538,7 @@ function MemberDuesOverview({ dues }: { dues: DuesSummary }) {
         : "Due this month";
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-5">
+    <section className="admin-panel p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dues overview</p>

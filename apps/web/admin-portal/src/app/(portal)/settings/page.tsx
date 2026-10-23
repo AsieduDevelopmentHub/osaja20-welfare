@@ -4,6 +4,7 @@ import { PageHeaderSkeleton, Skeleton } from "@osaja/ui";
 import { CreditCard, Loader2, Save, Settings, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import type { PaymentSettings } from "@/lib/types";
 
@@ -49,7 +50,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <PageHeaderSkeleton variant="dark" />
-        <div className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-6">
+        <div className="admin-panel space-y-4 p-6">
           <Skeleton variant="dark" className="h-5 w-40" />
           <Skeleton variant="dark" className="h-10 w-full" />
           <Skeleton variant="dark" className="h-10 w-full" />
@@ -65,15 +66,24 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={Settings}
         title="Payment settings"
         description="Configure what members see on the Contributions page — Paystack online pay is the default."
       />
 
-      {message ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{message}</p> : null}
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+      {message ? (
+        <Alert tone="success" onDismiss={() => setMessage("")}>
+          {message}
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
+      ) : null}
 
       <form onSubmit={save} className="space-y-6">
-        <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+        <section className="admin-panel p-5 sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-semibold text-white">
               <CreditCard className="h-5 w-5 text-brand-gold" />
@@ -95,7 +105,7 @@ export default function SettingsPage() {
           </p>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+        <section className="admin-panel p-5 sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 font-semibold text-white">
             <Settings className="h-5 w-5 text-brand-gold" />
             Dues amount &amp; copy
@@ -129,7 +139,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+        <section className="admin-panel p-5 sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-semibold text-white">
               <Smartphone className="h-5 w-5 text-brand-gold" />

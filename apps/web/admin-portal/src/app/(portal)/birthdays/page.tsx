@@ -5,6 +5,7 @@ import { Cake, Gift, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { Alert, EmptyState } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { resolveAvatarUrl } from "@/lib/avatars";
 
@@ -61,15 +62,11 @@ export default function AdminBirthdaysPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={Cake}
         title="Birthdays"
         description={`Members celebrating in ${monthLabel}. Notify all members when someone has a birthday today.`}
         action={
-          <button
-            type="button"
-            onClick={runBirthdayScan}
-            disabled={scanning}
-            className="flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-          >
+          <button type="button" onClick={runBirthdayScan} disabled={scanning} className="btn-gold">
             <RefreshCw className={`h-4 w-4 ${scanning ? "animate-spin" : ""}`} />
             Run birthday scan
           </button>
@@ -77,9 +74,12 @@ export default function AdminBirthdaysPage() {
       />
 
       {message ? (
-        <div className="rounded-xl border border-white/10 bg-brand-navy/60 px-4 py-3 text-sm text-slate-300">
+        <Alert
+          tone={message.toLowerCase().includes("fail") ? "error" : "success"}
+          onDismiss={() => setMessage("")}
+        >
           {message}
-        </div>
+        </Alert>
       ) : null}
 
       {todayBirthdays.length > 0 ? (
@@ -94,14 +94,11 @@ export default function AdminBirthdaysPage() {
       {loading ? (
         <ListRowsSkeleton rows={6} variant="dark" />
       ) : sorted.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
-          <Cake className="mx-auto h-10 w-10" strokeWidth={1.25} />
-          <p className="mt-2 text-sm">No birthdays this month.</p>
-        </div>
+        <EmptyState icon={Cake} title="No birthdays this month" />
       ) : (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">All in {monthLabel}</h2>
-          <div className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-brand-navy/60">
+          <div className="admin-panel divide-y divide-white/10">
             {sorted.map((b) => (
               <BirthdayRow key={b.member_id} person={b} isToday={b.day === today} />
             ))}

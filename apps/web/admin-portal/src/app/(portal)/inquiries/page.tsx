@@ -5,6 +5,7 @@ import { CheckCircle2, MessageSquare, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { Alert, EmptyState, FilterPills } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import type { PaginatedResponse } from "@/lib/types";
 
@@ -22,7 +23,11 @@ interface SupportInquiry {
   messages?: InquiryChatMessage[];
 }
 
-const STATUS_FILTERS = ["", "open", "resolved"];
+const STATUS_FILTERS = [
+  { value: "", label: "All" },
+  { value: "open", label: "Open" },
+  { value: "resolved", label: "Resolved" },
+];
 
 export default function InquiriesPage() {
   const [items, setItems] = useState<SupportInquiry[]>([]);
@@ -115,52 +120,33 @@ export default function InquiriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <AdminHeader
-          title="Member inquiries"
-          description={
-            total > 0
-              ? `${total} conversation${total === 1 ? "" : "s"} with members.`
-              : "Ongoing chat threads from the member portal contact button."
-          }
-        />
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s || "all"}
-            type="button"
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${
-              statusFilter === s
-                ? "bg-brand-gold text-brand-navy-dark"
-                : "bg-white/10 text-slate-300 hover:bg-white/15"
-            }`}
-          >
-            {s || "All"}
+      <AdminHeader
+        icon={MessageSquare}
+        title="Member inquiries"
+        description={
+          total > 0
+            ? `${total} conversation${total === 1 ? "" : "s"} with members.`
+            : "Ongoing chat threads from the member portal contact button."
+        }
+        action={
+          <button type="button" onClick={load} disabled={loading} className="btn-ghost">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
           </button>
-        ))}
-      </div>
+        }
+      />
+
+      <FilterPills options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
 
       {error ? (
-        <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300" role="alert">
+        <Alert tone="error" onDismiss={() => setError("")}>
           {error}
-        </div>
+        </Alert>
       ) : null}
       {success ? (
-        <div className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300" role="status">
+        <Alert tone="success" onDismiss={() => setSuccess("")}>
           {success}
-        </div>
+        </Alert>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
@@ -168,10 +154,11 @@ export default function InquiriesPage() {
           {loading ? (
             <ListRowsSkeleton rows={5} variant="dark" />
           ) : items.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-10 text-center text-slate-400">
-              <MessageSquare className="mx-auto h-10 w-10" strokeWidth={1.25} />
-              <p className="mt-2 text-sm">No inquiries {statusFilter ? `with status “${statusFilter}”` : "yet"}.</p>
-            </div>
+            <EmptyState
+              icon={MessageSquare}
+              title={statusFilter ? `No ${statusFilter} inquiries` : "No inquiries yet"}
+              description="Conversations from the member portal contact button appear here."
+            />
           ) : (
             items.map((item) => (
               <button
@@ -209,7 +196,7 @@ export default function InquiriesPage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-brand-navy/60 p-4 sm:p-5">
+        <div className="admin-panel p-4 sm:p-5">
           {!selectedId ? (
             <div className="flex min-h-[20rem] flex-col items-center justify-center text-center text-slate-400">
               <MessageSquare className="h-10 w-10" strokeWidth={1.25} />

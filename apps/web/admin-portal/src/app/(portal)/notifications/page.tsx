@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
+import { EmptyState } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 
 interface NotificationItem {
@@ -59,50 +60,44 @@ export default function AdminNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <AdminHeader
-          title="Notifications"
-          description={
-            unread > 0
-              ? `${unread} unread — payments, inquiries, birthdays, and more.`
-              : "Payments, member inquiries, birthdays, and announcements."
-          }
-        />
-        {!loading && items.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {unread > 0 ? (
+      <AdminHeader
+        icon={Bell}
+        title="Notifications"
+        description={
+          unread > 0
+            ? `${unread} unread — payments, inquiries, birthdays, and more.`
+            : "Payments, member inquiries, birthdays, and announcements."
+        }
+        action={
+          !loading && items.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {unread > 0 ? (
+                <button type="button" onClick={markAllRead} className="btn-ghost">
+                  <CheckCheck className="h-4 w-4" />
+                  Mark all read
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={markAllRead}
-                className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5"
+                onClick={deleteAll}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 px-3 py-2.5 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
               >
-                <CheckCheck className="h-4 w-4" />
-                Mark all read
+                <Trash2 className="h-4 w-4" />
+                Clear all
               </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={deleteAll}
-              className="flex items-center gap-2 rounded-xl border border-red-500/30 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10"
-            >
-              <Trash2 className="h-4 w-4" />
-              Clear all
-            </button>
-          </div>
-        ) : null}
-      </div>
+            </div>
+          ) : undefined
+        }
+      />
 
       {loading ? (
         <NotificationListSkeleton variant="dark" />
+      ) : items.length === 0 ? (
+        <EmptyState icon={Bell} title="No notifications yet" />
       ) : (
-        <div className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-brand-navy/60">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 p-10 text-slate-500">
-              <Bell className="h-10 w-10" strokeWidth={1.25} />
-              <p className="text-sm">No notifications yet</p>
-            </div>
-          ) : (
-            items.map((n) => (
+        <div className="admin-panel divide-y divide-white/10">
+          {
+            {items.map((n) => (
               <div
                 key={n.id}
                 className={`flex items-start gap-2 px-4 py-4 sm:px-6 ${!n.read ? "bg-white/5" : ""}`}
@@ -147,8 +142,7 @@ export default function AdminNotificationsPage() {
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-            ))
-          )}
+            ))}
         </div>
       )}
     </div>

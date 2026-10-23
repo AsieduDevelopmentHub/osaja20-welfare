@@ -2,9 +2,10 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
-import { Pencil, Send, Trash2 } from "lucide-react";
+import { Megaphone, Pencil, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { Alert, EmptyState } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import type { AnnouncementItem } from "@/lib/types";
 
@@ -107,12 +108,13 @@ export default function AnnouncementsPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={Megaphone}
         title="Announcements"
         description="Publish to all members — in-app notifications and push alerts for subscribed devices."
       />
 
       {editing ? (
-        <form onSubmit={saveEdit} className="space-y-4 rounded-2xl border border-brand-gold/30 bg-brand-navy/60 p-5 sm:p-6">
+        <form onSubmit={saveEdit} className="admin-panel space-y-4 border-brand-gold/30 p-5 sm:p-6">
           <h2 className="font-semibold text-white">Edit announcement</h2>
           <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required className="input-dark" />
           <textarea
@@ -127,24 +129,16 @@ export default function AnnouncementsPage() {
             Re-notify all members (in-app + push)
           </label>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-xl bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className="btn-gold">
               {loading ? "Saving..." : "Save changes"}
             </button>
-            <button
-              type="button"
-              onClick={() => setEditing(null)}
-              className="rounded-xl border border-slate-600 px-5 py-2.5 text-sm text-slate-300"
-            >
+            <button type="button" onClick={() => setEditing(null)} className="btn-ghost">
               Cancel
             </button>
           </div>
         </form>
       ) : (
-        <form onSubmit={publish} className="space-y-4 rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
+        <form onSubmit={publish} className="admin-panel space-y-4 p-5 sm:p-6">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -160,26 +154,32 @@ export default function AnnouncementsPage() {
             placeholder="Write your announcement..."
             className="input-dark"
           />
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold py-3 font-semibold text-brand-navy-dark disabled:opacity-50 sm:w-auto sm:px-6"
-          >
+          <button type="submit" disabled={loading} className="btn-gold w-full sm:w-auto">
             <Send className="h-5 w-5" />
             {loading ? "Publishing..." : "Publish & notify"}
           </button>
         </form>
       )}
 
-      {message ? <p className="text-sm text-brand-gold">{message}</p> : null}
+      {message ? (
+        <Alert
+          tone={message.toLowerCase().includes("fail") ? "error" : "success"}
+          onDismiss={() => setMessage("")}
+        >
+          {message}
+        </Alert>
+      ) : null}
 
-      <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5 sm:p-6">
-        <h2 className="mb-4 font-semibold text-white">Recent announcements</h2>
-        {historyLoading ? (
+      {historyLoading ? (
+        <section className="admin-panel p-5 sm:p-6">
+          <h2 className="mb-4 font-semibold text-white">Recent announcements</h2>
           <ListRowsSkeleton rows={4} variant="dark" />
-        ) : history.length === 0 ? (
-          <p className="text-sm text-slate-400">No announcements published yet.</p>
-        ) : (
+        </section>
+      ) : history.length === 0 ? (
+        <EmptyState icon={Megaphone} title="No announcements published yet" />
+      ) : (
+        <section className="admin-panel p-5 sm:p-6">
+          <h2 className="mb-4 font-semibold text-white">Recent announcements</h2>
           <ul className="divide-y divide-white/5">
             {history.map((a) => (
               <li key={a.id} className="py-4 first:pt-0 last:pb-0">
@@ -214,8 +214,8 @@ export default function AnnouncementsPage() {
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }

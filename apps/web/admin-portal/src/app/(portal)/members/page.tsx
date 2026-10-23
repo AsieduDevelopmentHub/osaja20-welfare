@@ -3,14 +3,24 @@
 import type { Member, UserRole } from "@osaja/types";
 import { MemberListSkeleton } from "@osaja/ui";
 import { RefreshCw, Search, User, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AdminHeader } from "@/components/AdminHeader";
+import { Alert, EmptyState, FilterPills, PaginationBar } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { resolveAvatarUrl } from "@/lib/avatars";
 import { useAuth } from "@/lib/auth";
 import { mapMember, type MemberListResponse } from "@/lib/types";
 
 const ROLES: UserRole[] = ["member", "executive", "administrator"];
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "pending", label: "Pending" },
+  { value: "archived", label: "Archived" },
+];
 
 export default function MembersPage() {
   const { member: admin } = useAuth();
@@ -20,9 +30,12 @@ export default function MembersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [query, setQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const loadMembers = useCallback(async () => {
     if (!admin) return;
     setLoading(true);
@@ -32,13 +45,18 @@ export default function MembersPage() {
         const res = await apiFetch<Record<string, unknown>[]>(
           `/members/search?q=${encodeURIComponent(query.trim())}&limit=50`
         );
-        const items = (res.data ?? []).map((raw) => mapMember(raw));
+        let items = (res.data ?? []).map((raw) => mapMember(raw));
+        if (statusFilter) items = items.filter((m) => m.status === statusFilter);
         setMembers(items);
         setTotal(items.length);
         setTotalPages(1);
-        setPage(1);
       } else {
-        const res = await apiFetch<MemberListResponse>(`/members?page=${page}&page_size=20`);
+        const params = new URLSearchParams({
+          page: String(page),
+          page_size: "20",
+        });
+        if (statusFilter) params.set("status", statusFilter);
+        const res = await apiFetch<MemberListResponse>(`/members?${params.toString()}`);
         const data = res.data;
         setMembers((data?.items ?? []).map((raw) => mapMember(raw)));
         setTotal(data?.total ?? 0);
@@ -49,20 +67,34 @@ export default function MembersPage() {
     } finally {
       setLoading(false);
     }
-  }, [admin, page, query]);
+  }, [admin, page, query, statusFilter]);
 
   useEffect(() => {
     loadMembers();
   }, [loadMembers]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    setQuery(searchInput);
-  };
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPage(1);
+      setQuery(searchInput.trim());
+    }, 350);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchInput]);
 
-  const promoteRole = async (memberId: string, role: UserRole) => {
+  const promoteRole = async (memberId: string, role: UserRole, currentRole?: string) => {
     if (admin?.role !== "administrator") return;
+    if (role === (currentRole ?? "member")) return;
+    const member = members.find((m) => m.id === memberId);
+    const ok = window.confirm(
+      `Change ${member?.fullName ?? "this member"}'s role from “${currentRole ?? "member"}” to “${role}”?`
+    );
+    if (!ok) {
+      await loadMembers();
+      return;
+    }
     setUpdatingId(memberId);
     try {
       await apiFetch(`/members/${memberId}/role`, {
@@ -79,161 +111,144 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-gold/20">
-            <Users className="h-5 w-5 text-brand-gold" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Members</h1>
-            <p className="text-sm text-slate-400">{total} registered member{total === 1 ? "" : "s"}</p>
-          </div>
-        </div>
-      </header>
+      <AdminHeader
+        icon={Users}
+        title="Members"
+        description={`${total} registered member${total === 1 ? "" : "s"}`}
+        action={
+          <button type="button" onClick={loadMembers} disabled={loading} className="btn-ghost">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        }
+      />
 
-      <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex flex-col gap-3">
+        <div className="relative min-w-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by name, email, or membership ID..."
-            className="w-full rounded-xl border border-slate-600 bg-slate-900 py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-brand-gold"
+            className="input-dark pl-10"
           />
         </div>
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="rounded-xl bg-brand-gold px-4 py-2.5 text-sm font-semibold text-brand-navy-dark hover:bg-brand-gold-light"
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchInput("");
-              setQuery("");
-              setPage(1);
-            }}
-            className="flex items-center gap-1 rounded-xl border border-slate-600 px-3 py-2.5 text-sm text-slate-300 hover:bg-slate-800"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Reset
-          </button>
-        </div>
-      </form>
+        <FilterPills
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={(v) => {
+            setStatusFilter(v);
+            setPage(1);
+          }}
+        />
+      </div>
 
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
+      ) : null}
 
       {loading ? (
         <MemberListSkeleton variant="dark" />
+      ) : members.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="No members found"
+          description={query || statusFilter ? "Try adjusting search or status filters." : undefined}
+        />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-brand-navy/60">
-          {members.length === 0 ? (
-            <p className="p-6 text-sm text-slate-400">No members found.</p>
-          ) : (
-            <ul className="divide-y divide-white/5">
-              {members.map((m) => {
-                const avatarSrc = resolveAvatarUrl(m.avatarUrl);
-                return (
-                  <li key={m.id} className="p-4 sm:p-5">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
-                        {avatarSrc ? (
-                          <img
-                            src={avatarSrc}
-                            alt=""
-                            className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-                          />
-                        ) : (
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10">
-                            <User className="h-5 w-5 text-slate-400" />
-                          </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <Link
-                            href={`/profile/${m.id}`}
-                            className="truncate font-semibold text-white hover:text-brand-gold"
-                          >
-                            {m.fullName}
-                          </Link>
-                          <p className="truncate text-sm text-slate-400">{m.email}</p>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">@{m.username}</span>
-                            <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">{m.membershipId}</span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 capitalize ${
-                                m.status === "active"
-                                  ? "bg-emerald-500/20 text-emerald-300"
-                                  : m.status === "inactive"
-                                    ? "bg-amber-500/20 text-amber-300"
-                                    : "bg-white/10 text-slate-300"
-                              }`}
-                            >
-                              {m.status}
-                            </span>
-                            <span className="rounded-full bg-brand-gold/20 px-2 py-0.5 capitalize text-brand-gold">
-                              {m.role ?? "member"}
-                            </span>
-                          </div>
+        <div className="admin-panel">
+          <ul className="divide-y divide-white/5">
+            {members.map((m) => {
+              const avatarSrc = resolveAvatarUrl(m.avatarUrl);
+              return (
+                <li key={m.id} className="p-4 sm:p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      {avatarSrc ? (
+                        <img
+                          src={avatarSrc}
+                          alt=""
+                          className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                        />
+                      ) : (
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10">
+                          <User className="h-5 w-5 text-slate-400" />
                         </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
+                      )}
+                      <div className="min-w-0 flex-1">
                         <Link
                           href={`/profile/${m.id}`}
-                          className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/5"
+                          className="truncate font-semibold text-white hover:text-brand-gold"
                         >
-                          View profile
+                          {m.fullName}
                         </Link>
-                        {admin?.role === "administrator" && m.id !== admin.id ? (
-                          <select
-                            id={`role-${m.id}`}
-                            value={m.role ?? "member"}
-                            disabled={updatingId === m.id}
-                            onChange={(e) => promoteRole(m.id, e.target.value as UserRole)}
-                            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-gold"
+                        <p className="truncate text-sm text-slate-400">{m.email}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">
+                            @{m.username}
+                          </span>
+                          <span className="rounded-full bg-white/10 px-2 py-0.5 text-slate-300">
+                            {m.membershipId}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 capitalize ${
+                              m.status === "active"
+                                ? "bg-emerald-500/20 text-emerald-300"
+                                : m.status === "inactive"
+                                  ? "bg-amber-500/20 text-amber-300"
+                                  : "bg-white/10 text-slate-300"
+                            }`}
                           >
-                            {ROLES.map((r) => (
-                              <option key={r} value={r}>
-                                {r}
-                              </option>
-                            ))}
-                          </select>
-                        ) : null}
+                            {m.status}
+                          </span>
+                          <span className="rounded-full bg-brand-gold/20 px-2 py-0.5 capitalize text-brand-gold">
+                            {m.role ?? "member"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/profile/${m.id}`} className="btn-ghost px-3 py-2 text-xs">
+                        View profile
+                      </Link>
+                      {admin?.role === "administrator" && m.id !== admin.id ? (
+                        <select
+                          id={`role-${m.id}`}
+                          value={m.role ?? "member"}
+                          disabled={updatingId === m.id}
+                          onChange={(e) => promoteRole(m.id, e.target.value as UserRole, m.role)}
+                          className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-brand-gold"
+                          title="Confirm before changing role"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {!query ? (
+            <div className="border-t border-white/10 px-4 py-3 sm:px-6">
+              <PaginationBar
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                label="member"
+                onPageChange={setPage}
+              />
+            </div>
+          ) : null}
         </div>
       )}
-
-      {!query && totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-slate-400">
-          <button
-            type="button"
-            disabled={page <= 1 || loading}
-            onClick={() => setPage((p) => p - 1)}
-            className="rounded-lg border border-slate-600 px-3 py-1.5 disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span>
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page >= totalPages || loading}
-            onClick={() => setPage((p) => p + 1)}
-            className="rounded-lg border border-slate-600 px-3 py-1.5 disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }

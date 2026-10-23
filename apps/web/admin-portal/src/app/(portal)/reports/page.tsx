@@ -4,6 +4,7 @@ import { formatCurrency } from "@osaja/utils";
 import { BarChart3, Cake, Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
+import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv, downloadExcel, fetchAllPages } from "@/lib/export";
 import {
@@ -218,11 +219,12 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
+        icon={BarChart3}
         title="Reports & exports"
         description="Download accountability reports for executive meetings and audits."
       />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-brand-navy/60 px-4 py-3">
+      <div className="admin-panel flex flex-wrap items-center gap-3 px-4 py-3">
         <span className="text-sm text-slate-400">Export format:</span>
         <div className="flex rounded-lg bg-white/10 p-0.5">
           <button
@@ -247,12 +249,20 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {message ? <p className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{message}</p> : null}
-      {error ? <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p> : null}
+      {message ? (
+        <Alert tone="success" onDismiss={() => setMessage("")}>
+          {message}
+        </Alert>
+      ) : null}
+      {error ? (
+        <Alert tone="error" onDismiss={() => setError("")}>
+          {error}
+        </Alert>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {cards.map((card) => (
-          <div key={card.key} className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
+          <div key={card.key} className="admin-panel p-5">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gold/20">
                 <BarChart3 className="h-5 w-5 text-brand-gold" />
@@ -260,12 +270,7 @@ export default function ReportsPage() {
               <div className="min-w-0 flex-1">
                 <h2 className="font-semibold text-white">{card.title}</h2>
                 <p className="mt-1 text-sm text-slate-400">{card.desc}</p>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={card.action}
-                  className="mt-4 flex items-center gap-2 rounded-xl bg-brand-gold px-4 py-2 text-sm font-semibold text-brand-navy-dark disabled:opacity-50"
-                >
+                <button type="button" disabled={busy !== null} onClick={card.action} className="btn-gold mt-4">
                   {busy === card.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   {busy === card.key ? "Exporting..." : `Download ${format === "excel" ? "Excel" : "CSV"}`}
                 </button>
@@ -275,7 +280,7 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      <section className="rounded-2xl border border-white/10 bg-brand-navy/60 p-5">
+      <section className="admin-panel p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <Cake className="mt-1 h-5 w-5 text-amber-400" />
@@ -284,12 +289,7 @@ export default function ReportsPage() {
               <p className="mt-1 text-sm text-slate-400">Scan members with birthdays today and send greetings.</p>
             </div>
           </div>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={scanBirthdays}
-            className="rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/5 disabled:opacity-50"
-          >
+          <button type="button" disabled={busy !== null} onClick={scanBirthdays} className="btn-ghost">
             {busy === "birthdays" ? "Scanning..." : "Run birthday scan"}
           </button>
         </div>

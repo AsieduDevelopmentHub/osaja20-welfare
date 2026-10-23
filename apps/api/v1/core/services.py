@@ -2093,10 +2093,13 @@ class PlatformService:
         page: int = 1,
         page_size: int = 50,
         action: str | None = None,
+        entity_type: str | None = None,
     ) -> dict:
         filters = []
         if action:
             filters.append(ActivityLog.action == action)
+        if entity_type:
+            filters.append(ActivityLog.entity_type == entity_type)
 
         count_q = select(func.count(ActivityLog.id))
         if filters:
