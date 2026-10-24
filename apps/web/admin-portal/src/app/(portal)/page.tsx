@@ -4,47 +4,15 @@ import { adminModules, DashboardPageSkeleton, Skeleton, StatCard } from "@osaja/
 import { formatCurrency } from "@osaja/utils";
 import { Cake, Download, Megaphone, Users, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { Alert } from "@/components/ui";
+import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 import { useAuth } from "@/lib/auth";
-import { mapMember, type DashboardStats, type MemberListResponse } from "@/lib/types";
-import type { Member } from "@osaja/types";
 
 export default function AdminDashboard() {
   const { member } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({
-    total_members: 0,
-    active_members: 0,
-    pending_welfare_cases: 0,
-    total_contributions: 0,
-    upcoming_birthdays_today: 0,
-    active_votes: 0,
-  });
-  const [recentMembers, setRecentMembers] = useState<Member[]>([]);
-  const [error, setError] = useState("");
+  const { data, isLoading, isFetching, error, refetch } = useAdminDashboard(Boolean(member));
 
-  useEffect(() => {
-    if (!member) return;
-
-    setLoading(true);
-    setError("");
-    Promise.all([
-      apiFetch<DashboardStats>("/dashboard/stats"),
-      apiFetch<MemberListResponse>("/members?page=1&page_size=5"),
-    ])
-      .then(([statsRes, membersRes]) => {
-        if (statsRes.data) setStats(statsRes.data);
-        const items = membersRes.data?.items ?? [];
-        setRecentMembers(items.map((raw) => mapMember(raw)));
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load dashboard");
-      })
-      .finally(() => setLoading(false));
-  }, [member]);
-
-  if (loading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -63,6 +31,16 @@ export default function AdminDashboard() {
     );
   }
 
+  const stats = data?.stats ?? {
+    total_members: 0,
+    active_members: 0,
+    pending_welfare_cases: 0,
+    total_contributions: 0,
+    upcoming_birthdays_today: 0,
+    active_votes: 0,
+  };
+  const recentMembers = data?.recentMembers ?? [];
+
   const statCards = [
     { label: "Total members", value: String(stats.total_members), icon: Users },
     { label: "Active members", value: String(stats.active_members), icon: Users, iconClassName: "text-brand-gold" },
@@ -73,12 +51,12 @@ export default function AdminDashboard() {
       icon: Wallet,
       iconClassName: "text-green-400",
     },
-    { label: "Active votes", value: String(stats.active_votes), icon: Vote, iconClassName: "text-purple-400" },
+    { label: "Active votes", value: String(stats.active_votes), icon: Vote, iconClassName: "text-sky-300" },
     { label: "Birthdays today", value: String(stats.upcoming_birthdays_today), icon: Cake, iconClassName: "text-amber-400" },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isFetching && data ? "opacity-95" : ""}`}>
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-medium text-brand-gold">Administration</p>
@@ -86,17 +64,11 @@ export default function AdminDashboard() {
           <p className="text-sm text-slate-400">Leadership analytics & operations</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/reports"
-            className="flex items-center gap-2 rounded-xl border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
-          >
+          <Link href="/reports" className="btn-ghost">
             <Download className="h-4 w-4" />
             Export
           </Link>
-          <Link
-            href="/announcements"
-            className="flex items-center gap-2 rounded-xl bg-brand-gold px-3 py-2 text-sm font-semibold text-brand-navy-dark hover:bg-brand-gold-light"
-          >
+          <Link href="/announcements" className="btn-gold">
             <Megaphone className="h-4 w-4" />
             Announce
           </Link>
@@ -104,7 +76,12 @@ export default function AdminDashboard() {
       </header>
 
       {error ? (
-        <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>
+        <Alert tone="error">
+          {error instanceof Error ? error.message : "Failed to load dashboard"}{" "}
+          <button type="button" onClick={() => refetch()} className="font-semibold underline">
+            Retry
+          </button>
+        </Alert>
       ) : null}
 
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-3">
@@ -125,7 +102,10 @@ export default function AdminDashboard() {
         ) : (
           <ul className="divide-y divide-white/5">
             {recentMembers.map((m) => (
-              <li key={m.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+              <li
+                key={m.id}
+                className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+              >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-white">{m.fullName}</p>
                   <p className="truncate text-xs text-slate-400">{m.email}</p>

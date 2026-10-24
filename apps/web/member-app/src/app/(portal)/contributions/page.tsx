@@ -2,8 +2,9 @@
 
 import { ContributionCardSkeleton, ListRowsSkeleton } from "@osaja/ui";
 import { formatCurrency } from "@osaja/utils";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Wallet } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { ContributionHistory } from "@/components/ContributionHistory";
 import { DuesStatusBanner } from "@/components/DuesStatusBanner";
 import { MonthDuesGrid } from "@/components/MonthDuesGrid";
@@ -14,74 +15,64 @@ import { Alert, PaginationBar } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import { env } from "@/lib/env";
+import { queryKeys } from "@/lib/query-keys";
 import { mapContributionList, mapDuesSummary } from "@/lib/types";
-import type { Contribution, DuesSummary } from "@osaja/types";
 
 export default function ContributionsPage() {
   const { member } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [dues, setDues] = useState<DuesSummary | null>(null);
-  const [history, setHistory] = useState<Contribution[]>([]);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [paymentConfig, setPaymentConfig] = useState({
+
+  const duesQuery = useQuery({
+    queryKey: queryKeys.dues,
+    enabled: Boolean(member),
+    queryFn: async () => {
+      const res = await apiFetch<Record<string, unknown>>("/members/me/dues");
+      return mapDuesSummary(res.data as Record<string, unknown>);
+    },
+  });
+
+  const paymentQuery = useQuery({
+    queryKey: queryKeys.paymentSettings,
+    enabled: Boolean(member),
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const payRes = await apiFetch<Record<string, unknown>>("/settings/payment");
+      const raw = (payRes.data || {}) as Record<string, unknown>;
+      return {
+        paystackEnabled: Boolean(raw.paystack_enabled ?? true),
+        paystackConfigured: Boolean(raw.paystack_configured),
+        manualEnabled: Boolean(raw.manual_payment_enabled),
+        title: String(raw.title ?? env.payment.title),
+        note: String(raw.note ?? env.payment.note),
+      };
+    },
+  });
+
+  const historyQuery = useQuery({
+    queryKey: queryKeys.contributions(page),
+    enabled: Boolean(member),
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const histRes = await apiFetch<Record<string, unknown>>(
+        `/members/me/contributions?page=${page}&page_size=20`
+      );
+      return mapContributionList(histRes.data as Record<string, unknown>);
+    },
+  });
+
+  const dues = duesQuery.data ?? null;
+  const paymentConfig = paymentQuery.data ?? {
     paystackEnabled: true,
     paystackConfigured: false,
     manualEnabled: false,
     title: env.payment.title,
     note: env.payment.note,
-  });
-  const [error, setError] = useState("");
-
-  const loadHistory = useCallback(async (pageNum: number) => {
-    setHistoryLoading(true);
-    try {
-      const histRes = await apiFetch<Record<string, unknown>>(
-        `/members/me/contributions?page=${pageNum}&page_size=20`
-      );
-      const mapped = mapContributionList(histRes.data as Record<string, unknown>);
-      setHistory(mapped.items);
-      setTotal(mapped.total);
-      setTotalPages(mapped.total_pages);
-      setPage(mapped.page);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load payment history");
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!member) return;
-    setLoading(true);
-    setError("");
-
-    Promise.all([
-      apiFetch<Record<string, unknown>>("/members/me/dues"),
-      apiFetch<Record<string, unknown>>("/members/me/contributions?page=1&page_size=20"),
-      apiFetch<Record<string, unknown>>("/settings/payment"),
-    ])
-      .then(([duesRes, histRes, payRes]) => {
-        setDues(mapDuesSummary(duesRes.data as Record<string, unknown>));
-        const mapped = mapContributionList(histRes.data as Record<string, unknown>);
-        setHistory(mapped.items);
-        setTotal(mapped.total);
-        setTotalPages(mapped.total_pages);
-        setPage(mapped.page);
-        const raw = (payRes.data || {}) as Record<string, unknown>;
-        setPaymentConfig({
-          paystackEnabled: Boolean(raw.paystack_enabled ?? true),
-          paystackConfigured: Boolean(raw.paystack_configured),
-          manualEnabled: Boolean(raw.manual_payment_enabled),
-          title: String(raw.title ?? env.payment.title),
-          note: String(raw.note ?? env.payment.note),
-        });
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load contributions"))
-      .finally(() => setLoading(false));
-  }, [member]);
+  };
+  const history = historyQuery.data?.items ?? [];
+  const total = historyQuery.data?.total ?? 0;
+  const totalPages = historyQuery.data?.total_pages ?? 1;
+  const bootLoading = Boolean(member) && duesQuery.isLoading && !duesQuery.data;
+  const error = duesQuery.error || paymentQuery.error || historyQuery.error;
 
   return (
     <div className="space-y-6">
@@ -92,12 +83,12 @@ export default function ContributionsPage() {
       />
 
       {error ? (
-        <Alert tone="error" onDismiss={() => setError("")}>
-          {error}
+        <Alert tone="error">
+          {error instanceof Error ? error.message : "Could not load contributions"}
         </Alert>
       ) : null}
 
-      {loading ? (
+      {bootLoading ? (
         <>
           <ContributionCardSkeleton variant="light" />
           <ListRowsSkeleton rows={4} variant="light" />
@@ -128,7 +119,7 @@ export default function ContributionsPage() {
             <PaymentInstructions membershipId={member.membershipId} />
           ) : null}
 
-          {historyLoading ? (
+          {historyQuery.isLoading && !historyQuery.data ? (
             <ListRowsSkeleton rows={4} variant="light" />
           ) : (
             <ContributionHistory
@@ -140,7 +131,7 @@ export default function ContributionsPage() {
                   totalPages={totalPages}
                   total={total}
                   label="payment"
-                  onPageChange={(p) => loadHistory(p)}
+                  onPageChange={setPage}
                 />
               }
             />

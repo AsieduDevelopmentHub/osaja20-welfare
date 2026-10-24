@@ -1,55 +1,80 @@
 "use client";
 
 import { NotificationListSkeleton } from "@osaja/ui";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { FilterPills } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import type { NotificationItem } from "@/lib/types";
 
 type NotifFilter = "all" | "unread";
 
 export default function NotificationsPage() {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<NotifFilter>("all");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data: items = [], isLoading, isFetching } = useQuery({
+    queryKey: queryKeys.notifications,
+    queryFn: async () => {
       const res = await apiFetch<NotificationItem[]>("/notifications");
-      setItems((res.data as NotificationItem[]) ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return (res.data as NotificationItem[]) ?? [];
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const markRead = async (id: string) => {
-    await apiFetch(`/notifications/${id}/read`, { method: "PATCH" });
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  const invalidateNotifs = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.unreadCount });
   };
 
-  const markAllRead = async () => {
-    await apiFetch("/notifications/mark-all-read", { method: "POST" });
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  const markRead = useMutation({
+    mutationFn: (id: string) => apiFetch(`/notifications/${id}/read`, { method: "PATCH" }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications });
+      const prev = queryClient.getQueryData<NotificationItem[]>(queryKeys.notifications);
+      queryClient.setQueryData<NotificationItem[]>(queryKeys.notifications, (old = []) =>
+        old.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(queryKeys.notifications, ctx.prev);
+    },
+    onSettled: invalidateNotifs,
+  });
 
-  const deleteOne = async (id: string) => {
-    await apiFetch(`/notifications/${id}`, { method: "DELETE" });
-    setItems((prev) => prev.filter((n) => n.id !== id));
-  };
+  const markAllRead = useMutation({
+    mutationFn: () => apiFetch("/notifications/mark-all-read", { method: "POST" }),
+    onSuccess: invalidateNotifs,
+  });
 
-  const deleteAll = async () => {
-    await apiFetch("/notifications", { method: "DELETE" });
-    setItems([]);
-  };
+  const deleteOne = useMutation({
+    mutationFn: (id: string) => apiFetch(`/notifications/${id}`, { method: "DELETE" }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications });
+      const prev = queryClient.getQueryData<NotificationItem[]>(queryKeys.notifications);
+      queryClient.setQueryData<NotificationItem[]>(queryKeys.notifications, (old = []) =>
+        old.filter((n) => n.id !== id)
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(queryKeys.notifications, ctx.prev);
+    },
+    onSettled: invalidateNotifs,
+  });
+
+  const deleteAll = useMutation({
+    mutationFn: () => apiFetch("/notifications", { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.notifications, []);
+      queryClient.setQueryData(queryKeys.unreadCount, 0);
+    },
+  });
 
   const unread = items.filter((n) => !n.read).length;
   const visible = useMemo(
@@ -64,17 +89,23 @@ export default function NotificationsPage() {
         title="Notifications"
         description={unread > 0 ? `${unread} unread` : "Meetings, welfare updates, and announcements."}
         action={
-          !loading && items.length > 0 ? (
+          !isLoading && items.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {unread > 0 ? (
-                <button type="button" onClick={markAllRead} className="btn-ghost">
+                <button
+                  type="button"
+                  onClick={() => markAllRead.mutate()}
+                  disabled={markAllRead.isPending}
+                  className="btn-ghost"
+                >
                   <CheckCheck className="h-4 w-4" />
                   Mark all read
                 </button>
               ) : null}
               <button
                 type="button"
-                onClick={deleteAll}
+                onClick={() => deleteAll.mutate()}
+                disabled={deleteAll.isPending}
                 className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
               >
                 <Trash2 className="h-4 w-4" />
@@ -94,7 +125,7 @@ export default function NotificationsPage() {
         onChange={setFilter}
       />
 
-      {loading ? (
+      {isLoading ? (
         <NotificationListSkeleton variant="light" />
       ) : visible.length === 0 ? (
         <div className="glass-card">
@@ -107,7 +138,7 @@ export default function NotificationsPage() {
           />
         </div>
       ) : (
-        <div className="glass-card divide-y divide-slate-100">
+        <div className={`glass-card divide-y divide-slate-100 ${isFetching ? "opacity-90" : ""}`}>
           {visible.map((n) => (
             <div
               key={n.id}
@@ -115,7 +146,7 @@ export default function NotificationsPage() {
             >
               <button
                 type="button"
-                onClick={() => !n.read && markRead(n.id)}
+                onClick={() => !n.read && markRead.mutate(n.id)}
                 className="min-w-0 flex-1 text-left transition hover:opacity-90"
               >
                 <div className="flex items-start gap-3">
@@ -133,7 +164,7 @@ export default function NotificationsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => deleteOne(n.id)}
+                onClick={() => deleteOne.mutate(n.id)}
                 aria-label="Delete notification"
                 className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-red-600"
               >

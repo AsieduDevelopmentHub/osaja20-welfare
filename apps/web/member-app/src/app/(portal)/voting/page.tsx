@@ -2,13 +2,15 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatCurrency, formatDate } from "@osaja/utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Lock, Vote } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
 import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import { mapVote } from "@/lib/types";
 import type { MemberVote } from "@osaja/types";
 
@@ -19,34 +21,31 @@ interface PendingVote {
 }
 
 export default function VotingPage() {
-  const [votes, setVotes] = useState<MemberVote[]>([]);
-  const [publishedResults, setPublishedResults] = useState<PublishedVoteResult[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingVote | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [votesRes, resultsRes] = await Promise.all([
-        apiFetch<Record<string, unknown>[]>("/voting"),
-        apiFetch<PublishedVoteResult[]>("/voting/published-results"),
-      ]);
-      setVotes((votesRes.data ?? []).map((v) => mapVote(v as Record<string, unknown>)));
-      setPublishedResults(resultsRes.data ?? []);
-    } catch {
-      setVotes([]);
-      setPublishedResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const votingQuery = useQuery({
+    queryKey: queryKeys.voting,
+    queryFn: async () => {
+      const res = await apiFetch<Record<string, unknown>[]>("/voting");
+      return (res.data ?? []).map((v) => mapVote(v as Record<string, unknown>));
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const resultsQuery = useQuery({
+    queryKey: queryKeys.publishedResults,
+    queryFn: async () => {
+      const res = await apiFetch<PublishedVoteResult[]>("/voting/published-results");
+      return res.data ?? [];
+    },
+  });
+
+  const votes: MemberVote[] = votingQuery.data ?? [];
+  const publishedResults = resultsQuery.data ?? [];
+  const loading = (votingQuery.isLoading && !votingQuery.data) || (resultsQuery.isLoading && !resultsQuery.data);
 
   const selectOption = (voteId: string, optionId: string, label: string) => {
     setPending({ voteId, optionId, label });
@@ -66,7 +65,11 @@ export default function VotingPage() {
       });
       setSuccess("Your vote has been recorded and locked.");
       setPending(null);
-      await load();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.voting }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.publishedResults }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
+      ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not submit vote");
     } finally {

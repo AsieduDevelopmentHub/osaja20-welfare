@@ -2,40 +2,38 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, Pencil, Send, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { Alert, EmptyState } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import type { AnnouncementItem } from "@/lib/types";
 
 export default function AnnouncementsPage() {
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<AnnouncementItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
   const [editing, setEditing] = useState<AnnouncementItem | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [reNotify, setReNotify] = useState(false);
 
-  const loadHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    try {
+  const historyQuery = useQuery({
+    queryKey: queryKeys.announcements,
+    queryFn: async () => {
       const res = await apiFetch<AnnouncementItem[]>("/announcements");
-      setHistory(res.data ?? []);
-    } catch {
-      setHistory([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
+      return res.data ?? [];
+    },
+  });
 
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+  const history = historyQuery.data ?? [];
+  const historyLoading = historyQuery.isLoading && !historyQuery.data;
+
+  const reloadHistory = () => queryClient.invalidateQueries({ queryKey: queryKeys.announcements });
 
   const publish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +47,7 @@ export default function AnnouncementsPage() {
       setMessage("Announcement published — members notified in-app and via push.");
       setTitle("");
       setContent("");
-      await loadHistory();
+      await reloadHistory();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to publish");
     } finally {
@@ -81,7 +79,7 @@ export default function AnnouncementsPage() {
       });
       setMessage(reNotify ? "Announcement updated and members re-notified." : "Announcement updated.");
       setEditing(null);
-      await loadHistory();
+      await reloadHistory();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to update");
     } finally {
@@ -97,7 +95,7 @@ export default function AnnouncementsPage() {
       await apiFetch(`/announcements/${id}`, { method: "DELETE" });
       setMessage("Announcement removed.");
       if (editing?.id === id) setEditing(null);
-      await loadHistory();
+      await reloadHistory();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Failed to delete");
     } finally {

@@ -2,31 +2,10 @@
 
 import { Bell } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 
 export function NotificationBell() {
-  const [count, setCount] = useState(0);
-
-  const refresh = useCallback(async () => {
-    try {
-      const res = await apiFetch<{ count: number }>("/notifications/unread-count");
-      setCount(Number(res.data?.count ?? 0));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const interval = window.setInterval(refresh, 60_000);
-    const onFocus = () => refresh();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [refresh]);
+  const { data: count = 0 } = useUnreadCount();
 
   const label =
     count > 0

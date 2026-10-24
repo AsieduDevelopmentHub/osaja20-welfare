@@ -4,6 +4,7 @@ import { BRAND, SITE_META, resolveSiteUrl } from "@osaja/config";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { ServiceWorkerInit } from "@/components/ServiceWorkerInit";
 import { AuthProvider } from "@/lib/auth";
+import { QueryProvider } from "@/lib/query-provider";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -64,11 +65,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${inter.variable} ${display.variable} font-sans antialiased`}>
-        <AuthProvider>
-          <ServiceWorkerInit />
-          {children}
-          <PwaInstallBanner />
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <ServiceWorkerInit />
+            {children}
+            <PwaInstallBanner />
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

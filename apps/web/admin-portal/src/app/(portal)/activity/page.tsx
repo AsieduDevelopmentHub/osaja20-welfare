@@ -2,11 +2,13 @@
 
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Activity, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { AdminHeader } from "@/components/AdminHeader";
 import { Alert, EmptyState, FilterPills, PaginationBar } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 
 interface ActivityItem {
   id: string;
@@ -51,17 +53,14 @@ function actionLabel(action: string) {
 }
 
 export default function ActivityPage() {
-  const [data, setData] = useState<ActivityResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [entityType, setEntityType] = useState("");
   const [action, setAction] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
+  const activityQuery = useQuery({
+    queryKey: queryKeys.activity(page, entityType, action),
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         page_size: "50",
@@ -69,20 +68,19 @@ export default function ActivityPage() {
       if (entityType) params.set("entity_type", entityType);
       if (action) params.set("action", action);
       const res = await apiFetch<ActivityResponse>(`/activity?${params.toString()}`);
-      setData(res.data ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load activity");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, entityType, action]);
+      return res.data ?? null;
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  const data = activityQuery.data;
+  const loading = activityQuery.isLoading && !activityQuery.data;
+  const error = activityQuery.error
+    ? activityQuery.error instanceof Error
+      ? activityQuery.error.message
+      : "Failed to load activity"
+    : "";
   const items = data?.items ?? [];
+  const load = () => activityQuery.refetch();
 
   return (
     <div className="space-y-6">
@@ -118,8 +116,11 @@ export default function ActivityPage() {
       </div>
 
       {error ? (
-        <Alert tone="error" onDismiss={() => setError("")}>
-          {error}
+        <Alert tone="error">
+          {error}{" "}
+          <button type="button" onClick={() => load()} className="font-semibold underline">
+            Retry
+          </button>
         </Alert>
       ) : null}
 

@@ -4,101 +4,41 @@ import { DashboardPageSkeleton, StatCard } from "@osaja/ui";
 import { formatCurrency, formatDate } from "@osaja/utils";
 import { Bell, Cake, ChevronRight, HeartHandshake, Receipt, Vote, Wallet } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { DuesStatusBanner } from "@/components/DuesStatusBanner";
 import { EmptyState } from "@/components/EmptyState";
 import { NotificationTypeBadge } from "@/components/NotificationTypeBadge";
 import { PageHeader } from "@/components/PageHeader";
-import { VoteResultsCard, type PublishedVoteResult } from "@/components/VoteResultsCard";
+import { VoteResultsCard } from "@/components/VoteResultsCard";
 import { Alert } from "@/components/ui";
+import { useMemberDashboard } from "@/hooks/useMemberDashboard";
 import { useAuth } from "@/lib/auth";
-import { apiFetch } from "@/lib/api";
-import { mapContribution, mapDuesSummary, type NotificationItem } from "@/lib/types";
-import type { Contribution, DuesSummary, WelfareCase, WelfareStatus } from "@osaja/types";
+import type { WelfareStatus } from "@osaja/types";
+
+const WELFARE_LABELS: Record<WelfareStatus, string> = {
+  pending: "Pending review",
+  approved: "Approved",
+  allocated: "Support allocated",
+  resolved: "Resolved",
+  archived: "Archived",
+};
 
 export default function DashboardPage() {
   const { member } = useAuth();
   const compact = member?.preferences?.compactDashboard ?? false;
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [dues, setDues] = useState<DuesSummary | null>(null);
-  const [unread, setUnread] = useState(0);
-  const [birthdays, setBirthdays] = useState(0);
-  const [activeVotes, setActiveVotes] = useState(0);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [recentPayments, setRecentPayments] = useState<Contribution[]>([]);
-  const [welfareCases, setWelfareCases] = useState<WelfareCase[]>([]);
-  const [voteResults, setVoteResults] = useState<PublishedVoteResult[]>([]);
+  const { data, isLoading, isFetching, error, refetch } = useMemberDashboard(Boolean(member), compact);
 
-  const WELFARE_LABELS: Record<WelfareStatus, string> = {
-    pending: "Pending review",
-    approved: "Approved",
-    allocated: "Support allocated",
-    resolved: "Resolved",
-    archived: "Archived",
-  };
-
-  const loadDashboard = () => {
-    if (!member) return;
-
-    setLoading(true);
-    setLoadError("");
-    const month = new Date().getMonth() + 1;
-    const notifLimit = compact ? 2 : 4;
-    const welfareLimit = compact ? 2 : 3;
-    const paymentLimit = compact ? 2 : 3;
-    const resultsLimit = compact ? 1 : 2;
-
-    Promise.all([
-      apiFetch<Record<string, unknown>>("/members/me/dues"),
-      apiFetch<{ count: number }>("/notifications/unread-count"),
-      apiFetch<NotificationItem[]>("/notifications?unread_only=false"),
-      apiFetch<{ day: number }[]>(`/dashboard/birthdays?month=${month}`),
-      apiFetch<Record<string, unknown>[]>("/voting"),
-      apiFetch<{ items: Record<string, unknown>[] }>(
-        `/members/me/contributions?page=1&page_size=${paymentLimit}`
-      ),
-      apiFetch<{ items: Record<string, unknown>[] }>(
-        `/welfare/me/cases?page=1&page_size=${welfareLimit}`
-      ),
-      apiFetch<PublishedVoteResult[]>("/voting/published-results"),
-    ])
-      .then(([duesRes, unreadRes, notifRes, birthdaysRes, votesRes, contribRes, welfareRes, resultsRes]) => {
-        setDues(mapDuesSummary(duesRes.data as Record<string, unknown>));
-        setUnread(unreadRes.data?.count ?? 0);
-        setNotifications((notifRes.data as NotificationItem[])?.slice(0, notifLimit) ?? []);
-        setBirthdays(Array.isArray(birthdaysRes.data) ? birthdaysRes.data.length : 0);
-        setActiveVotes(Array.isArray(votesRes.data) ? votesRes.data.length : 0);
-        const items = (contribRes.data?.items ?? []) as Record<string, unknown>[];
-        setRecentPayments(items.map(mapContribution));
-        const wItems = welfareRes.data?.items ?? [];
-        setWelfareCases(
-          wItems.map((raw) => ({
-            id: String(raw.id),
-            memberId: String(raw.member_id),
-            title: String(raw.title),
-            description: String(raw.description),
-            status: raw.status as WelfareStatus,
-            createdAt: String(raw.created_at),
-            updatedAt: String(raw.updated_at),
-          }))
-        );
-        setVoteResults((resultsRes.data ?? []).slice(0, resultsLimit));
-      })
-      .catch((err) => {
-        setLoadError(err instanceof Error ? err.message : "Failed to load dashboard");
-      })
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    loadDashboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [member, compact]);
-
-  if (loading) {
+  if (isLoading && !data) {
     return <DashboardPageSkeleton variant="light" />;
   }
+
+  const dues = data?.dues ?? null;
+  const unread = data?.unread ?? 0;
+  const notifications = data?.notifications ?? [];
+  const birthdays = data?.birthdays ?? 0;
+  const activeVotes = data?.activeVotes ?? 0;
+  const recentPayments = data?.recentPayments ?? [];
+  const welfareCases = data?.welfareCases ?? [];
+  const voteResults = data?.voteResults ?? [];
 
   const duesLabel =
     dues?.currentStatus === "paid"
@@ -118,10 +58,10 @@ export default function DashboardPage() {
         }
       />
 
-      {loadError ? (
+      {error ? (
         <Alert tone="error">
-          {loadError}{" "}
-          <button type="button" onClick={loadDashboard} className="font-semibold underline">
+          {error instanceof Error ? error.message : "Failed to load dashboard"}{" "}
+          <button type="button" onClick={() => refetch()} className="font-semibold underline">
             Retry
           </button>
         </Alert>
@@ -130,11 +70,11 @@ export default function DashboardPage() {
       {dues ? <DuesStatusBanner dues={dues} compact /> : null}
 
       <div
-        className={
+        className={`transition-opacity ${isFetching && data ? "opacity-90" : ""} ${
           compact
             ? "grid grid-cols-2 gap-2"
             : "grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4"
-        }
+        }`}
       >
         <StatCard
           label="Total contributions"
@@ -179,9 +119,7 @@ export default function DashboardPage() {
                       <NotificationTypeBadge type={n.type} />
                     </div>
                     <p className="truncate text-sm font-medium text-slate-800">{n.title}</p>
-                    {!compact ? (
-                      <p className="line-clamp-2 text-xs text-slate-500">{n.message}</p>
-                    ) : null}
+                    {!compact ? <p className="line-clamp-2 text-xs text-slate-500">{n.message}</p> : null}
                   </div>
                 </li>
               ))}
@@ -277,10 +215,7 @@ export default function DashboardPage() {
       ) : null}
 
       {birthdays > 0 && !compact ? (
-        <Link
-          href="/birthdays"
-          className="glass-card flex items-center gap-4 p-4 transition hover:shadow-lg sm:p-5"
-        >
+        <Link href="/birthdays" className="glass-card flex items-center gap-4 p-4 transition hover:shadow-lg sm:p-5">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
             <Cake className="h-6 w-6 text-amber-600" strokeWidth={1.75} />
           </div>

@@ -3,13 +3,15 @@
 import { ListRowsSkeleton } from "@osaja/ui";
 import { formatDate } from "@osaja/utils";
 import type { WelfareCase, WelfareStatus } from "@osaja/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HeartHandshake, Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert } from "@/components/ui";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { queryKeys } from "@/lib/query-keys";
 
 const STATUS_LABELS: Record<WelfareStatus, string> = {
   pending: "Pending review",
@@ -41,38 +43,28 @@ function mapCase(raw: Record<string, unknown>): WelfareCase {
 
 export default function WelfarePage() {
   const { member } = useAuth();
-  const [cases, setCases] = useState<WelfareCase[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const casesQuery = useQuery({
+    queryKey: queryKeys.welfareMine,
+    enabled: Boolean(member),
+    queryFn: async () => {
       const res = await apiFetch<{ items: Record<string, unknown>[] }>("/welfare/me/cases?page=1&page_size=50");
-      setCases((res.data?.items ?? []).map(mapCase));
-    } catch {
-      setCases([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return (res.data?.items ?? []).map(mapCase);
+    },
+  });
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const cases: WelfareCase[] = casesQuery.data ?? [];
+  const loading = casesQuery.isLoading && !casesQuery.data;
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!member) return;
-    setBusy(true);
-    setError("");
-    setMessage("");
-    try {
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!member) throw new Error("Not signed in");
       await apiFetch("/welfare/cases", {
         method: "POST",
         body: JSON.stringify({
@@ -81,17 +73,30 @@ export default function WelfarePage() {
           description: description.trim(),
         }),
       });
+    },
+    onSuccess: async () => {
       setMessage("Your welfare request has been submitted. The executive team will review it.");
       setTitle("");
       setDescription("");
       setShowForm(false);
-      await load();
-    } catch (err) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.welfareMine }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard }),
+      ]);
+    },
+    onError: (err) => {
       setError(err instanceof Error ? err.message : "Could not submit request");
-    } finally {
-      setBusy(false);
-    }
+    },
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    submitMutation.mutate();
   };
+
+  const busy = submitMutation.isPending;
 
   return (
     <div className="space-y-6">

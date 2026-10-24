@@ -50,9 +50,12 @@ export function MobileShell({
 
   useEffect(() => {
     setMoreOpen(false);
-    window.scrollTo(0, 0);
+    // Soft scroll reset — avoid window jump that feels like a full reload
     const main = document.getElementById("main-content");
     if (main) main.scrollTop = 0;
+    else if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+    }
   }, [pathname]);
 
   useEffect(() => {
