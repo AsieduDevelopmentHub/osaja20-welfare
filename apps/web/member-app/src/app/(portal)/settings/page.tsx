@@ -1,6 +1,6 @@
 "use client";
 
-import type { Member, MemberPreferences } from "@osaja/types";
+import type { MemberPreferences } from "@osaja/types";
 import { DEFAULT_MEMBER_PREFERENCES } from "@/lib/profile";
 import { Loader2, Save, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -3,7 +3,6 @@
 import type { Member } from "@osaja/types";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import { queryKeys } from "@/lib/query-keys";
 import { mapMember, type DashboardStats, type MemberListResponse } from "@/lib/types";
 
 export function useAdminDashboard(enabled: boolean) {

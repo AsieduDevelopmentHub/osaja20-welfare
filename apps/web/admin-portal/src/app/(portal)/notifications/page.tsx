@@ -96,53 +96,52 @@ export default function AdminNotificationsPage() {
         <EmptyState icon={Bell} title="No notifications yet" />
       ) : (
         <div className="admin-panel divide-y divide-white/10">
-          {
-            {items.map((n) => (
-              <div
-                key={n.id}
-                className={`flex items-start gap-2 px-4 py-4 sm:px-6 ${!n.read ? "bg-white/5" : ""}`}
+          {items.map((n) => (
+            <div
+              key={n.id}
+              className={`flex items-start gap-2 px-4 py-4 sm:px-6 ${!n.read ? "bg-white/5" : ""}`}
+            >
+              <button
+                type="button"
+                onClick={() => !n.read && markRead(n.id)}
+                className="min-w-0 flex-1 text-left transition hover:opacity-90"
               >
-                <button
-                  type="button"
-                  onClick={() => !n.read && markRead(n.id)}
-                  className="min-w-0 flex-1 text-left transition hover:opacity-90"
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-slate-600" : "bg-brand-gold"}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1.5">
-                        <NotificationTypeBadge type={n.type} />
-                      </div>
-                      <p className="font-medium text-white">{n.title}</p>
-                      <p className="mt-1 text-sm text-slate-400">{n.message}</p>
-                      {n.type === "support" ? (
-                        <Link href="/inquiries" className="mt-2 inline-block text-xs font-semibold text-brand-gold hover:underline">
-                          Open inquiries →
-                        </Link>
-                      ) : null}
-                      {n.type === "payment" ? (
-                        <Link
-                          href="/contributions"
-                          className="mt-2 inline-block text-xs font-semibold text-brand-gold hover:underline"
-                        >
-                          View contributions →
-                        </Link>
-                      ) : null}
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? "bg-slate-600" : "bg-brand-gold"}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1.5">
+                      <NotificationTypeBadge type={n.type} />
                     </div>
+                    <p className="font-medium text-white">{n.title}</p>
+                    <p className="mt-1 text-sm text-slate-400">{n.message}</p>
+                    {n.type === "support" ? (
+                      <Link href="/inquiries" className="mt-2 inline-block text-xs font-semibold text-brand-gold hover:underline">
+                        Open inquiries →
+                      </Link>
+                    ) : null}
+                    {n.type === "payment" ? (
+                      <Link
+                        href="/contributions"
+                        className="mt-2 inline-block text-xs font-semibold text-brand-gold hover:underline"
+                      >
+                        View contributions →
+                      </Link>
+                    ) : null}
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteOne(n.id)}
-                  aria-label="Delete notification"
-                  className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-white/10 hover:text-red-400"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteOne(n.id)}
+                aria-label="Delete notification"
+                className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-white/10 hover:text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

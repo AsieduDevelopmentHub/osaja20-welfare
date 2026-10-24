@@ -8,7 +8,6 @@ import { AdminHeader } from "@/components/AdminHeader";
 import { apiFetch, apiUpload } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { resolveAvatarUrl } from "@/lib/avatars";
-import { mapMember } from "@/lib/types";
 
 export default function AdminSelfProfilePage() {
   const { member, refresh } = useAuth();
