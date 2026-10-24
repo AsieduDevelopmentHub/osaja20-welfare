@@ -13,7 +13,7 @@ concurrency:
 jobs:
   quality:
     name: Lint, typecheck & build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +43,7 @@ jobs:
 
   test:
     name: Unit & API tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -80,7 +80,7 @@ jobs:
 
   e2e:
     name: Playwright E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [quality]
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
 
   audit:
     name: Dependency audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
