@@ -13,7 +13,66 @@
 npx pnpm@9.15.0 install
 ```
 
-## 2. Start infrastructure (optional for local dev)
+## 2. Set up and run all apps locally (no Docker required)
+
+From the repository root:
+
+```bash
+pnpm setup:local
+pnpm dev:all
+```
+
+`setup:local` creates `apps/api/.venv`, installs the API requirements, and copies
+local environment examples only where a local env file does not already exist.
+The default API database is SQLite, local auth is enabled, and the background
+Redis worker is disabled. `dev:all` starts the API and all four web apps:
+
+| App | URL |
+|-----|-----|
+| Member portal | http://localhost:3000 |
+| Admin dashboard | http://localhost:3001 |
+| Public landing site | http://localhost:3002 |
+| SMS portal | http://localhost:3003 |
+| API docs | http://localhost:8000/docs |
+
+All five ports must be free. Press Ctrl+C to stop all apps. Optional integrations
+such as Supabase, Paystack, Arkesel, and SMTP still require their own credentials.
+
+## Bra Fie Night ticketing
+
+The landing page and API include the Bra Fie Night 2027 ticket flow. On first API
+startup, the event and its Early Bird (GH₵90), Single (GH₵100), and Double
+(GH₵180, two admissions) categories are created if they do not already exist.
+Executives can manage event and category configuration through the ticket API;
+administrators can also manage category prices and inventory in the admin portal.
+
+Ticket purchases use the existing server-side Paystack client. To enable checkout:
+
+1. Configure `PAYSTACK_SECRET_KEY` in `apps/api/.env` (test key for development).
+2. Set `TICKET_CALLBACK_URL` to the public landing URL plus `/tickets/complete`.
+3. Configure the Paystack webhook to call `/api/v1/payments/webhook`.
+4. Generate and set a stable `TICKET_TOKEN_ENCRYPTION_KEY` using the command in
+   `apps/api/.env.example`; do not rotate it while existing tickets must remain
+   retrievable.
+5. Apply the API database migrations during deployment.
+
+Without Paystack credentials, checkout fails explicitly; tickets are never issued
+from a browser-only success message. The purchaser can retrieve issued QR tickets
+from the payment-return page using the order reference and purchaser email. Ticket
+tokens are random, hashed for lookup, and encrypted at rest. The same QR code is
+used for both Double admissions.
+
+The admin portal permits executive/administrator accounts to check in tickets
+online at Gate 1, Gate 2, or Gate 3. Admission increments are atomic, and each
+record includes the gate, browser device ID, staff account, and timestamp. The
+scanner fails closed during network errors; it does not queue offline admissions.
+Gate/staff assignment, email/SMS delivery, USSD purchases, refunds, and a shared
+offline admission service are not yet implemented. The event page uses the venue
+shown in the supplied video: Candix Royal Hotel, Amanfrom Sawmill Junction,
+opposite Seventh Day Adventist (SDA) School. Configure the early-bird sales
+cutoff once organizers confirm it.
+
+## 3. Start infrastructure (optional for local dev)
 
 The API defaults to **SQLite** — no Docker required for local development.
 
@@ -30,7 +89,7 @@ Then set in `apps/api/.env`:
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/osaja_welfare
 ```
 
-## 3. Set up API virtual environment (local, not global)
+## 4. Set up API virtual environment (local, not global)
 
 **Windows (PowerShell):**
 
@@ -47,7 +106,7 @@ chmod +x scripts/setup-api-venv.sh
 
 This creates `apps/api/.venv` and installs all Python dependencies inside it.
 
-## 4. Configure API
+## 5. Configure API
 
 ```bash
 cp apps/api/.env.example apps/api/.env
@@ -75,7 +134,7 @@ Include the SMS portal origin in CORS for local multi-app work:
 CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003
 ```
 
-## 5. Run database migrations (optional)
+## 6. Run database migrations (optional)
 
 With venv activated:
 
@@ -95,7 +154,7 @@ alembic stamp head             # mark migrations applied
 
 Do not run `alembic upgrade head` on an empty database first — later revisions expect core tables such as `members` to already exist.
 
-## 6. Seed admin account (optional)
+## 7. Seed admin account (optional)
 
 ```bash
 cd apps/api
@@ -105,7 +164,7 @@ python scripts/seed_admin.py
 
 Default admin: `admin@osaja20.local` / `Admin@OSAJA20`
 
-## 7. Run API
+## 8. Run API
 
 **Windows:**
 
@@ -124,7 +183,7 @@ uvicorn v1.main:app --reload
 
 API docs: http://localhost:8000/docs
 
-## 8. Run web apps
+## 9. Run web apps
 
 ### Web environment (`.env.local`)
 

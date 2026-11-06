@@ -11,6 +11,7 @@ from v1.core.models import Member
 from v1.core.paystack_client import verify_webhook_signature
 from v1.core.payment_service import complete_payment_if_successful, handle_paystack_webhook, initialize_dues_payment
 from v1.core.schemas import ApiResponse, PaymentInitialize
+from v1.modules.tickets.service import handle_ticket_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +79,10 @@ async def paystack_webhook(
 
     event = str(payload.get("event", ""))
     data = payload.get("data") or {}
-    result = await handle_paystack_webhook(db, event, data)
+    ticket_handled = await handle_ticket_webhook(db, event, data)
+    result = None if ticket_handled else await handle_paystack_webhook(db, event, data)
     await db.commit()
 
     if result:
         logger.info("Webhook recorded payment %s", result.get("reference"))
-    return ApiResponse(success=True, message="Webhook processed")
+    return ApiResponse(success=True, message="Ticket payment webhook processed" if ticket_handled else "Webhook processed")

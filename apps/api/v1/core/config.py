@@ -61,6 +61,8 @@ class Settings(BaseSettings):
 
     # Member portal base URL (password reset redirect fallback)
     member_portal_url: str = "http://localhost:3000"
+    ticket_callback_url: str = "http://localhost:3002/tickets/complete"
+    ticket_token_encryption_key: str = ""
 
     # Paystack (online dues payments)
     paystack_secret_key: str = ""

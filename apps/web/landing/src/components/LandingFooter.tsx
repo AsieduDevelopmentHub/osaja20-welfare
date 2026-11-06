@@ -5,10 +5,11 @@ import { aos } from "@/lib/aos";
 import { portalUrls } from "@/lib/env";
 
 const FOOTER_LINKS = [
-  { href: "#vision", label: "Vision" },
-  { href: "#dream", label: "Our dream" },
-  { href: "#pillars", label: "What we do" },
-  { href: "#gallery", label: "Gallery" },
+  { href: "/programs/bra-fie-night-2027", label: "Bra Fie Night" },
+  { href: "/#vision", label: "Vision" },
+  { href: "/#dream", label: "Our dream" },
+  { href: "/#pillars", label: "What we do" },
+  { href: "/#gallery", label: "Gallery" },
 ] as const;
 
 export function LandingFooter() {
@@ -37,9 +38,9 @@ export function LandingFooter() {
             <ul className="mt-4 space-y-2 text-sm">
               {FOOTER_LINKS.map((link) => (
                 <li key={link.href}>
-                  <a href={link.href} className="transition hover:text-white">
+                  <Link href={link.href} className="transition hover:text-white">
                     {link.label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

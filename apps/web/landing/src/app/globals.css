@@ -19,6 +19,30 @@ html {
   }
 }
 
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .ticket-print-area,
+  .ticket-print-area * {
+    visibility: visible !important;
+  }
+
+  .ticket-print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: white;
+  }
+
+  .ticket-print-area article {
+    break-inside: avoid;
+    border: 1px solid #d1d5db;
+    box-shadow: none;
+  }
+}
+
 body {
   color: var(--foreground);
   background:

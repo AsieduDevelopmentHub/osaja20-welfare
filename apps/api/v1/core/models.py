@@ -6,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -299,6 +300,118 @@ class PaymentTransaction(Base):
     contribution_ids_json: Mapped[list] = mapped_column("contribution_ids", JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TicketEvent(Base):
+    __tablename__ = "ticket_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    venue: Mapped[str] = mapped_column(String(300), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    sales_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sales_end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TicketCategory(Base):
+    __tablename__ = "ticket_categories"
+    __table_args__ = (
+        UniqueConstraint("event_id", "name", name="uq_ticket_category_event_name"),
+        Index("idx_ticket_category_event_active", "event_id", "is_active"),
+        CheckConstraint("price > 0", name="ck_ticket_category_price_positive"),
+        CheckConstraint("admissions_per_ticket > 0", name="ck_ticket_category_admissions_positive"),
+        CheckConstraint(
+            "inventory_limit IS NULL OR inventory_limit >= sold_quantity + reserved_quantity",
+            name="ck_ticket_category_inventory",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ticket_events.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    admissions_per_ticket: Mapped[int] = mapped_column(default=1, nullable=False)
+    inventory_limit: Mapped[int | None] = mapped_column(nullable=True)
+    sold_quantity: Mapped[int] = mapped_column(default=0, nullable=False)
+    reserved_quantity: Mapped[int] = mapped_column(default=0, nullable=False)
+    sales_start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sales_end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TicketOrder(Base):
+    __tablename__ = "ticket_orders"
+    __table_args__ = (
+        UniqueConstraint("reference", name="uq_ticket_order_reference"),
+        CheckConstraint("quantity > 0", name="ck_ticket_order_quantity_positive"),
+        CheckConstraint("amount > 0", name="ck_ticket_order_amount_positive"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_events.id"), nullable=False, index=True)
+    category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_categories.id"), nullable=False)
+    purchaser_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    purchaser_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    purchaser_phone: Mapped[str] = mapped_column(String(30), nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="GHS", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False, index=True)
+    reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    authorization_url: Mapped[str | None] = mapped_column(String(500))
+    provider_reference: Mapped[str | None] = mapped_column(String(100))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AdmissionTicket(Base):
+    __tablename__ = "admission_tickets"
+    __table_args__ = (
+        CheckConstraint("admission_entitlement > 0", name="ck_admission_ticket_entitlement_positive"),
+        CheckConstraint(
+            "admissions_used >= 0 AND admissions_used <= admission_entitlement",
+            name="ck_admission_ticket_usage",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ticket_orders.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_categories.id"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    admission_entitlement: Mapped[int] = mapped_column(nullable=False)
+    admissions_used: Mapped[int] = mapped_column(default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="valid", nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TicketAdmission(Base):
+    __tablename__ = "ticket_admissions"
+    __table_args__ = (
+        Index("idx_ticket_admission_ticket_time", "ticket_id", "created_at"),
+        CheckConstraint("admission_count > 0", name="ck_ticket_admission_count_positive"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    ticket_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("admission_tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    admission_count: Mapped[int] = mapped_column(nullable=False)
+    gate: Mapped[str] = mapped_column(String(100), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    staff_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class PlatformSetting(Base):

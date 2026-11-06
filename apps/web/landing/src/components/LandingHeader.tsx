@@ -8,11 +8,12 @@ import { useEffect, useState } from "react";
 import { portalUrls } from "@/lib/env";
 
 const NAV = [
-  { href: "#vision", label: "Vision" },
-  { href: "#dream", label: "Our dream" },
-  { href: "#pillars", label: "What we do" },
-  { href: "#gallery", label: "Gallery" },
-  { href: "#join", label: "Join us" },
+  { href: "/programs/bra-fie-night-2027", label: "Bra Fie Night" },
+  { href: "/#vision", label: "Vision" },
+  { href: "/#dream", label: "Our dream" },
+  { href: "/#pillars", label: "What we do" },
+  { href: "/#gallery", label: "Gallery" },
+  { href: "/#join", label: "Join us" },
 ] as const;
 
 export function LandingHeader() {
@@ -44,7 +45,7 @@ export function LandingHeader() {
       }`}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <a href="#" className="flex min-w-0 items-center gap-3">
+        <Link href="/" className="flex min-w-0 items-center gap-3">
           <BrandLogo src={BRAND_PATHS.welfareLogo} alt={`${BRAND_COPY.name} logo`} size="sm" priority />
           <div className="min-w-0">
             <p
@@ -62,11 +63,11 @@ export function LandingHeader() {
               {BRAND_COPY.tagline}
             </p>
           </div>
-        </a>
+        </Link>
 
         <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
           {NAV.map((item) => (
-            <a
+            <Link
               key={item.href}
               href={item.href}
               className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -76,7 +77,7 @@ export function LandingHeader() {
               }`}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
           <Link href={portalUrls.member} className="btn-gold ml-2 !py-2.5">
             Member portal
@@ -100,14 +101,14 @@ export function LandingHeader() {
         <div className="border-t border-brand-navy/10 bg-white px-4 py-4 shadow-lg md:hidden">
           <nav className="flex flex-col gap-1" aria-label="Mobile">
             {NAV.map((item) => (
-              <a
+              <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className="rounded-xl px-3 py-3 text-sm font-medium text-brand-navy hover:bg-brand-navy/5"
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
             <Link
               href={portalUrls.member}

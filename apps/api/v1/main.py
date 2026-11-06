@@ -28,6 +28,8 @@ from v1.modules.push.router import router as push_router
 from v1.modules.settings.router import router as settings_router
 from v1.modules.sms.router import router as sms_router
 from v1.modules.support.router import router as support_router
+from v1.modules.tickets.router import router as tickets_router
+from v1.modules.tickets.service import seed_default_event
 from v1.modules.uploads.router import router as uploads_router
 from v1.modules.voting.router import router as voting_router
 from v1.modules.welfare.router import router as welfare_router
@@ -43,6 +45,7 @@ async def lifespan(app: FastAPI):
         (Path(settings.uploads_dir) / "avatars").mkdir(parents=True, exist_ok=True)
     await init_database()
     async with async_session() as session:
+        await seed_default_event(session)
         await warm_indexes(session)
         await session.commit()
 
@@ -109,6 +112,7 @@ app.include_router(push_router, prefix=API_PREFIX)
 app.include_router(settings_router, prefix=API_PREFIX)
 app.include_router(sms_router, prefix=API_PREFIX)
 app.include_router(support_router, prefix=API_PREFIX)
+app.include_router(tickets_router, prefix=API_PREFIX)
 app.include_router(uploads_router)
 
 

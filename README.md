@@ -46,21 +46,26 @@ The platform uses purpose-built algorithms for robustness:
 
 ```bash
 npx pnpm@9.15.0 install
-cd infrastructure/docker && docker compose up -d postgres redis
 
-# API — uses local venv (not global pip)
-.\scripts\setup-api-venv.ps1    # Windows
-./scripts/setup-api-venv.sh     # macOS/Linux
-.\scripts\run-api.ps1
+# One-time local setup: creates apps/api/.venv and copies local env examples
+pnpm setup:local
 
-npx pnpm dev:member   # http://localhost:3000
-npx pnpm dev:admin    # http://localhost:3001
-npx pnpm dev:landing  # http://localhost:3002
-npx pnpm dev:sms      # http://localhost:3003
+# Starts the API and all four web apps (SQLite; Docker is not required)
+pnpm dev:all
 ```
 
-See [docs/setup/Installation.md](docs/setup/Installation.md) for full setup instructions.  
+| App | Local URL |
+|-----|-----------|
+| Member portal | http://localhost:3000 |
+| Admin dashboard | http://localhost:3001 |
+| Public landing site | http://localhost:3002 |
+| SMS portal | http://localhost:3003 |
+| API / interactive docs | http://localhost:8000/docs |
+
+`pnpm dev:all` requires these ports to be free. Press Ctrl+C to stop all processes.
+PostgreSQL and Redis are optional; see [docs/setup/Installation.md](docs/setup/Installation.md) for the Docker-based option and full setup instructions.
 SMS portal product spec: [docs/sms/sms_portal.md](docs/sms/sms_portal.md).
+Bra Fie Night ticketing setup and operational limits: [docs/setup/Installation.md](docs/setup/Installation.md#bra-fie-night-ticketing).
 
 ## API Endpoints
 

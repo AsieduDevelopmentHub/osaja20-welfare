@@ -6,6 +6,11 @@ const apiProxyTarget = process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8000";
 const unstableDevCache =
   process.platform === "win32" || process.cwd().includes("OneDrive");
 
+const adminSecurityHeaders = [
+  ...nextSecurityHeaders.filter((header) => header.key !== "Permissions-Policy"),
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+];
+
 const nextConfig: NextConfig = {
   transpilePackages: ["@osaja/types", "@osaja/utils", "@osaja/config", "@osaja/ui"],
   experimental: {
@@ -37,7 +42,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/(.*)",
-        headers: [...nextSecurityHeaders],
+        headers: adminSecurityHeaders,
       },
     ];
   },

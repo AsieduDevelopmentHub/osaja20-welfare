@@ -1,6 +1,6 @@
 import { BRAND_COPY, BRAND_PATHS, LANDING_COPY } from "@osaja/config";
 import { BrandLogo } from "@osaja/ui";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Ticket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { aos } from "@/lib/aos";
@@ -49,6 +49,10 @@ export function HeroSection() {
           </p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link href="/programs/bra-fie-night-2027" className="btn-gold">
+              <Ticket className="h-4 w-4" />
+              Bra Fie Night tickets
+            </Link>
             <Link href={portalUrls.member} className="btn-gold">
               {hero.ctaMember}
               <ArrowRight className="h-4 w-4" />
