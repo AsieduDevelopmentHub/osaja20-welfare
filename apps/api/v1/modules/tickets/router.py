@@ -2,8 +2,9 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from v1.core.auth.dependencies import require_executive
@@ -23,14 +24,19 @@ from v1.modules.tickets.schemas import (
     TicketEventView,
     TicketEventCreate,
     TicketEventUpdate,
+    TicketManualPaymentDecision,
+    TicketManualPaymentSubmit,
     TicketOrderCreate,
     TicketOrderRetrieve,
+    TicketOrderStatusRequest,
     TicketScanRequest,
 )
 from v1.modules.tickets.service import (
     EVENT_SLUG,
     VALID_GATES,
+    available_ticket_payment_options,
     category_view,
+    finalize_ticket_order,
     initialize_ticket_order,
     release_expired_orders,
     retrieve_order_tickets,
@@ -96,6 +102,7 @@ async def get_public_event(
             venue=event.venue,
             starts_at=event.starts_at,
             categories=categories,
+            payment_options=await available_ticket_payment_options(db),
         ).model_dump(mode="json"),
     )
 
@@ -126,6 +133,23 @@ async def create_ticket_order(
     ):
         raise HTTPException(status_code=410, detail="Ticket sales are closed")
 
+    payment_options = await available_ticket_payment_options(db)
+    if not payment_options:
+        raise HTTPException(
+            status_code=503,
+            detail="Ticket payments are not configured. Please contact the organizers.",
+        )
+    requested_method = payload.payment_method or str(payment_options[0]["method"])
+    payment_option = next(
+        (option for option in payment_options if option["method"] == requested_method),
+        None,
+    )
+    if not payment_option:
+        raise HTTPException(
+            status_code=409,
+            detail="That ticket payment method is not currently enabled.",
+        )
+
     inventory = await db.execute(
         update(TicketCategory)
         .where(
@@ -152,10 +176,20 @@ async def create_ticket_order(
             purchaser_name=payload.purchaser_name,
             purchaser_email=str(payload.purchaser_email),
             purchaser_phone=payload.purchaser_phone,
+            payment_method=requested_method,
+            payment_details=payment_option if requested_method != "paystack" else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return ApiResponse(success=True, data=order, message="Continue to Paystack to pay securely")
+    return ApiResponse(
+        success=True,
+        data=order,
+        message=(
+            "Continue to Paystack to pay securely"
+            if requested_method == "paystack"
+            else "Order reserved. Complete your transfer and submit its reference."
+        ),
+    )
 
 
 @router.post("/orders/{reference}/verify", response_model=ApiResponse)
@@ -191,6 +225,87 @@ async def retrieve_tickets(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return ApiResponse(success=True, data={"tickets": tickets})
+
+
+@router.post("/orders/{reference}/submit-payment", response_model=ApiResponse)
+async def submit_manual_ticket_payment(
+    reference: str,
+    payload: TicketManualPaymentSubmit,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    order_result = await db.execute(
+        select(TicketOrder).where(TicketOrder.reference == reference).with_for_update()
+    )
+    order = order_result.scalar_one_or_none()
+    if not order or order.purchaser_email != str(payload.purchaser_email).strip().lower():
+        raise HTTPException(status_code=404, detail="Ticket order not found for this email")
+    if order.payment_method not in {"momo", "bank"}:
+        raise HTTPException(status_code=409, detail="This order does not use a manual payment method")
+    if order.status != "awaiting_payment":
+        raise HTTPException(status_code=409, detail="This order is no longer accepting payment references")
+    if _as_utc(order.expires_at) <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="This ticket reservation has expired")
+
+    transaction_reference = payload.transaction_reference.strip().upper()
+    duplicate = await db.execute(
+        select(TicketOrder.id).where(
+            TicketOrder.manual_payment_reference == transaction_reference
+        )
+    )
+    if duplicate.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="This payment reference has already been submitted")
+
+    order.manual_payment_reference = transaction_reference
+    order.manual_payment_sender_name = payload.sender_name
+    order.payment_submitted_at = datetime.now(timezone.utc)
+    order.status = "payment_submitted"
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This payment reference has already been submitted",
+        ) from exc
+
+    return ApiResponse(
+        success=True,
+        data={"reference": order.reference, "status": order.status},
+        message="Payment reference received. Tickets will be issued after staff confirmation.",
+    )
+
+
+@router.post("/orders/{reference}/status", response_model=ApiResponse)
+async def get_ticket_order_status(
+    reference: str,
+    payload: TicketOrderStatusRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await release_expired_orders(db)
+    result = await db.execute(
+        select(TicketOrder).where(
+            TicketOrder.reference == reference,
+            TicketOrder.purchaser_email == str(payload.purchaser_email).strip().lower(),
+        )
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ticket order not found for this email")
+    return ApiResponse(
+        success=True,
+        data={
+            "reference": order.reference,
+            "status": order.status,
+            "payment_method": order.payment_method,
+            "payment_details": order.payment_details,
+            "amount": order.amount,
+            "currency": order.currency,
+            "quantity": order.quantity,
+            "expires_at": _as_utc(order.expires_at),
+            "payment_submitted_at": order.payment_submitted_at,
+            "review_note": order.review_note,
+        },
+    )
 
 
 @router.post("/scan", response_model=ApiResponse)
@@ -307,6 +422,9 @@ async def _admission_history(db: AsyncSession, ticket_id: UUID) -> list[dict]:
 async def ticket_admin_overview(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[Member, Depends(require_executive)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 10,
+    search: Annotated[str, Query(max_length=200)] = "",
 ):
     await release_expired_orders(db)
     event_result = await db.execute(select(TicketEvent).where(TicketEvent.slug == EVENT_SLUG))
@@ -318,13 +436,30 @@ async def ticket_admin_overview(
         select(TicketCategory).where(TicketCategory.event_id == event.id).order_by(TicketCategory.price)
     )
     categories = [category_view(category) for category in categories_result.scalars()]
+    order_filter = [TicketOrder.event_id == event.id]
+    if search.strip():
+        order_filter.append(TicketOrder.purchaser_name.icontains(search.strip(), autoescape=True))
+    total_orders = (await db.execute(select(func.count(TicketOrder.id)).where(*order_filter))).scalar_one()
     order_result = await db.execute(
         select(TicketOrder, TicketCategory.name)
         .join(TicketCategory, TicketCategory.id == TicketOrder.category_id)
-        .where(TicketOrder.event_id == event.id)
-        .order_by(TicketOrder.created_at.desc())
-        .limit(100)
+        .where(*order_filter)
+        .order_by(TicketOrder.created_at.desc(), TicketOrder.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
+    order_rows = order_result.all()
+    order_ids = [order.id for order, _ in order_rows]
+    ticket_numbers: dict[UUID, list[str]] = {}
+    if order_ids:
+        ticket_result = await db.execute(
+            select(AdmissionTicket.order_id, AdmissionTicket.ticket_number)
+            .where(AdmissionTicket.order_id.in_(order_ids))
+            .order_by(AdmissionTicket.created_at, AdmissionTicket.id)
+        )
+        for order_id, ticket_number in ticket_result:
+            if ticket_number:
+                ticket_numbers.setdefault(order_id, []).append(ticket_number)
     orders = [
         {
             "reference": order.reference,
@@ -334,9 +469,15 @@ async def ticket_admin_overview(
             "quantity": order.quantity,
             "amount": order.amount,
             "status": order.status,
+            "payment_method": order.payment_method,
+            "manual_payment_reference": order.manual_payment_reference,
+            "manual_payment_phone": order.manual_payment_phone,
+            "manual_payment_sender_name": order.manual_payment_sender_name,
+            "ticket_numbers": ticket_numbers.get(order.id, []),
+            "payment_submitted_at": order.payment_submitted_at,
             "created_at": order.created_at,
         }
-        for order, category_name in order_result
+        for order, category_name in order_rows
     ]
     stats_result = await db.execute(
         select(
@@ -372,9 +513,75 @@ async def ticket_admin_overview(
             },
             "categories": categories,
             "orders": orders,
+            "pagination": {"page": page, "page_size": page_size, "total": total_orders},
             "stats": stats,
         },
     )
+
+
+@router.post("/admin/orders/{reference}/confirm", response_model=ApiResponse)
+async def confirm_manual_ticket_payment(
+    reference: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    staff: Annotated[Member, Depends(require_executive)],
+):
+    result = await db.execute(
+        select(TicketOrder).where(TicketOrder.reference == reference).with_for_update()
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ticket order not found")
+    if order.payment_method not in {"momo", "bank"} or order.status != "payment_submitted":
+        raise HTTPException(status_code=409, detail="This order is not awaiting manual payment confirmation")
+
+    status = await finalize_ticket_order(
+        db,
+        order.reference,
+        amount_pesewas=int(order.amount * 100),
+        currency=order.currency,
+        provider_reference=order.manual_payment_reference,
+    )
+    if status != "paid":
+        raise HTTPException(status_code=409, detail=f"Order could not be confirmed (status: {status})")
+    order.reviewed_by = staff.id
+    order.reviewed_at = datetime.now(timezone.utc)
+    order.review_note = None
+    await db.flush()
+    return ApiResponse(success=True, data={"reference": order.reference, "status": "paid"}, message="Payment confirmed and tickets issued")
+
+
+@router.post("/admin/orders/{reference}/reject", response_model=ApiResponse)
+async def reject_manual_ticket_payment(
+    reference: str,
+    payload: TicketManualPaymentDecision,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    staff: Annotated[Member, Depends(require_executive)],
+):
+    result = await db.execute(
+        select(TicketOrder).where(TicketOrder.reference == reference).with_for_update()
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ticket order not found")
+    if order.payment_method not in {"momo", "bank"} or order.status != "payment_submitted":
+        raise HTTPException(status_code=409, detail="This order is not awaiting manual payment confirmation")
+
+    released = await db.execute(
+        update(TicketCategory)
+        .where(
+            TicketCategory.id == order.category_id,
+            TicketCategory.reserved_quantity >= order.quantity,
+        )
+        .values(reserved_quantity=TicketCategory.reserved_quantity - order.quantity)
+    )
+    if released.rowcount != 1:
+        raise HTTPException(status_code=409, detail="Reserved ticket inventory could not be reconciled")
+    order.status = "rejected"
+    order.reviewed_by = staff.id
+    order.reviewed_at = datetime.now(timezone.utc)
+    order.review_note = (payload.note or "Payment reference could not be verified").strip()
+    await db.flush()
+    return ApiResponse(success=True, data={"reference": order.reference, "status": "rejected"}, message="Payment submission rejected")
 
 
 @router.post("/admin/events", response_model=ApiResponse)

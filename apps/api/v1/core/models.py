@@ -351,6 +351,7 @@ class TicketOrder(Base):
     __tablename__ = "ticket_orders"
     __table_args__ = (
         UniqueConstraint("reference", name="uq_ticket_order_reference"),
+        UniqueConstraint("manual_payment_reference", name="uq_ticket_manual_payment_reference"),
         CheckConstraint("quantity > 0", name="ck_ticket_order_quantity_positive"),
         CheckConstraint("amount > 0", name="ck_ticket_order_amount_positive"),
     )
@@ -366,6 +367,15 @@ class TicketOrder(Base):
     currency: Mapped[str] = mapped_column(String(3), default="GHS", nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False, index=True)
     reference: Mapped[str] = mapped_column(String(100), nullable=False)
+    payment_method: Mapped[str] = mapped_column(String(20), default="paystack", nullable=False)
+    payment_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    manual_payment_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    manual_payment_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    manual_payment_sender_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    payment_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("members.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     authorization_url: Mapped[str | None] = mapped_column(String(500))
     provider_reference: Mapped[str | None] = mapped_column(String(100))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -390,6 +400,7 @@ class AdmissionTicket(Base):
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_categories.id"), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    ticket_number: Mapped[str | None] = mapped_column(String(16), nullable=True, unique=True, index=True)
     admission_entitlement: Mapped[int] = mapped_column(nullable=False)
     admissions_used: Mapped[int] = mapped_column(default=0, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="valid", nullable=False, index=True)

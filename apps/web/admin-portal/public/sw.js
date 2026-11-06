@@ -1,6 +1,6 @@
 /* OSAJA'20 Admin service worker — offline fallback */
 
-const CACHE_VERSION = "osaja-admin-v3";
+const CACHE_VERSION = "osaja-admin-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 
@@ -88,6 +88,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(networkFirstStatic(request));
+    return;
+  }
+
   if (isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirst(request));
     return;
@@ -128,6 +133,19 @@ async function cacheFirst(request) {
     return response;
   } catch {
     return (await caches.match("/offline.html")) || offlineResponse();
+  }
+}
+
+async function networkFirstStatic(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(STATIC_CACHE);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return (await caches.match(request)) || Response.error();
   }
 }
 

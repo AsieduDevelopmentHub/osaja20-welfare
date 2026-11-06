@@ -109,58 +109,42 @@ export const LANDING_COPY = {
 } as const;
 
 /**
- * Gallery entries — replace `image` paths with real photos in `apps/web/landing/public/gallery/`.
+ * Gallery entries — real African community photos from Pexels.
  * Featured items appear larger in the grid.
  */
 export const GALLERY_ITEMS: GalleryItem[] = [
   {
-    id: "outreach-2025",
-    title: "Community outreach",
-    description: "Batch members supporting local families with supplies and encouragement.",
-    date: "March 2025",
-    image: "/gallery/outreach.svg",
+    id: "community-gathering",
+    title: "Community gathering",
+    description: "An elder leading a community gathering — wisdom, guidance, and collective listening.",
+    date: "2024",
+    image: "/gallery/community-gathering.jpg",
+    category: "community",
+    featured: true,
+  },
+  {
+    id: "school-outreach",
+    title: "School community",
+    description: "Children gathered at a school — the foundation of education and hope for tomorrow.",
+    date: "2024",
+    image: "/gallery/school-community.jpg",
     category: "outreach",
     featured: true,
   },
   {
-    id: "welfare-support",
-    title: "Welfare support drive",
-    description: "Executive team coordinating assistance for a member in need.",
-    date: "January 2025",
-    image: "/gallery/welfare.svg",
-    category: "welfare",
-    featured: true,
-  },
-  {
-    id: "batch-reunion",
-    title: "Batch reunion",
-    description: "Former classmates reunited — laughter, memories, and renewed bonds.",
-    date: "December 2024",
-    image: "/gallery/reunion.svg",
-    category: "reunion",
-  },
-  {
-    id: "school-visit",
-    title: "School visit",
-    description: "Giving back to Asuofua D/A JHS — mentoring current students.",
-    date: "November 2024",
-    image: "/gallery/community.svg",
-    category: "community",
-  },
-  {
-    id: "end-of-year",
-    title: "End-of-year celebration",
-    description: "Honouring members and recognising contributions to the welfare fund.",
-    date: "December 2024",
-    image: "/gallery/celebration.svg",
+    id: "family-celebration",
+    title: "Family celebration",
+    description: "Extended family celebrating under a tent — togetherness, joy, and African tradition.",
+    date: "2024",
+    image: "/gallery/family-celebration.jpg",
     category: "celebration",
   },
   {
-    id: "charity-giving",
-    title: "Charity giving",
-    description: "Collective giving that reflects our motto: one school, one family.",
-    date: "October 2024",
-    image: "/gallery/giving.svg",
+    id: "charity-volunteers",
+    title: "Charity volunteers",
+    description: "Volunteers sorting donations — the spirit of giving and support that drives us forward.",
+    date: "2024",
+    image: "/gallery/charity-volunteer.jpg",
     category: "giving",
   },
 ];

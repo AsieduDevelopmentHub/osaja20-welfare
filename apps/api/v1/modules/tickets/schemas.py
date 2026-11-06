@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from typing import Annotated
@@ -27,6 +28,7 @@ class TicketEventView(BaseModel):
     venue: str
     starts_at: datetime
     categories: list[TicketCategoryView]
+    payment_options: list[dict]
 
 
 class TicketOrderCreate(BaseModel):
@@ -35,6 +37,7 @@ class TicketOrderCreate(BaseModel):
     purchaser_name: str = Field(min_length=2, max_length=200)
     purchaser_email: EmailStr
     purchaser_phone: PhoneNumber
+    payment_method: Literal["paystack", "momo", "bank"] | None = None
 
 
 class TicketOrderView(BaseModel):
@@ -48,6 +51,24 @@ class TicketOrderView(BaseModel):
 
 class TicketOrderRetrieve(BaseModel):
     purchaser_email: EmailStr
+
+
+class TicketOrderStatusRequest(BaseModel):
+    purchaser_email: EmailStr
+
+
+class TicketManualPaymentSubmit(BaseModel):
+    purchaser_email: EmailStr
+    transaction_reference: str = Field(
+        min_length=4,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9._/-]+$",
+    )
+    sender_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
+
+
+class TicketManualPaymentDecision(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
 
 
 class TicketScanRequest(BaseModel):

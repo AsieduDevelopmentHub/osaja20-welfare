@@ -2,6 +2,7 @@
 
 import { CalendarDays, Clock3, MapPin, Ticket } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { aos } from "@/lib/aos";
@@ -21,6 +22,12 @@ type TicketEvent = {
   venue: string;
   starts_at: string;
   categories: TicketCategory[];
+  payment_options: PaymentOption[];
+};
+
+type PaymentOption = {
+  method: "paystack" | "momo" | "bank";
+  label: string;
 };
 
 function formatPrice(price: string) {
@@ -31,9 +38,18 @@ function formatPrice(price: string) {
   }).format(Number(price));
 }
 
+function rememberOrderEmail(reference: string, email: string) {
+  try {
+    sessionStorage.setItem(`ticket-order-email:${reference}`, email.trim());
+  } catch {
+    return;
+  }
+}
+
 export function BraFieProgramSection() {
   const [event, setEvent] = useState<TicketEvent | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [purchaserName, setPurchaserName] = useState("");
   const [purchaserEmail, setPurchaserEmail] = useState("");
@@ -51,6 +67,7 @@ export function BraFieProgramSection() {
         if (result.success && result.data && active) {
           setEvent(result.data);
           setSelectedCategory(result.data.categories[0]?.id ?? "");
+          setPaymentMethod(result.data.payment_options?.[0]?.method ?? "");
         }
       })
       .catch((cause: unknown) => {
@@ -86,10 +103,17 @@ export function BraFieProgramSection() {
           purchaser_name: purchaserName,
           purchaser_email: purchaserEmail,
           purchaser_phone: purchaserPhone,
+          payment_method: paymentMethod,
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? "Could not start checkout.");
+      if (result.data?.payment_method === "momo" || result.data?.payment_method === "bank") {
+        const reference = result.data.reference;
+        rememberOrderEmail(reference, purchaserEmail);
+        window.location.assign(`/tickets/complete?manual=1&reference=${encodeURIComponent(reference)}`);
+        return;
+      }
       const authorizationUrl = result.data?.authorization_url;
       if (!authorizationUrl) throw new Error("The payment provider did not return a checkout link.");
       window.location.assign(authorizationUrl);
@@ -185,11 +209,10 @@ export function BraFieProgramSection() {
                     type="button"
                     onClick={() => setSelectedCategory(category.id)}
                     aria-pressed={selectedCategory === category.id}
-                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition ${
-                      selectedCategory === category.id
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition ${selectedCategory === category.id
                         ? "border-amber-200/70 bg-amber-200/10"
                         : "border-white/10 bg-white/[0.03] hover:border-white/25"
-                    }`}
+                      }`}
                   >
                     <span>
                       <span className="block text-sm font-semibold">{category.name}</span>
@@ -270,17 +293,33 @@ export function BraFieProgramSection() {
                 />
               </label>
             </div>
+            {event?.payment_options?.length ? (
+              <label className="block text-sm font-medium text-rose-50">
+                Payment method
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  disabled={submitting}
+                  className="mt-2 w-full rounded-xl border border-white/15 bg-[#16090c] px-3 py-3 text-white outline-none focus:border-amber-200"
+                >
+                  {event.payment_options.map((option) => (
+                    <option key={option.method} value={option.method}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            ) : !loading ? <p className="text-sm text-rose-200">Ticket payments are not currently available.</p> : null}
             {error ? <p role="alert" className="rounded-xl border border-red-300/30 bg-red-950/50 p-3 text-sm text-red-100">{error}</p> : null}
             <button
               type="submit"
-              disabled={!selected || loading || submitting || selected.inventory_remaining === 0}
+              disabled={!selected || !paymentMethod || loading || submitting || selected.inventory_remaining === 0}
               className="flex w-full items-center justify-center rounded-xl bg-amber-200 px-5 py-3.5 text-sm font-bold text-[#2a0a0f] transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? "Opening secure checkout…" : "Continue to secure checkout"}
+              {submitting ? "Preparing checkout…" : paymentMethod === "paystack" ? "Continue to secure checkout" : "Continue to payment"}
             </button>
             <p className="text-center text-xs leading-relaxed text-rose-100/45">
-              Your ticket is issued only after payment is confirmed by the payment provider.
+              Tickets are issued after payment is confirmed.
             </p>
+            <p className="text-center text-sm text-rose-100/70"><Link href="/tickets/complete" className="underline hover:text-white">Check an existing order</Link></p>
           </form>
         </div>
       </div>
