@@ -322,7 +322,10 @@ async def scan_ticket(
         .join(TicketCategory, TicketCategory.id == AdmissionTicket.category_id)
         .join(TicketOrder, TicketOrder.id == AdmissionTicket.order_id)
         .join(TicketEvent, TicketEvent.id == TicketOrder.event_id)
-        .where(AdmissionTicket.token_hash == _token_hash(payload.token.strip()))
+        .where(or_(
+            AdmissionTicket.token_hash == _token_hash(payload.token),
+            AdmissionTicket.ticket_number == payload.token.upper(),
+        ))
     )
     record = result.first()
     if not record:
@@ -438,7 +441,25 @@ async def ticket_admin_overview(
     categories = [category_view(category) for category in categories_result.scalars()]
     order_filter = [TicketOrder.event_id == event.id]
     if search.strip():
-        order_filter.append(TicketOrder.purchaser_name.icontains(search.strip(), autoescape=True))
+        term = search.strip()
+        order_filter.append(or_(
+            TicketOrder.purchaser_name.icontains(term, autoescape=True),
+            TicketOrder.purchaser_email.icontains(term, autoescape=True),
+            TicketOrder.purchaser_phone.icontains(term, autoescape=True),
+            TicketOrder.reference.icontains(term, autoescape=True),
+            TicketOrder.status.icontains(term, autoescape=True),
+            TicketOrder.payment_method.icontains(term, autoescape=True),
+            TicketOrder.manual_payment_reference.icontains(term, autoescape=True),
+            TicketOrder.manual_payment_sender_name.icontains(term, autoescape=True),
+            select(TicketCategory.id).where(
+                TicketCategory.id == TicketOrder.category_id,
+                TicketCategory.name.icontains(term, autoescape=True),
+            ).correlate(TicketOrder).exists(),
+            select(AdmissionTicket.id).where(
+                AdmissionTicket.order_id == TicketOrder.id,
+                AdmissionTicket.ticket_number.icontains(term, autoescape=True),
+            ).correlate(TicketOrder).exists(),
+        ))
     total_orders = (await db.execute(select(func.count(TicketOrder.id)).where(*order_filter))).scalar_one()
     order_result = await db.execute(
         select(TicketOrder, TicketCategory.name)

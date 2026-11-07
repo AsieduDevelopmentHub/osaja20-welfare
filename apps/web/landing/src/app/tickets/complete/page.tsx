@@ -159,25 +159,21 @@ export default function TicketPaymentCompletePage() {
     }
   }
 
-  async function downloadTicket(ticket: IssuedTicket, index: number) {
+  async function downloadTicket(ticket: IssuedTicket, index: number, element: HTMLElement | null) {
     try {
-      const image = new window.Image();
-      image.src = `data:image/svg+xml;base64,${ticket.qr_svg_base64}`;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = 768;
-      canvas.height = 768;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Image download is unavailable.");
-      context.fillStyle = "white";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      if (!element) throw new Error("Ticket is unavailable.");
+      const { toPng } = await import("html-to-image");
       const link = document.createElement("a");
-      link.href = canvas.toDataURL("image/png");
+      link.href = await toPng(element, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        skipFonts: true,
+        filter: (node) => !(node instanceof HTMLElement && node.hasAttribute("data-download-exclude")),
+      });
       link.download = `ticket-${ticket.ticket_number ?? index + 1}.png`;
       link.click();
     } catch {
-      setError("The QR image could not be downloaded. Try printing the ticket instead.");
+      setError("The ticket image could not be downloaded. Try printing the ticket instead.");
     }
   }
 
@@ -346,7 +342,7 @@ export default function TicketPaymentCompletePage() {
                           className="mx-auto mt-4 aspect-square w-48 max-w-full"
                         />
                         <p className="mt-2 text-center text-xs text-slate-500">Show this code at the entrance</p>
-                        <button type="button" onClick={() => void downloadTicket(ticket, index)} className="mt-4 inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 print:hidden"><Download className="h-4 w-4" />Download QR</button>
+                        <button type="button" data-download-exclude onClick={(event) => void downloadTicket(ticket, index, event.currentTarget.closest("article"))} className="mt-4 inline-flex items-center gap-2 rounded border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 print:hidden"><Download className="h-4 w-4" />Download ticket</button>
                       </article>
                     ))}
                   </div>

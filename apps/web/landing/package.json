@@ -13,6 +13,7 @@
     "@osaja/config": "workspace:*",
     "@osaja/ui": "workspace:*",
     "aos": "^2.3.4",
+    "html-to-image": "^1.11.13",
     "lucide-react": "^0.469.0",
     "next": "^15.5.24",
     "react": "^19.0.0",

@@ -373,14 +373,14 @@ export default function TicketManagementPage() {
                   }}
                   className="flex flex-col gap-3 sm:flex-row"
                 >
-                  <label htmlFor="ticket-code" className="sr-only">Ticket QR code value</label>
+                  <label htmlFor="ticket-code" className="sr-only">Ticket number or QR code</label>
                   <input
                     id="ticket-code"
                     value={ticketCode}
                     onChange={(event) => setTicketCode(event.target.value)}
                     autoComplete="off"
                     className="admin-input min-w-0 flex-1"
-                    placeholder="Or enter ticket code manually"
+                    placeholder="Enter ticket number or QR code"
                   />
                   <button type="submit" className="btn-gold inline-flex items-center justify-center gap-2">
                     <Ticket className="h-4 w-4" />
@@ -392,8 +392,8 @@ export default function TicketManagementPage() {
                   <div
                     role="status"
                     className={`rounded-xl border p-4 ${scanIsPositive
-                        ? "border-emerald-400/30 bg-emerald-950/30"
-                        : "border-red-400/30 bg-red-950/30"
+                      ? "border-emerald-400/30 bg-emerald-950/30"
+                      : "border-red-400/30 bg-red-950/30"
                       }`}
                   >
                     <div className="flex items-center gap-2">
@@ -438,9 +438,9 @@ export default function TicketManagementPage() {
                 <p className="mt-1 text-sm text-slate-400">Only paid orders count towards confirmed revenue.</p>
               </div>
               <label className="relative block w-full sm:max-w-xs">
-                <span className="sr-only">Search purchaser name</span>
+                <span className="sr-only">Search orders by name, ticket number, reference or payment</span>
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search purchaser name" className="admin-input w-full !pl-9" />
+                <input type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Search name, ticket, reference…" className="admin-input w-full !pl-9" />
               </label>
             </div>
             <div className="overflow-x-auto">
@@ -474,9 +474,11 @@ export default function TicketManagementPage() {
                           }`}>{order.status.replaceAll("_", " ")}</span>
                       </td>
                       <td className="px-4 py-3 text-slate-300">
-                        <p className="uppercase">{order.payment_method}</p>
-                        {order.manual_payment_reference ? <p className="mt-1 text-xs">Payment reference: {order.manual_payment_reference}</p> : null}
-                        {order.manual_payment_sender_name ? <p className="text-xs">Payer name (provided): {order.manual_payment_sender_name}</p> : order.manual_payment_phone ? <p className="text-xs">Sender: {order.manual_payment_phone}</p> : null}
+                        <div className="space-y-1 break-words text-xs">
+                          <p>{order.payment_method.toUpperCase()}</p>
+                          {order.manual_payment_reference ? <p>{order.manual_payment_reference}</p> : null}
+                          {order.manual_payment_sender_name || order.manual_payment_phone ? <p>{order.manual_payment_sender_name || order.manual_payment_phone}</p> : null}
+                        </div>
                         {order.status === "payment_submitted" && (order.payment_method === "momo" || order.payment_method === "bank") ? (
                           <div className="mt-2 flex gap-2">
                             <button type="button" disabled={!!reviewingOrder} onClick={() => void reviewOrder(order, "confirm")} className="rounded border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-50">Confirm</button>

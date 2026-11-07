@@ -214,6 +214,12 @@ async def test_manual_ticket_payment_can_be_tracked_and_approved(client):
     assert overview.json()["data"]["orders"][0]["manual_payment_sender_name"] == "Test MoMo Account"
     assert overview.json()["data"]["orders"][0]["ticket_numbers"] == [tickets.json()["data"]["tickets"][0]["ticket_number"]]
     assert "token" not in overview.json()["data"]["orders"][0]
+    ticket_number = tickets.json()["data"]["tickets"][0]["ticket_number"]
+    for search in (ticket_number.lower(), reference, "buyer@example.com", "0244123456", "double", "momo", "TEST-TRANSFER-123", "Test MoMo Account", "paid"):
+        found = await client.get("/api/v1/tickets/admin/overview", params={"search": search}, headers=_admin_headers(member))
+        assert found.json()["data"]["pagination"]["total"] == 1, search
+        assert found.json()["data"]["orders"][0]["reference"] == reference
+    assert (await client.get("/api/v1/tickets/admin/overview", params={"search": "%"}, headers=_admin_headers(member))).json()["data"]["pagination"]["total"] == 0
     assert (await client.get("/api/v1/tickets/admin/overview?search=Nobody", headers=_admin_headers(member))).json()["data"]["pagination"]["total"] == 0
 
     second_order = await client.post("/api/v1/tickets/orders", json={
@@ -333,7 +339,7 @@ async def test_double_ticket_can_be_admitted_in_two_visits(client, monkeypatch):
             "/api/v1/tickets/scan",
             headers=_admin_headers(member),
             json={
-                "token": ticket["token"],
+                "token": ticket["ticket_number"].lower(),
                 "admission_count": 1,
                 "gate": "Gate 2",
                 "device_id": "test-device-2",

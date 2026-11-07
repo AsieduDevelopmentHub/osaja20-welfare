@@ -72,7 +72,7 @@ class TicketManualPaymentDecision(BaseModel):
 
 
 class TicketScanRequest(BaseModel):
-    token: str = Field(min_length=20, max_length=200)
+    token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=12, max_length=200)]
     admission_count: int = Field(default=1, ge=1, le=20)
     gate: str = Field(min_length=1, max_length=100)
     device_id: DeviceId
