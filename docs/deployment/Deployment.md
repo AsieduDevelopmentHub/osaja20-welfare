@@ -124,11 +124,12 @@ Public marketing site for the welfare organisation — vision, mission, gallery,
 | Variable | Required | Value |
 |----------|----------|--------|
 | `NEXT_PUBLIC_SITE_URL` | Recommended | `https://osaja2020welfare.org` (or your apex domain) |
+| `API_PROXY_TARGET` | **Yes** | `https://YOUR-API.onrender.com` (no trailing slash) |
 | `NEXT_PUBLIC_MEMBER_URL` | Recommended | `https://member.osaja2020welfare.org` |
 | `NEXT_PUBLIC_ADMIN_URL` | Optional | `https://admin.osaja2020welfare.org` |
 | `NEXT_PUBLIC_SMS_URL` | Optional | `https://sms.osaja2020welfare.org` |
 
-The landing app does **not** need `API_PROXY_TARGET` — it is static marketing content only.
+The landing app proxies ticket checkout requests to the API. Set `API_PROXY_TARGET` in Vercel before deploying; the local default points to `http://127.0.0.1:8000`.
 
 ### Gallery photos
 
