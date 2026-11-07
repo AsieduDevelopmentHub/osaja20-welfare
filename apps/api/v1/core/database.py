@@ -1,5 +1,7 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
+from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -26,6 +28,12 @@ def _engine_kwargs() -> dict:
 
 engine = create_async_engine(settings.database_url, **_engine_kwargs())
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+SCHEMA_INIT_LOCK_ID = 22332385911312944
+
+
+def acquire_schema_lock(connection: Connection) -> None:
+    if connection.dialect.name == "postgresql":
+        connection.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": SCHEMA_INIT_LOCK_ID})
 
 
 class Base(DeclarativeBase):

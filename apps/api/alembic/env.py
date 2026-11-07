@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from v1.core.config import settings
-from v1.core.database import Base
+from v1.core.database import Base, acquire_schema_lock
 from v1.core import models  # noqa: F401
 
 config = context.config
@@ -28,6 +28,7 @@ def run_migrations_offline() -> None:
 def do_run_migrations(connection):
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
+        acquire_schema_lock(connection)
         context.run_migrations()
 
 

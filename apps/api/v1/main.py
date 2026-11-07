@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from v1.core.config import settings
-from v1.core.database import async_session, engine
+from v1.core.database import acquire_schema_lock, async_session, engine
 from v1.core.security_headers import SecurityHeadersMiddleware
 from v1.core.init_db import init_database, warm_indexes
 from v1.core.schemas import ApiResponse
@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
         (Path(settings.uploads_dir) / "avatars").mkdir(parents=True, exist_ok=True)
     await init_database()
     async with async_session() as session:
+        await (await session.connection()).run_sync(acquire_schema_lock)
         await seed_default_event(session)
         await warm_indexes(session)
         await session.commit()

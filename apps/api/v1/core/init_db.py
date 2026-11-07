@@ -3,13 +3,14 @@ import re
 
 from sqlalchemy import inspect, text
 
-from v1.core.database import Base, engine
+from v1.core.database import Base, acquire_schema_lock, engine
 from v1.core import models  # noqa: F401 — register all tables before create_all
 from v1.core.services import registry
 
 
 async def init_database() -> None:
     async with engine.begin() as conn:
+        await conn.run_sync(acquire_schema_lock)
         await conn.run_sync(Base.metadata.create_all)
         await _apply_migrations(conn)
 
