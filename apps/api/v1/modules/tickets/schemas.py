@@ -4,7 +4,7 @@ from typing import Literal
 from uuid import UUID
 
 from typing import Annotated
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, EmailStr, Field, StringConstraints, model_validator
 
 PhoneNumber = Annotated[str, StringConstraints(strip_whitespace=True, min_length=7, max_length=30)]
 DeviceId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
@@ -35,7 +35,7 @@ class TicketOrderCreate(BaseModel):
     category_id: UUID
     quantity: int = Field(ge=1, le=10)
     purchaser_name: str = Field(min_length=2, max_length=200)
-    purchaser_email: EmailStr
+    purchaser_email: EmailStr | None = None
     purchaser_phone: PhoneNumber
     payment_method: Literal["paystack", "momo", "bank"] | None = None
 
@@ -50,15 +50,30 @@ class TicketOrderView(BaseModel):
 
 
 class TicketOrderRetrieve(BaseModel):
-    purchaser_email: EmailStr
+    purchaser_email: EmailStr | None = None
+    purchaser_phone: PhoneNumber | None = None
+
+    @model_validator(mode="after")
+    def require_email_or_phone(self):
+        if not self.purchaser_email and not self.purchaser_phone:
+            raise ValueError("Provide purchaser email or phone to retrieve tickets")
+        return self
 
 
 class TicketOrderStatusRequest(BaseModel):
-    purchaser_email: EmailStr
+    purchaser_email: EmailStr | None = None
+    purchaser_phone: PhoneNumber | None = None
+
+    @model_validator(mode="after")
+    def require_email_or_phone(self):
+        if not self.purchaser_email and not self.purchaser_phone:
+            raise ValueError("Provide purchaser email or phone")
+        return self
 
 
 class TicketManualPaymentSubmit(BaseModel):
-    purchaser_email: EmailStr
+    purchaser_email: EmailStr | None = None
+    purchaser_phone: PhoneNumber | None = None
     transaction_reference: str = Field(
         min_length=4,
         max_length=100,
@@ -66,13 +81,24 @@ class TicketManualPaymentSubmit(BaseModel):
     )
     sender_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
 
+    @model_validator(mode="after")
+    def require_email_or_phone(self):
+        if not self.purchaser_email and not self.purchaser_phone:
+            raise ValueError("Provide purchaser email or phone")
+        return self
+
 
 class TicketManualPaymentDecision(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class TicketLookupRequest(BaseModel):
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
+
+
 class TicketScanRequest(BaseModel):
-    token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=12, max_length=200)]
+    token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=8, max_length=200)]
+    action: Literal["enter", "exit", "return"] = "enter"
     admission_count: int = Field(default=1, ge=1, le=20)
     gate: str = Field(min_length=1, max_length=100)
     device_id: DeviceId

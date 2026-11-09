@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -12,7 +13,6 @@ from v1.core.database import get_db
 from v1.core.models import (
     AdmissionTicket,
     Member,
-    TicketAdmission,
     TicketCategory,
     TicketEvent,
     TicketOrder,
@@ -24,6 +24,7 @@ from v1.modules.tickets.schemas import (
     TicketEventView,
     TicketEventCreate,
     TicketEventUpdate,
+    TicketLookupRequest,
     TicketManualPaymentDecision,
     TicketManualPaymentSubmit,
     TicketOrderCreate,
@@ -34,13 +35,17 @@ from v1.modules.tickets.schemas import (
 from v1.modules.tickets.service import (
     EVENT_SLUG,
     VALID_GATES,
+    apply_ticket_action,
     available_ticket_payment_options,
     category_view,
+    deliver_issued_tickets,
     finalize_ticket_order,
     initialize_ticket_order,
+    lookup_tickets,
+    notify_ticket_payment_submitted,
+    order_matches_identity,
     release_expired_orders,
     retrieve_order_tickets,
-    _token_hash,
     verify_ticket_order,
 )
 
@@ -174,13 +179,15 @@ async def create_ticket_order(
             category=category,
             quantity=payload.quantity,
             purchaser_name=payload.purchaser_name,
-            purchaser_email=str(payload.purchaser_email),
+            purchaser_email=str(payload.purchaser_email) if payload.purchaser_email else None,
             purchaser_phone=payload.purchaser_phone,
             payment_method=requested_method,
             payment_details=payment_option if requested_method != "paystack" else None,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        message = str(exc)
+        code = 422 if "email is required" in message.lower() else 503
+        raise HTTPException(status_code=code, detail=message) from exc
     return ApiResponse(
         success=True,
         data=order,
@@ -207,7 +214,7 @@ async def verify_order(
         success=True,
         data={"reference": reference, "status": result},
         message=(
-            "Payment confirmed. Retrieve your tickets with your purchaser email."
+            "Payment confirmed. Retrieve your tickets with your email or phone."
             if result == "paid"
             else "Payment is not confirmed yet. Your tickets have not been issued."
         ),
@@ -221,7 +228,12 @@ async def retrieve_tickets(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
-        tickets = await retrieve_order_tickets(db, reference, str(payload.purchaser_email))
+        tickets = await retrieve_order_tickets(
+            db,
+            reference,
+            purchaser_email=str(payload.purchaser_email) if payload.purchaser_email else None,
+            purchaser_phone=payload.purchaser_phone,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return ApiResponse(success=True, data={"tickets": tickets})
@@ -237,8 +249,12 @@ async def submit_manual_ticket_payment(
         select(TicketOrder).where(TicketOrder.reference == reference).with_for_update()
     )
     order = order_result.scalar_one_or_none()
-    if not order or order.purchaser_email != str(payload.purchaser_email).strip().lower():
-        raise HTTPException(status_code=404, detail="Ticket order not found for this email")
+    if not order or not order_matches_identity(
+        order,
+        purchaser_email=str(payload.purchaser_email) if payload.purchaser_email else None,
+        purchaser_phone=payload.purchaser_phone,
+    ):
+        raise HTTPException(status_code=404, detail="Ticket order not found for these details")
     if order.payment_method not in {"momo", "bank"}:
         raise HTTPException(status_code=409, detail="This order does not use a manual payment method")
     if order.status != "awaiting_payment":
@@ -268,6 +284,8 @@ async def submit_manual_ticket_payment(
             detail="This payment reference has already been submitted",
         ) from exc
 
+    await notify_ticket_payment_submitted(db, order)
+
     return ApiResponse(
         success=True,
         data={"reference": order.reference, "status": order.status},
@@ -282,15 +300,14 @@ async def get_ticket_order_status(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await release_expired_orders(db)
-    result = await db.execute(
-        select(TicketOrder).where(
-            TicketOrder.reference == reference,
-            TicketOrder.purchaser_email == str(payload.purchaser_email).strip().lower(),
-        )
-    )
+    result = await db.execute(select(TicketOrder).where(TicketOrder.reference == reference))
     order = result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Ticket order not found for this email")
+    if not order or not order_matches_identity(
+        order,
+        purchaser_email=str(payload.purchaser_email) if payload.purchaser_email else None,
+        purchaser_phone=payload.purchaser_phone,
+    ):
+        raise HTTPException(status_code=404, detail="Ticket order not found for these details")
     return ApiResponse(
         success=True,
         data={
@@ -304,7 +321,28 @@ async def get_ticket_order_status(
             "expires_at": _as_utc(order.expires_at),
             "payment_submitted_at": order.payment_submitted_at,
             "review_note": order.review_note,
+            "purchaser_email": order.purchaser_email,
+            "purchaser_phone": order.purchaser_phone,
         },
+    )
+
+
+@router.post("/lookup", response_model=ApiResponse)
+async def lookup_ticket(
+    payload: TicketLookupRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    try:
+        data = await lookup_tickets(db, payload.query)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not data["matches"]:
+        raise HTTPException(status_code=404, detail="No matching tickets found")
+    return ApiResponse(
+        success=True,
+        data=data,
+        message="Verify guest details before admitting, exiting, or returning.",
     )
 
 
@@ -317,108 +355,24 @@ async def scan_ticket(
     if payload.gate not in VALID_GATES:
         raise HTTPException(status_code=400, detail="Choose a registered gate")
 
-    result = await db.execute(
-        select(AdmissionTicket, TicketCategory, TicketOrder, TicketEvent)
-        .join(TicketCategory, TicketCategory.id == AdmissionTicket.category_id)
-        .join(TicketOrder, TicketOrder.id == AdmissionTicket.order_id)
-        .join(TicketEvent, TicketEvent.id == TicketOrder.event_id)
-        .where(or_(
-            AdmissionTicket.token_hash == _token_hash(payload.token),
-            AdmissionTicket.ticket_number == payload.token.upper(),
-        ))
-    )
-    record = result.first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Ticket code is not recognized")
-    ticket, category, order, event = record
-
-    if order.status != "paid":
-        return ApiResponse(success=True, data={"outcome": "unpaid"}, message="Payment is not confirmed")
-    if not event.is_active:
-        return ApiResponse(success=True, data={"outcome": "event_closed"}, message="Event admission is closed")
-    if ticket.status != "valid":
-        return ApiResponse(success=True, data={"outcome": ticket.status}, message="Ticket is not valid for entry")
-
-    updated = await db.execute(
-        update(AdmissionTicket)
-        .where(
-            AdmissionTicket.id == ticket.id,
-            AdmissionTicket.status == "valid",
-            AdmissionTicket.admissions_used + payload.admission_count
-            <= AdmissionTicket.admission_entitlement,
-        )
-        .values(admissions_used=AdmissionTicket.admissions_used + payload.admission_count)
-    )
-    if updated.rowcount != 1:
-        await db.refresh(ticket)
-        history = await _admission_history(db, ticket.id)
-        remaining = max(0, ticket.admission_entitlement - ticket.admissions_used)
-        if ticket.status != "valid":
-            outcome = ticket.status
-            message = "Ticket is not valid for entry"
-        elif remaining == 0:
-            outcome = "fully_used"
-            message = "No admissions remain on this ticket"
-        else:
-            outcome = "quantity_exceeded"
-            message = f"Only {remaining} admission(s) remain on this ticket"
-        return ApiResponse(
-            success=True,
-            data={
-                "outcome": outcome,
-                "category": category.name,
-                "admission_entitlement": ticket.admission_entitlement,
-                "admissions_used": ticket.admissions_used,
-                "admissions_remaining": remaining,
-                "history": history,
-            },
-            message=message,
-        )
-
-    db.add(
-        TicketAdmission(
-            ticket_id=ticket.id,
+    try:
+        result = await apply_ticket_action(
+            db,
+            token=payload.token,
+            action=payload.action,
             admission_count=payload.admission_count,
             gate=payload.gate,
             device_id=payload.device_id,
             staff_id=staff.id,
         )
-    )
-    await db.flush()
-    await db.refresh(ticket)
-    history = await _admission_history(db, ticket.id)
-    remaining = ticket.admission_entitlement - ticket.admissions_used
-    outcome = "admitted" if remaining == 0 else "partially_used"
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     return ApiResponse(
         success=True,
-        data={
-            "outcome": outcome,
-            "category": category.name,
-            "admission_entitlement": ticket.admission_entitlement,
-            "admissions_used": ticket.admissions_used,
-            "admissions_remaining": remaining,
-            "history": history,
-        },
-        message=f"{payload.admission_count} admission(s) recorded at {payload.gate}",
+        data=result,
+        message=result.get("message") or "Gate action processed",
     )
-
-
-async def _admission_history(db: AsyncSession, ticket_id: UUID) -> list[dict]:
-    result = await db.execute(
-        select(TicketAdmission)
-        .where(TicketAdmission.ticket_id == ticket_id)
-        .order_by(TicketAdmission.created_at.desc())
-    )
-    return [
-        {
-            "count": entry.admission_count,
-            "gate": entry.gate,
-            "device_id": entry.device_id,
-            "staff_id": str(entry.staff_id),
-            "at": entry.created_at,
-        }
-        for entry in result.scalars()
-    ]
 
 
 @router.get("/admin/overview", response_model=ApiResponse)
@@ -515,10 +469,13 @@ async def ticket_admin_overview(
         for row in stats_result
     }
     checked_in = await db.execute(
-        select(func.coalesce(func.sum(TicketAdmission.admission_count), 0))
-        .join(AdmissionTicket, AdmissionTicket.id == TicketAdmission.ticket_id)
+        select(func.coalesce(func.sum(AdmissionTicket.currently_inside), 0))
         .join(TicketOrder, TicketOrder.id == AdmissionTicket.order_id)
-        .where(TicketOrder.event_id == event.id)
+        .where(
+            TicketOrder.event_id == event.id,
+            TicketOrder.status == "paid",
+            AdmissionTicket.status == "valid",
+        )
     )
     stats["checked_in"] = checked_in.scalar_one()
     return ApiResponse(
@@ -568,7 +525,31 @@ async def confirm_manual_ticket_payment(
     order.reviewed_at = datetime.now(timezone.utc)
     order.review_note = None
     await db.flush()
-    return ApiResponse(success=True, data={"reference": order.reference, "status": "paid"}, message="Payment confirmed and tickets issued")
+    return ApiResponse(
+        success=True,
+        data={"reference": order.reference, "status": "paid"},
+        message="Payment confirmed and tickets issued",
+    )
+
+
+@router.post("/admin/orders/{reference}/resend-delivery", response_model=ApiResponse)
+async def resend_ticket_delivery(
+    reference: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[Member, Depends(require_executive)],
+):
+    result = await db.execute(select(TicketOrder).where(TicketOrder.reference == reference))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Ticket order not found")
+    if order.status != "paid":
+        raise HTTPException(status_code=409, detail="Tickets are only delivered after payment is confirmed")
+    delivery = await deliver_issued_tickets(db, order)
+    return ApiResponse(
+        success=True,
+        data={"reference": order.reference, "delivery": delivery},
+        message="Ticket delivery attempted",
+    )
 
 
 @router.post("/admin/orders/{reference}/reject", response_model=ApiResponse)

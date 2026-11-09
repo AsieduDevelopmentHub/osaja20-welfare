@@ -23,7 +23,7 @@ type Category = {
 type Order = {
   reference: string;
   purchaser_name: string;
-  purchaser_email: string;
+  purchaser_email: string | null;
   category: string;
   quantity: number;
   amount: string;
@@ -45,13 +45,26 @@ type Overview = {
   pagination: { page: number; page_size: number; total: number };
   stats: Record<string, Stat> & { checked_in: number };
 };
-type ScanResult = {
-  outcome: string;
-  category?: string;
-  admission_entitlement?: number;
-  admissions_used?: number;
-  admissions_remaining?: number;
-  history?: { count: number; gate: string; at: string; staff_id: string }[];
+type TicketPreview = {
+  ticket_id: string;
+  ticket_number: string | null;
+  purchaser_name: string;
+  purchaser_email: string | null;
+  purchaser_phone: string;
+  order_reference: string;
+  category: string;
+  status: string;
+  admission_entitlement: number;
+  admissions_used: number;
+  currently_inside: number;
+  outside: number;
+  admissions_remaining: number;
+  can_enter: boolean;
+  can_exit: boolean;
+  can_return: boolean;
+  history?: { count: number; direction?: string; gate: string; at: string; staff_id: string }[];
+  outcome?: string;
+  message?: string;
 };
 type DetectedBarcode = { rawValue: string };
 type NativeBarcodeDetector = { detect(source: HTMLVideoElement): Promise<DetectedBarcode[]> };
@@ -74,9 +87,12 @@ export default function TicketManagementPage() {
   const [gate, setGate] = useState("Gate 1");
   const [admissionCount, setAdmissionCount] = useState(1);
   const [ticketCode, setTicketCode] = useState("");
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [preview, setPreview] = useState<TicketPreview | null>(null);
+  const [previewMatches, setPreviewMatches] = useState<TicketPreview[]>([]);
+  const [actionResult, setActionResult] = useState<TicketPreview | null>(null);
   const [scanError, setScanError] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [acting, setActing] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -152,6 +168,23 @@ export default function TicketManagementPage() {
     }
   }
 
+  async function resendDelivery(order: Order) {
+    setReviewingOrder(order.reference);
+    setPageError("");
+    try {
+      const response = await apiFetch<{ delivery: { email: string; sms: string } }>(
+        `/tickets/admin/orders/${encodeURIComponent(order.reference)}/resend-delivery`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      const delivery = response.data?.delivery;
+      window.alert(`Delivery: email=${delivery?.email ?? "n/a"}, sms=${delivery?.sms ?? "n/a"}`);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Could not resend ticket delivery.");
+    } finally {
+      setReviewingOrder("");
+    }
+  }
+
   async function reviewOrder(order: Order, decision: "confirm" | "reject") {
     let note: string | undefined;
     if (decision === "confirm") {
@@ -176,39 +209,79 @@ export default function TicketManagementPage() {
     }
   }
 
-  const submitScan = useCallback(async (token = ticketCode) => {
+  const lookupTicket = useCallback(async (query = ticketCode) => {
     setScanError("");
-    setScanResult(null);
-    if (!token.trim()) {
-      setScanError("Scan a QR code or enter its ticket code.");
+    setActionResult(null);
+    setPreview(null);
+    setPreviewMatches([]);
+    if (!query.trim()) {
+      setScanError("Scan a QR code or enter a ticket number / guest name.");
       return;
     }
+    try {
+      const response = await apiFetch<{ matches: TicketPreview[]; exact: boolean }>("/tickets/lookup", {
+        method: "POST",
+        body: JSON.stringify({ query: query.trim() }),
+      });
+      const matches = response.data?.matches ?? [];
+      if (!matches.length) {
+        setScanError("No matching tickets found.");
+        return;
+      }
+      if (matches.length === 1) {
+        setPreview(matches[0]);
+        setTicketCode(matches[0].ticket_number ?? query.trim());
+      } else {
+        setPreviewMatches(matches);
+      }
+    } catch (error) {
+      setScanError(
+        error instanceof Error
+          ? error.message
+          : "Lookup failed. No gate action was recorded.",
+      );
+    }
+  }, [ticketCode]);
+
+  const applyGateAction = useCallback(async (action: "enter" | "exit" | "return") => {
+    if (!preview?.ticket_number && !ticketCode.trim()) {
+      setScanError("Verify a ticket before taking a gate action.");
+      return;
+    }
+    setActing(true);
+    setScanError("");
+    setActionResult(null);
     try {
       let deviceId = localStorage.getItem(LOCAL_DEVICE_KEY);
       if (!deviceId) {
         deviceId = crypto.randomUUID();
         localStorage.setItem(LOCAL_DEVICE_KEY, deviceId);
       }
-      const response = await apiFetch<ScanResult>("/tickets/scan", {
+      const token = preview?.ticket_number || ticketCode.trim();
+      const response = await apiFetch<TicketPreview>("/tickets/scan", {
         method: "POST",
         body: JSON.stringify({
-          token: token.trim(),
+          token,
+          action,
           admission_count: admissionCount,
           gate,
           device_id: deviceId,
         }),
       });
-      setScanResult(response.data ?? null);
-      setTicketCode("");
+      const result = response.data ?? null;
+      setActionResult(result);
+      if (result) setPreview(result);
       void refresh();
     } catch (error) {
       setScanError(
         error instanceof Error
           ? error.message
-          : "Network or verification error. No admission was recorded; reconnect and try again.",
+          : "Network or verification error. No gate action was recorded.",
       );
+    } finally {
+      setActing(false);
     }
-  }, [admissionCount, gate, refresh, ticketCode]);
+  }, [admissionCount, gate, preview, refresh, ticketCode]);
 
   async function startCamera() {
     setCameraError("");
@@ -241,7 +314,7 @@ export default function TicketManagementPage() {
               if (codes[0]?.rawValue) {
                 const token = codes[0].rawValue;
                 stopCamera();
-                await submitScan(token);
+                await lookupTicket(token);
                 return;
               }
             } catch {
@@ -262,7 +335,7 @@ export default function TicketManagementPage() {
               const token = result.getText();
               scanner.stop();
               stopCamera();
-              void submitScan(token);
+              void lookupTicket(token);
             } else if (error && !["NotFoundException", "ChecksumException", "FormatException"].includes(typeof error.getKind === "function" ? error.getKind() : error.name)) {
               setCameraError("QR scan failed. Ensure the code is visible and well-lit.");
               scanner.stop();
@@ -283,7 +356,7 @@ export default function TicketManagementPage() {
   }
 
   const paidStats = overview?.stats.paid;
-  const scanIsPositive = scanResult?.outcome === "admitted" || scanResult?.outcome === "partially_used";
+  const actionIsPositive = ["admitted", "partially_used", "exited", "returned"].includes(actionResult?.outcome ?? "");
   const totalPages = Math.max(1, Math.ceil((overview?.pagination.total ?? 0) / 10));
 
   return (
@@ -334,7 +407,7 @@ export default function TicketManagementPage() {
               <QrCode className="h-5 w-5 text-brand-gold" />
               <div>
                 <h2 className="text-lg font-semibold text-white">Gate scanner</h2>
-                <p className="text-sm text-slate-400">Online-only verification. Failed network checks never admit a guest.</p>
+                <p className="text-sm text-slate-400">Scan or look up a ticket, then admit, exit, or return.</p>
               </div>
             </div>
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.8fr)]">
@@ -349,7 +422,7 @@ export default function TicketManagementPage() {
                     </select>
                   </label>
                   <label className="text-sm text-slate-300">
-                    Guests arriving now
+                    Guests in this action
                     <select
                       value={admissionCount}
                       onChange={(event) => setAdmissionCount(Number(event.target.value))}
@@ -369,48 +442,102 @@ export default function TicketManagementPage() {
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void submitScan();
+                    void lookupTicket();
                   }}
                   className="flex flex-col gap-3 sm:flex-row"
                 >
-                  <label htmlFor="ticket-code" className="sr-only">Ticket number or QR code</label>
+                  <label htmlFor="ticket-code" className="sr-only">Ticket number, QR code, or guest name</label>
                   <input
                     id="ticket-code"
                     value={ticketCode}
                     onChange={(event) => setTicketCode(event.target.value)}
                     autoComplete="off"
                     className="admin-input min-w-0 flex-1"
-                    placeholder="Enter ticket number or QR code"
+                    placeholder="Ticket number, QR code, or guest name"
                   />
                   <button type="submit" className="btn-gold inline-flex items-center justify-center gap-2">
                     <Ticket className="h-4 w-4" />
-                    Verify & admit
+                    Verify ticket
                   </button>
                 </form>
                 {scanError ? <Alert tone="error">{scanError}</Alert> : null}
-                {scanResult ? (
+                {previewMatches.length > 1 ? (
+                  <div className="space-y-2 rounded-xl border border-white/10 p-3">
+                    <p className="text-sm font-medium text-white">Select a matching ticket</p>
+                    {previewMatches.map((match) => (
+                      <button
+                        key={match.ticket_id}
+                        type="button"
+                        onClick={() => {
+                          setPreview(match);
+                          setPreviewMatches([]);
+                          setTicketCode(match.ticket_number ?? "");
+                        }}
+                        className="flex w-full flex-col rounded-lg border border-white/10 px-3 py-2 text-left hover:bg-white/5"
+                      >
+                        <span className="font-medium text-white">{match.purchaser_name}</span>
+                        <span className="text-xs text-slate-400">
+                          {match.ticket_number} · {match.category} · {match.purchaser_email || match.purchaser_phone}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {preview ? (
+                  <div className="rounded-xl border border-brand-gold/30 bg-brand-gold/5 p-4">
+                    <p className="mt-1 text-lg font-semibold text-white">{preview.purchaser_name}</p>
+                    <p className="text-sm text-slate-300">{preview.purchaser_email || "—"}</p>
+                    <p className="text-sm text-slate-300">{preview.purchaser_phone}</p>
+                    <p className="mt-2 text-sm text-slate-200">
+                      {preview.category} · ticket {preview.ticket_number} · inside {preview.currently_inside}/{preview.admission_entitlement} · used {preview.admissions_used} · outside {preview.outside}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={acting || !preview.can_enter}
+                        onClick={() => void applyGateAction("enter")}
+                        className="btn-gold inline-flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {acting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        Admit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={acting || !preview.can_exit}
+                        onClick={() => void applyGateAction("exit")}
+                        className="btn-ghost disabled:opacity-50"
+                      >
+                        Mark going out
+                      </button>
+                      <button
+                        type="button"
+                        disabled={acting || !preview.can_return}
+                        onClick={() => void applyGateAction("return")}
+                        className="btn-ghost disabled:opacity-50"
+                      >
+                        Return / re-enter
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {actionResult?.outcome ? (
                   <div
                     role="status"
-                    className={`rounded-xl border p-4 ${scanIsPositive
+                    className={`rounded-xl border p-4 ${actionIsPositive
                       ? "border-emerald-400/30 bg-emerald-950/30"
                       : "border-red-400/30 bg-red-950/30"
                       }`}
                   >
                     <div className="flex items-center gap-2">
-                      {scanIsPositive ? <Check className="h-5 w-5 text-emerald-300" /> : <CircleAlert className="h-5 w-5 text-red-300" />}
-                      <p className="font-semibold capitalize text-white">{scanResult.outcome.replaceAll("_", " ")}</p>
+                      {actionIsPositive ? <Check className="h-5 w-5 text-emerald-300" /> : <CircleAlert className="h-5 w-5 text-red-300" />}
+                      <p className="font-semibold capitalize text-white">{actionResult.outcome.replaceAll("_", " ")}</p>
                     </div>
-                    {scanResult.category ? (
-                      <p className="mt-2 text-sm text-slate-200">
-                        {scanResult.category} · {scanResult.admissions_used}/{scanResult.admission_entitlement} used ·{" "}
-                        {scanResult.admissions_remaining} remaining
-                      </p>
-                    ) : null}
-                    {scanResult.history?.length ? (
+                    {actionResult.message ? <p className="mt-2 text-sm text-slate-200">{actionResult.message}</p> : null}
+                    {actionResult.history?.length ? (
                       <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs text-slate-300">
-                        {scanResult.history.map((entry, index) => (
+                        {actionResult.history.map((entry, index) => (
                           <li key={`${entry.at}-${index}`}>
-                            {entry.count} admitted · {entry.gate} · {new Date(entry.at).toLocaleString()}
+                            {entry.count} {entry.direction || "enter"} · {entry.gate} · {new Date(entry.at).toLocaleString()}
                           </li>
                         ))}
                       </ul>
@@ -419,13 +546,9 @@ export default function TicketManagementPage() {
                 ) : null}
               </div>
               <div className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-4">
-                <p className="text-sm font-semibold text-amber-100">Double ticket reminder</p>
+                <p className="text-sm font-semibold text-amber-100">Double tickets</p>
                 <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                  The same QR code can be checked in twice. Admit one guest now and the second later, or choose two
-                  when both guests arrive together. The server rejects quantities above the remaining entitlement.
-                </p>
-                <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                  If the network or server cannot confirm a scan, no admission is recorded. Do not admit offline.
+                  One QR covers both guests. Admit 1 or 2 as needed.
                 </p>
               </div>
             </div>
@@ -462,7 +585,7 @@ export default function TicketManagementPage() {
                     <tr key={order.reference}>
                       <td className="px-4 py-3">
                         <p className="font-medium text-white">{order.purchaser_name}</p>
-                        <p className="text-xs text-slate-400">{order.purchaser_email}</p>
+                        <p className="text-xs text-slate-400">{order.purchaser_email || "No email"}</p>
                         <p className="mt-1 break-all text-xs text-slate-400">{order.reference}</p>
                       </td>
                       <td className="px-4 py-3 text-slate-300">{order.category}</td>
@@ -483,6 +606,11 @@ export default function TicketManagementPage() {
                           <div className="mt-2 flex gap-2">
                             <button type="button" disabled={!!reviewingOrder} onClick={() => void reviewOrder(order, "confirm")} className="rounded border border-emerald-400/40 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-50">Confirm</button>
                             <button type="button" disabled={!!reviewingOrder} onClick={() => void reviewOrder(order, "reject")} className="rounded border border-red-400/40 px-2 py-1 text-xs text-red-300 hover:bg-red-400/10 disabled:opacity-50">Reject</button>
+                          </div>
+                        ) : null}
+                        {order.status === "paid" ? (
+                          <div className="mt-2">
+                            <button type="button" disabled={!!reviewingOrder} onClick={() => void resendDelivery(order)} className="rounded border border-white/20 px-2 py-1 text-xs text-slate-300 hover:bg-white/10 disabled:opacity-50">Resend ticket</button>
                           </div>
                         ) : null}
                       </td>

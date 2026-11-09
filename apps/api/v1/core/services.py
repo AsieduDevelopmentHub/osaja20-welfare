@@ -1566,6 +1566,7 @@ class PlatformService:
         return {
             "support": "/inquiries",
             "payment": "/contributions",
+            "ticket": "/tickets",
         }.get(notification_type, "/notifications")
 
     async def notify_executives(

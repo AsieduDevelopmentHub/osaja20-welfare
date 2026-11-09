@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_use_tls: bool = True
 
+    # Resend (ticket delivery) — https://resend.com/api-keys
+    resend_api_key: str = ""
+    resend_from_email: str = ""
+    resend_from_name: str = "OSAJA'20 Welfare"
+
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_key: str = ""

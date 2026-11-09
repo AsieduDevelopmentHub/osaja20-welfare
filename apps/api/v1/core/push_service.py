@@ -22,6 +22,7 @@ NOTIFICATION_PREF_KEY: dict[str, str] = {
     "welfare": "notify_welfare",
     "meeting": "notify_announcements",
     "support": "notify_support",
+    "ticket": "notify_announcements",
 }
 
 

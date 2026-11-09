@@ -360,7 +360,7 @@ class TicketOrder(Base):
     event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_events.id"), nullable=False, index=True)
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_categories.id"), nullable=False)
     purchaser_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    purchaser_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    purchaser_email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     purchaser_phone: Mapped[str] = mapped_column(String(30), nullable=False)
     quantity: Mapped[int] = mapped_column(nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -391,6 +391,10 @@ class AdmissionTicket(Base):
             "admissions_used >= 0 AND admissions_used <= admission_entitlement",
             name="ck_admission_ticket_usage",
         ),
+        CheckConstraint(
+            "currently_inside >= 0 AND currently_inside <= admission_entitlement",
+            name="ck_admission_ticket_inside",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -403,6 +407,7 @@ class AdmissionTicket(Base):
     ticket_number: Mapped[str | None] = mapped_column(String(16), nullable=True, unique=True, index=True)
     admission_entitlement: Mapped[int] = mapped_column(nullable=False)
     admissions_used: Mapped[int] = mapped_column(default=0, nullable=False)
+    currently_inside: Mapped[int] = mapped_column(default=0, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="valid", nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -419,6 +424,7 @@ class TicketAdmission(Base):
         ForeignKey("admission_tickets.id", ondelete="CASCADE"), nullable=False, index=True
     )
     admission_count: Mapped[int] = mapped_column(nullable=False)
+    direction: Mapped[str] = mapped_column(String(10), default="enter", nullable=False)
     gate: Mapped[str] = mapped_column(String(100), nullable=False)
     device_id: Mapped[str] = mapped_column(String(100), nullable=False)
     staff_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("members.id"), nullable=False, index=True)

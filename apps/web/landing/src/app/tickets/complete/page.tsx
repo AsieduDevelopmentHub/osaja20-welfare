@@ -34,12 +34,20 @@ type ManualOrder = {
   } | null;
 };
 
-function rememberOrderEmail(reference: string, email: string) {
+function rememberOrderIdentity(reference: string, email: string, phone: string) {
   try {
-    sessionStorage.setItem(`ticket-order-email:${reference}`, email.trim());
+    if (email.trim()) sessionStorage.setItem(`ticket-order-email:${reference}`, email.trim());
+    if (phone.trim()) sessionStorage.setItem(`ticket-order-phone:${reference}`, phone.trim());
   } catch {
     return;
   }
+}
+
+function identityPayload(email: string, phone: string) {
+  const payload: { purchaser_email?: string; purchaser_phone?: string } = {};
+  if (email.trim()) payload.purchaser_email = email.trim();
+  if (phone.trim()) payload.purchaser_phone = phone.trim();
+  return payload;
 }
 
 function validMomoNumber(number: string) {
@@ -52,6 +60,7 @@ export default function TicketPaymentCompletePage() {
   const [lookupReference, setLookupReference] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"checking" | "paid" | "pending" | "error" | "tracking" | "manual">("checking");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [manualOrder, setManualOrder] = useState<ManualOrder | null>(null);
   const [transactionReference, setTransactionReference] = useState("");
   const [senderName, setSenderName] = useState("");
@@ -67,14 +76,18 @@ export default function TicketPaymentCompletePage() {
     if (params.get("manual") === "1" || !paymentReference) {
       setLookupReference(paymentReference ?? "");
       let savedEmail: string | null = null;
+      let savedPhone: string | null = null;
       try {
         savedEmail = paymentReference ? sessionStorage.getItem(`ticket-order-email:${paymentReference}`) : null;
+        savedPhone = paymentReference ? sessionStorage.getItem(`ticket-order-phone:${paymentReference}`) : null;
       } catch {
         savedEmail = null;
+        savedPhone = null;
       }
-      if (paymentReference && savedEmail) {
-        setEmail(savedEmail);
-        void loadManualOrder(paymentReference, savedEmail);
+      if (paymentReference && (savedEmail || savedPhone)) {
+        if (savedEmail) setEmail(savedEmail);
+        if (savedPhone) setPhone(savedPhone);
+        void loadManualOrder(paymentReference, savedEmail ?? "", savedPhone ?? "");
       } else {
         setPaymentStatus("tracking");
       }
@@ -104,14 +117,19 @@ export default function TicketPaymentCompletePage() {
     };
   }, []);
 
-  async function loadManualOrder(orderReference: string, purchaserEmail: string) {
+  async function loadManualOrder(orderReference: string, purchaserEmail: string, purchaserPhone = phone) {
+    if (!purchaserEmail.trim() && !purchaserPhone.trim()) {
+      setError("Enter the purchaser email or phone used at checkout.");
+      setPaymentStatus("tracking");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/v1/tickets/orders/${encodeURIComponent(orderReference)}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purchaser_email: purchaserEmail.trim() }),
+        body: JSON.stringify(identityPayload(purchaserEmail, purchaserPhone)),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? "Order could not be found.");
@@ -120,7 +138,7 @@ export default function TicketPaymentCompletePage() {
       setLookupReference(order.reference);
       setManualOrder(order);
       setTransactionReference((current) => current || order.reference);
-      rememberOrderEmail(order.reference, purchaserEmail);
+      rememberOrderIdentity(order.reference, purchaserEmail, purchaserPhone);
       setPaymentStatus(order.status === "paid" ? "paid" : "manual");
     } catch (cause) {
       setPaymentStatus("tracking");
@@ -138,11 +156,15 @@ export default function TicketPaymentCompletePage() {
       const response = await fetch(`/api/v1/tickets/orders/${encodeURIComponent(reference)}/submit-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purchaser_email: email.trim(), transaction_reference: transactionReference.trim(), sender_name: senderName.trim() }),
+        body: JSON.stringify({
+          ...identityPayload(email, phone),
+          transaction_reference: transactionReference.trim(),
+          sender_name: senderName.trim(),
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail ?? "Payment could not be submitted.");
-      await loadManualOrder(reference, email);
+      await loadManualOrder(reference, email, phone);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Payment could not be submitted.");
     } finally {
@@ -187,7 +209,7 @@ export default function TicketPaymentCompletePage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ purchaser_email: email }),
+          body: JSON.stringify(identityPayload(email, phone)),
         },
       );
       const result = await response.json();
@@ -210,13 +232,16 @@ export default function TicketPaymentCompletePage() {
 
         <section className="mt-8 rounded-[1.75rem] border border-red-100/15 bg-gradient-to-br from-[#300b12] to-[#1d0a0d] p-6 sm:p-10">
           {paymentStatus === "tracking" ? (
-            <form onSubmit={(event) => { event.preventDefault(); void loadManualOrder(lookupReference.trim(), email); }} className="space-y-4">
+            <form onSubmit={(event) => { event.preventDefault(); void loadManualOrder(lookupReference.trim(), email, phone); }} className="space-y-4">
               <h1 className="font-display text-3xl font-semibold">Find your ticket order</h1>
               <label className="block text-sm font-medium text-rose-50">Order reference
                 <input required value={lookupReference} onChange={(event) => setLookupReference(event.target.value)} className="mt-2 w-full rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none focus:border-amber-200" />
               </label>
-              <label className="block text-sm font-medium text-rose-50">Purchaser email
-                <input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none focus:border-amber-200" />
+              <label className="block text-sm font-medium text-rose-50">Email
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none focus:border-amber-200" />
+              </label>
+              <label className="block text-sm font-medium text-rose-50">Phone
+                <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-2 w-full rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none focus:border-amber-200" />
               </label>
               <button disabled={busy} className="rounded-xl bg-amber-200 px-5 py-3 font-semibold text-[#2a0a0f] disabled:opacity-60">{busy ? "Checking…" : "Find order"}</button>
             </form>
@@ -232,7 +257,6 @@ export default function TicketPaymentCompletePage() {
                   <button type="button" onClick={() => void copyReference()} title="Copy order reference" aria-label="Copy order reference" className="rounded border border-white/20 p-2 text-white hover:bg-white/10"><Copy className="h-4 w-4" /></button>
                 </div>
                 {copyMessage ? <p role="status" className="mt-1 text-xs text-rose-100/70">{copyMessage}</p> : null}
-                <p className="mt-2 text-sm text-rose-100/70">Save this reference and your purchaser email to check your order later.</p>
               </div>
               {manualOrder.status === "awaiting_payment" ? (
                 <>
@@ -265,7 +289,7 @@ export default function TicketPaymentCompletePage() {
                   {!['payment_submitted', 'rejected', 'expired'].includes(manualOrder.status) ? `Order status: ${manualOrder.status.replaceAll('_', ' ')}` : null}
                 </div>
               )}
-              <button type="button" onClick={() => void loadManualOrder(reference, email)} disabled={busy} className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60">Check status</button>
+              <button type="button" onClick={() => void loadManualOrder(reference, email, phone)} disabled={busy} className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60">Check status</button>
             </div>
           ) : null}
 
@@ -288,21 +312,26 @@ export default function TicketPaymentCompletePage() {
                   <h1 className="mt-1 font-display text-3xl font-semibold">Your night is booked.</h1>
                 </div>
               </div>
-              <p className="mt-4 text-sm leading-relaxed text-rose-100/70">
-                Enter the purchaser email to retrieve your digital tickets. Keep each QR code ready at the gate.
-                A Double ticket uses one QR code for both admissions, including when guests arrive separately.
-              </p>
-              <form onSubmit={retrieveTickets} className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <label className="sr-only" htmlFor="purchaser-email">Purchaser email</label>
+              <form onSubmit={retrieveTickets} className="mt-6 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                <label className="sr-only" htmlFor="purchaser-email">Email</label>
                 <input
                   id="purchaser-email"
                   type="email"
-                  required
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="min-w-0 flex-1 rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none placeholder:text-rose-100/35 focus:border-amber-200"
-                  placeholder="Purchaser email"
+                  className="min-w-0 rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none placeholder:text-rose-100/35 focus:border-amber-200"
+                  placeholder="Email"
+                />
+                <label className="sr-only" htmlFor="purchaser-phone">Phone</label>
+                <input
+                  id="purchaser-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  className="min-w-0 rounded-xl border border-white/15 bg-[#16090c] px-4 py-3 text-white outline-none placeholder:text-rose-100/35 focus:border-amber-200"
+                  placeholder="Phone"
                 />
                 <button
                   type="submit"

@@ -312,6 +312,7 @@ async def test_double_ticket_can_be_admitted_in_two_visits(client, monkeypatch):
             headers=_admin_headers(member),
             json={
                 "token": ticket["token"],
+                "action": "enter",
                 "admission_count": 1,
                 "gate": "Gate 1",
                 "device_id": "test-device-1",
@@ -320,12 +321,14 @@ async def test_double_ticket_can_be_admitted_in_two_visits(client, monkeypatch):
         assert scan1.status_code == 200
         assert scan1.json()["data"]["outcome"] == "partially_used"
         assert scan1.json()["data"]["admissions_remaining"] == 1
+        assert scan1.json()["data"]["currently_inside"] == 1
 
         excess_scan = await client.post(
             "/api/v1/tickets/scan",
             headers=_admin_headers(member),
             json={
                 "token": ticket["token"],
+                "action": "enter",
                 "admission_count": 2,
                 "gate": "Gate 2",
                 "device_id": "test-device-over-limit",
@@ -340,6 +343,7 @@ async def test_double_ticket_can_be_admitted_in_two_visits(client, monkeypatch):
             headers=_admin_headers(member),
             json={
                 "token": ticket["ticket_number"].lower(),
+                "action": "enter",
                 "admission_count": 1,
                 "gate": "Gate 2",
                 "device_id": "test-device-2",
@@ -354,6 +358,7 @@ async def test_double_ticket_can_be_admitted_in_two_visits(client, monkeypatch):
             headers=_admin_headers(member),
             json={
                 "token": ticket["token"],
+                "action": "enter",
                 "admission_count": 1,
                 "gate": "Gate 3",
                 "device_id": "test-device-3",
@@ -372,12 +377,145 @@ async def test_scanner_requires_authorized_staff(client):
         "/api/v1/tickets/scan",
         json={
             "token": "ticket-token-that-does-not-exist",
+            "action": "enter",
             "admission_count": 1,
             "gate": "Gate 1",
             "device_id": "unauthorized-device",
         },
     )
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_optional_email_order_retrieve_by_phone_and_exit_return(client, monkeypatch):
+    category_id = await _seed_and_get_double_category()
+    member = await _create_admin()
+    async with async_session() as db:
+        await save_payment_settings(db, {
+            "paystack_enabled": False,
+            "manual_payment_enabled": True,
+            "momo_enabled": True,
+            "momo_number": "0244123456",
+        })
+        await db.commit()
+
+    emailed = {"count": 0}
+    smsed = {"count": 0}
+    notified = {"count": 0}
+
+    async def fake_notify(*_args, **_kwargs):
+        notified["count"] += 1
+        return 1
+
+    def fake_email(**_kwargs):
+        emailed["count"] += 1
+        return {"id": "email-1"}
+
+    async def fake_sms(**_kwargs):
+        smsed["count"] += 1
+        return {"status": "success"}
+
+    monkeypatch.setattr(ticket_service.platform_service, "notify_executives", fake_notify)
+    monkeypatch.setattr(ticket_service.resend_client, "is_configured", lambda: True)
+    monkeypatch.setattr(ticket_service.resend_client, "send_email", fake_email)
+    monkeypatch.setattr(ticket_service.arkesel_client, "is_configured", lambda: True)
+    monkeypatch.setattr(ticket_service.arkesel_client, "send_sms", fake_sms)
+
+    created = await client.post("/api/v1/tickets/orders", json={
+        "category_id": str(category_id),
+        "quantity": 1,
+        "purchaser_name": "Phone Only Buyer",
+        "purchaser_phone": "0244987654",
+        "payment_method": "momo",
+    })
+    assert created.status_code == 200
+    reference = created.json()["data"]["reference"]
+
+    submitted = await client.post(
+        f"/api/v1/tickets/orders/{reference}/submit-payment",
+        json={
+            "purchaser_phone": "0244987654",
+            "transaction_reference": "PHONE-ONLY-REF",
+            "sender_name": "Phone Only Buyer",
+        },
+    )
+    assert submitted.status_code == 200
+    assert notified["count"] >= 1
+
+    approved = await client.post(
+        f"/api/v1/tickets/admin/orders/{reference}/confirm",
+        headers=_admin_headers(member),
+    )
+    assert approved.status_code == 200
+    assert smsed["count"] == 1
+    assert emailed["count"] == 0  # no email on order
+
+    status = await client.post(
+        f"/api/v1/tickets/orders/{reference}/status",
+        json={"purchaser_phone": "0244987654"},
+    )
+    assert status.json()["data"]["status"] == "paid"
+
+    tickets = await client.post(
+        f"/api/v1/tickets/orders/{reference}/retrieve",
+        json={"purchaser_phone": "0244987654"},
+    )
+    assert tickets.status_code == 200
+    ticket = tickets.json()["data"]["tickets"][0]
+
+    lookup = await client.post(
+        "/api/v1/tickets/lookup",
+        headers=_admin_headers(member),
+        json={"query": "Phone Only Buyer"},
+    )
+    assert lookup.status_code == 200
+    assert lookup.json()["data"]["matches"][0]["purchaser_name"] == "Phone Only Buyer"
+    assert lookup.json()["data"]["matches"][0]["admissions_used"] == 0
+
+    enter = await client.post(
+        "/api/v1/tickets/scan",
+        headers=_admin_headers(member),
+        json={
+            "token": ticket["ticket_number"],
+            "action": "enter",
+            "admission_count": 1,
+            "gate": "Gate 1",
+            "device_id": "gate-device",
+        },
+    )
+    assert enter.json()["data"]["outcome"] == "partially_used"
+    assert enter.json()["data"]["currently_inside"] == 1
+
+    exit_scan = await client.post(
+        "/api/v1/tickets/scan",
+        headers=_admin_headers(member),
+        json={
+            "token": ticket["ticket_number"],
+            "action": "exit",
+            "admission_count": 1,
+            "gate": "Gate 1",
+            "device_id": "gate-device",
+        },
+    )
+    assert exit_scan.json()["data"]["outcome"] == "exited"
+    assert exit_scan.json()["data"]["currently_inside"] == 0
+    assert exit_scan.json()["data"]["admissions_used"] == 1
+
+    return_scan = await client.post(
+        "/api/v1/tickets/scan",
+        headers=_admin_headers(member),
+        json={
+            "token": ticket["ticket_number"],
+            "action": "return",
+            "admission_count": 1,
+            "gate": "Gate 2",
+            "device_id": "gate-device",
+        },
+    )
+    assert return_scan.json()["data"]["outcome"] == "returned"
+    assert return_scan.json()["data"]["currently_inside"] == 1
+    assert return_scan.json()["data"]["admissions_used"] == 1
+    assert return_scan.json()["data"]["outcome"] != "fully_used"
 
 
 @pytest.mark.asyncio

@@ -38,9 +38,10 @@ function formatPrice(price: string) {
   }).format(Number(price));
 }
 
-function rememberOrderEmail(reference: string, email: string) {
+function rememberOrderIdentity(reference: string, email: string, phone: string) {
   try {
-    sessionStorage.setItem(`ticket-order-email:${reference}`, email.trim());
+    if (email.trim()) sessionStorage.setItem(`ticket-order-email:${reference}`, email.trim());
+    if (phone.trim()) sessionStorage.setItem(`ticket-order-phone:${reference}`, phone.trim());
   } catch {
     return;
   }
@@ -101,7 +102,7 @@ export function BraFieProgramSection() {
           category_id: selected.id,
           quantity,
           purchaser_name: purchaserName,
-          purchaser_email: purchaserEmail,
+          purchaser_email: purchaserEmail.trim() || null,
           purchaser_phone: purchaserPhone,
           payment_method: paymentMethod,
         }),
@@ -110,7 +111,7 @@ export function BraFieProgramSection() {
       if (!response.ok) throw new Error(result.detail ?? "Could not start checkout.");
       if (result.data?.payment_method === "momo" || result.data?.payment_method === "bank") {
         const reference = result.data.reference;
-        rememberOrderEmail(reference, purchaserEmail);
+        rememberOrderIdentity(reference, purchaserEmail, purchaserPhone);
         window.location.assign(`/tickets/complete?manual=1&reference=${encodeURIComponent(reference)}`);
         return;
       }
@@ -266,10 +267,9 @@ export function BraFieProgramSection() {
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-medium text-rose-50">
-                Email for your tickets
+                Email
                 <input
                   type="email"
-                  required
                   autoComplete="email"
                   value={purchaserEmail}
                   onChange={(e) => setPurchaserEmail(e.target.value)}
